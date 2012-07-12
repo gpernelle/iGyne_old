@@ -7,8 +7,7 @@ class iGyne:
     parent.title = """iGyne"""
     parent.categories = ["""Wizards"""]
     parent.contributors = ["""Andrey Fedorov""", """Xiaojun Chen""", """Guillaume Pernelle""", """Ron Kikinis"""]
-    parent.helpText = """
-    Igyne help....""";
+    parent.helpText = """ Igyne help....""";
     parent.acknowledgementText = """This work is supported by NA-MIC, NAC, NCIGT, and the Slicer Community. See <a href="http://www.slicer.org">http://slicer.org</a> for details.  Module implemented by Andrey Fedorov. This work was partially supported by Brain Science Foundation and NIH U01 CA151261.
     """
     self.parent = parent
