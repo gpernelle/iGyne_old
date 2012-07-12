@@ -2,7 +2,7 @@ from __main__ import vtk, qt, ctk, slicer
 
 import iGyneWizard
 
-class iGyne:
+class iGynePy:
   def __init__( self, parent ):
     parent.title = """iGyne"""
     parent.categories = ["""Wizards"""]
@@ -13,7 +13,7 @@ class iGyne:
     """
     self.parent = parent
 
-class iGyneWidget:
+class iGynePyWidget:
   def __init__( self, parent=None ):
     if not parent:
       self.parent = slicer.qMRMLWidget()
