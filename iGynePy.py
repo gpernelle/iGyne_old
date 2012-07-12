@@ -2,7 +2,7 @@ from __main__ import vtk, qt, ctk, slicer
 
 import iGyneWizard
 
-class iGyne:
+class iGynePy:
   def __init__( self, parent ):
     parent.title = """iGyne"""
     parent.categories = ["""Wizards"""]
