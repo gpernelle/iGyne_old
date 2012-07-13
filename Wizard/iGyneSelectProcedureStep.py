@@ -3,14 +3,14 @@ from __main__ import qt, ctk
 from iGyneStep import *
 from Helper import *
 
-class iGyneSelectScansStep( iGyneStep ) :
+class iGyneSelectProcedureStep( iGyneStep ) :
 
   def __init__( self, stepid ):
     self.initialize( stepid )
-    self.setName( '1. Select input scans' )
-    self.setDescription( 'Select the baseline and follow-up scans to be compared.' )
+    self.setName( '1. Select input Procedure' )
+    self.setDescription( 'Select the baseline and follow-up Procedure to be compared.' )
 
-    self.__parent = super( iGyneSelectScansStep, self )
+    self.__parent = super( iGyneSelectProcedureStep, self )
 
   def createUserInterface( self ):
     '''
@@ -21,7 +21,7 @@ class iGyneSelectScansStep( iGyneStep ) :
    
     baselineScanLabel = qt.QLabel( 'Baseline scan:' )
     self.__baselineVolumeSelector = slicer.qMRMLNodeComboBox()
-    self.__baselineVolumeSelector.toolTip = "Choose the baseline scan"
+    self.__baselineVolumeSelector.toolTip = "Choose Procedure"
     self.__baselineVolumeSelector.nodeTypes = ['vtkMRMLScalarVolumeNode']
     self.__baselineVolumeSelector.setMRMLScene(slicer.mrmlScene)
     self.__baselineVolumeSelector.addEnabled = 0
@@ -85,7 +85,7 @@ class iGyneSelectScansStep( iGyneStep ) :
 
   def onEntry(self, comingFrom, transitionType):
 
-    super(iGyneSelectScansStep, self).onEntry(comingFrom, transitionType)
+    super(iGyneSelectProcedureStep, self).onEntry(comingFrom, transitionType)
     self.updateWidgetFromParameters(self.parameterNode())
     pNode = self.parameterNode()
     pNode.SetParameter('currentStep', self.stepid)
@@ -99,7 +99,7 @@ class iGyneSelectScansStep( iGyneStep ) :
     if goingTo.id() != 'DefineROI':
       return
 
-    super(iGyneSelectScansStep, self).onExit(goingTo, transitionType) 
+    super(iGyneSelectProcedureStep, self).onExit(goingTo, transitionType) 
 
   def updateWidgetFromParameters(self, parameterNode):
     baselineVolumeID = parameterNode.GetParameter('baselineVolumeID')

@@ -12,7 +12,7 @@ class iGynePy:
     """
     self.parent = parent
 
-class iGyneWidget:
+class iGynePyWidget:
   def __init__( self, parent=None ):
     if not parent:
       self.parent = slicer.qMRMLWidget()
