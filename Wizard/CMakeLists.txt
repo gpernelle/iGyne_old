@@ -3,7 +3,7 @@ SET(iGWizard_PYTHON_SCRIPTS
   Helper.py
   iGyneStep.py
   iGyneSelectProcedureStep.py
-  iGyneSelectModality.py
+  iGyneSelectApplicatorStep.py
   iGyneSegmentROIStep.py
   iGyneRegistrationStep.py
   iGyneLoadDiagnosticSeriesStep.py
