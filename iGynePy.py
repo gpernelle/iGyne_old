@@ -8,8 +8,8 @@ class iGynePy:
     parent.categories = ["""Wizards"""]
     parent.contributors = ["""Andrey Fedorov""", """Xiaojun Chen""", """Guillaume Pernelle""", """Ron Kikinis"""]
     parent.helpText = """ Igyne help....""";
-    parent.acknowledgementText = """This work is supported by NA-MIC, NAC, NCIGT, and the Slicer Community. See <a href="http://www.slicer.org">http://slicer.org</a> for details.  Module implemented by Andrey Fedorov. This work was partially supported by Brain Science Foundation and NIH U01 CA151261.
-    """
+    parent.acknowledgementText = """blabla"""
+  
     self.parent = parent
 
 class iGynePyWidget:
@@ -40,28 +40,6 @@ class iGynePyWidget:
     if slicer.mrmlScene.GetTagByClassName( "vtkMRMLScriptedModuleNode" ) != 'ScriptedModule':
       slicer.mrmlScene.RegisterNodeClass(vtkMRMLScriptedModuleNode())
 
-    # register default slots
-    #self.parent.connect('mrmlSceneChanged(vtkMRMLScene*)', self.onMRMLSceneChanged)      
-
-
-  #def logic( self ):
-    #if not self.__logic:
-    #    self.__logic = slicer.modulelogic.vtkiGyneLogic()
-    #    self.__logic.SetModuleName( "iGyne" )
-    #    self.__logic.SetMRMLScene( slicer.mrmlScene )
-    #    self.__logic.RegisterNodes()
-    #    self.__logic.InitializeEventListeners()
-
-    #return self.__logic
-
-  #def mrmlManager( self ):
-  #  if not self.__mrmlManager:
-  #      self.__mrmlManager = self.logic().GetMRMLManager()
-  #      self.__mrmlManager.SetMRMLScene( slicer.mrmlScene )
-  #
-  #  return self.__mrmlManager
-
-
   def setup( self ):
     '''
     Create and start the iGyne workflow.
@@ -75,24 +53,24 @@ class iGynePyWidget:
     workflowWidget.buttonBoxWidget().backButtonDefaultText = ""
     
     # create all wizard steps
-    selectProcedureStep = iGyneWizard.iGyneSelectProcedureStep( 'SelectProcedure'  )
-    selectModalityStep = iGyneWizard.iGyneSelectModalityStep( 'SelectModality'  )
-    LoadDiagnosticSeriesSetp = iGyneWizard.iGyneLoadDiagnosticSeriesSetp( 'LoadDiagnosticSeries'  )
+    #selectProcedureStep = iGyneWizard.iGyneSelectProcedureStep( 'SelectProcedure'  )
+    #selectModalityStep = iGyneWizard.iGyneSelectModalityStep( 'SelectModality'  )
+    LoadDiagnosticSeriesSetp = iGyneWizard.iGyneLoadDiagnosticSeriesStep( 'LoadDiagnosticSeries'  )
     segmentROIStep = iGyneWizard.iGyneSegmentROIStep( 'SegmentROI'  )
     registerROIStep = iGyneWizard.iGyneRegisterROIStep( 'RegisterROI'  )
 
     # add the wizard steps to an array for convenience
     allSteps = []
 
-    allSteps.append( selectProcedureStep )
-    allSteps.append( selectModalityStep )
+    #allSteps.append( selectProcedureStep )
+    #allSteps.append( selectModalityStep )
     allSteps.append( LoadDiagnosticSeriesSetp )
     allSteps.append( segmentROIStep )
     allSteps.append( registerROIStep )
 
     # Add transition for the first step which let's the user choose between simple and advanced mode
-    self.workflow.addTransition( selectProcedureStep, selectModalityStep )
-    self.workflow.addTransition( selectModalityStep, LoadDiagnosticSeriesSetp )
+    #self.workflow.addTransition( selectProcedureStep, selectModalityStep )
+    #self.workflow.addTransition( selectModalityStep, LoadDiagnosticSeriesSetp )
     self.workflow.addTransition( LoadDiagnosticSeriesSetp, segmentROIStep )
     self.workflow.addTransition( segmentROIStep, registerROIStep )
 
@@ -115,17 +93,15 @@ class iGynePyWidget:
     for s in allSteps:
         s.setWorkflow( self.workflow )
         s.setParameterNode (self.parameterNode)
-        #s.setLogic( self.logic() )
-        #s.setMRMLManager( self.mrmlManager() )
 
     # restore workflow step
     currentStep = self.parameterNode.GetParameter('currentStep')
     if currentStep != '':
       print 'Restoring workflow step to ', currentStep
-      if currentStep == 'SelectProcedure':
-        self.workflow.setInitialStep(selectProcedureStep)
-      if currentStep == 'SelectModality':
-        self.workflow.setInitialStep(selectModalityStep)
+#      if currentStep == 'SelectProcedure':
+#        self.workflow.setInitialStep(selectProcedureStep)
+#      if currentStep == 'SelectModality':
+#        self.workflow.setInitialStep(selectModalityStep)
       if currentStep == 'LoadDiaognosticSeries':
         self.workflow.setInitialStep(LoadDiagnosticSeriesSetp)
       if currentStep == 'SegmentROI':
@@ -138,14 +114,7 @@ class iGynePyWidget:
     # start the workflow and show the widget
     self.workflow.start()
     workflowWidget.visible = True
-    self.layout.addWidget( workflowWidget )
-
-    # enable global access to the dynamicFrames on step 2 and step 6
-    #slicer.modules.emsegmentSimpleDynamicFrame = defineInputChannelsSimpleStep.dynamicFrame()
-    #slicer.modules.emsegmentAdvancedDynamicFrame = definePreprocessingStep.dynamicFrame()
-
-    # compress the layout
-      #self.layout.addStretch(1)        
+    self.layout.addWidget( workflowWidget )     
  
   def enter(self):
     print "iGyne: enter() called"

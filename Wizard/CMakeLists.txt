@@ -1,4 +1,4 @@
-SET(CTWizard_PYTHON_SCRIPTS
+SET(iGWizard_PYTHON_SCRIPTS
   __init__.py
   Helper.py
   iGyneStep.py
@@ -10,7 +10,7 @@ SET(CTWizard_PYTHON_SCRIPTS
   iGyneRegisterStep.py
  )
 
-SET(CTWizard_PYTHON_RESOURCES
+SET(iGWizard_PYTHON_RESOURCES
   )
   
 ctkMacroCompilePythonScript(
