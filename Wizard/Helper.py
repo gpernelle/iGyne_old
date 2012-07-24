@@ -16,7 +16,7 @@ class Helper( object ):
     
     '''
 
-    #print "[ChangeTrackerPy " + time.strftime( "%m/%d/%Y %H:%M:%S" ) + "]: " + str( message )
+    #print "[iGynePy " + time.strftime( "%m/%d/%Y %H:%M:%S" ) + "]: " + str( message )
     #sys.stdout.flush()
 
   @staticmethod
@@ -25,7 +25,7 @@ class Helper( object ):
     
     '''
 
-    #print "[ChangeTrackerPy " + time.strftime( "%m/%d/%Y %H:%M:%S" ) + "]: WARNING: " + str( message )
+    #print "[iGynePy " + time.strftime( "%m/%d/%Y %H:%M:%S" ) + "]: WARNING: " + str( message )
     #sys.stdout.flush()
 
   @staticmethod
@@ -34,7 +34,7 @@ class Helper( object ):
     
     '''
 
-    print "[ChangeTrackerPy " + time.strftime( "%m/%d/%Y %H:%M:%S" ) + "]: ERROR: " + str( message )
+    print "[iGynePy " + time.strftime( "%m/%d/%Y %H:%M:%S" ) + "]: ERROR: " + str( message )
     sys.stdout.flush()
 
 
@@ -47,7 +47,7 @@ class Helper( object ):
     showDebugOutput = 0
     from time import strftime
     if showDebugOutput:
-        print "[ChangeTrackerPy " + time.strftime( "%m/%d/%Y %H:%M:%S" ) + "] DEBUG: " + str( message )
+        print "[iGynePy " + time.strftime( "%m/%d/%Y %H:%M:%S" ) + "] DEBUG: " + str( message )
         sys.stdout.flush()
 
   @staticmethod
@@ -66,9 +66,9 @@ class Helper( object ):
     '''
     '''
     steps = [None, # 0
-             'SelectScans', # 1
-             'DefineROI', # 2
-             'SegmentROI', # 3
+             'SelectProcedure', # 1
+             'SelectApplicator', # 2
+             'LoadTemplate', # 3
              'AnalyzeROI', # 4
              'ReportROI', # 5
              ]                        

@@ -55,7 +55,7 @@ class iGynePyWidget:
     # create all wizard steps
     selectProcedureStep = iGyneWizard.iGyneSelectProcedureStep( 'SelectProcedure'  )
     selectApplicatorStep = iGyneWizard.iGyneSelectApplicatorStep( 'SelectApplicator'  )
-#    LoadDiagnosticSeriesSetp = iGyneWizard.iGyneLoadDiagnosticSeriesStep( 'LoadDiagnosticSeries'  )
+    LoadModelStep = iGyneWizard.iGyneLoadModelStep( 'LoadModel'  )
 #    segmentROIStep = iGyneWizard.iGyneSegmentROIStep( 'SegmentROI'  )
 #    registerROIStep = iGyneWizard.iGyneRegisterROIStep( 'RegisterROI'  )
 
@@ -64,15 +64,15 @@ class iGynePyWidget:
 
     allSteps.append( selectProcedureStep )
     allSteps.append( selectApplicatorStep )
-#    allSteps.append( LoadDiagnosticSeriesSetp )
+    allSteps.append( LoadModelStep )
 #    allSteps.append( segmentROIStep )
 #    allSteps.append( registerROIStep )
 
 ##     Add transition for the first step which let's the user choose between simple and advanced mode
     self.workflow.addTransition( selectProcedureStep, selectApplicatorStep )
-#    self.workflow.addTransition( selectProcedureStep, selectModalityStep )
-#    self.workflow.addTransition( selectModalityStep, LoadDiagnosticSeriesSetp )
-#    self.workflow.addTransition( LoadDiagnosticSeriesSetp, segmentROIStep )
+    self.workflow.addTransition( selectApplicatorStep, loadModelStep )
+#    self.workflow.addTransition( selectModalityStep, LoadModelStep )
+#    self.workflow.addTransition( LoadModelStep, segmentROIStep )
 #    self.workflow.addTransition( segmentROIStep, registerROIStep )
 
     nNodes = slicer.mrmlScene.GetNumberOfNodesByClass('vtkMRMLScriptedModuleNode')
@@ -103,8 +103,8 @@ class iGynePyWidget:
         self.workflow.setInitialStep(selectProcedureStep)
       if currentStep == 'SelectApplicator':
         self.workflow.setInitialStep(selectApplicatorStep)
-#      if currentStep == 'LoadDiaognosticSeries':
-#        self.workflow.setInitialStep(LoadDiagnosticSeriesSetp)
+      if currentStep == 'LoadModel':
+        self.workflow.setInitialStep(LoadModelStep)
 #      if currentStep == 'SegmentROI':
 #        self.workflow.setInitialStep(segmentROIStep)
 #      if currentStep == 'RegisterROI':
