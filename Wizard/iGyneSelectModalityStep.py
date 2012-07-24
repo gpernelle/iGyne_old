@@ -4,7 +4,7 @@ from iGyneStep import *
 from Helper import *
 import PythonQt
 
-class iGyneDefineROIStep( iGyneStep ) :
+class iGyneSelectModalityStep( iGyneStep ) :
 
   def __init__( self, stepid ):
     self.initialize( stepid )
