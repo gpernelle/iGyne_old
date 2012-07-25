@@ -1,4 +1,5 @@
 from __main__ import qt, ctk
+
 from iGyneStep import *
 from Helper import *
 
@@ -29,8 +30,7 @@ class iGyneSelectProcedureStep( iGyneStep ) :
 
     # self.updateWidgetFromParameters(self.parameterNode())
 
-    qt.QTimer.singleShot(0, self.killButton)
-  
+    # qt.QTimer.singleShot(0, self.killButton)
   
 
   # def validate(self, desiredBranchId):
@@ -49,7 +49,7 @@ class iGyneSelectProcedureStep( iGyneStep ) :
     pNode = self.parameterNode()
     pNode.SetParameter('currentStep', self.stepid)
     # self.updateWidgetFromParameterNode(pNode)    
-    qt.QTimer.singleShot(0, self.killButton)
+    # qt.QTimer.singleShot(0, self.killButton)
 
   def onExit(self, goingTo, transitionType):
 

@@ -1,4 +1,5 @@
 from __main__ import qt, ctk, slicer
+
 from iGyneStep import *
 from Helper import *
 import PythonQt
@@ -10,13 +11,7 @@ class iGyneSelectApplicatorStep( iGyneStep ) :
     self.setName( '2. Choose Applicator' )
     self.setDescription( 'Choose the applicator you are using. It will load the right template.' )
     self.__parent = super( iGyneSelectApplicatorStep, self )
-    qt.QTimer.singleShot(0, self.killButton)
-
-  def killButton(self):
-    # hide useless button
-    bl = slicer.util.findChildren(text='LoadDiagnosticSeries')
-    if len(bl):
-      bl[0].hide()
+    # qt.QTimer.singleShot(0, self.killButton)
 
   def createUserInterface( self ):
   
@@ -38,7 +33,7 @@ class iGyneSelectApplicatorStep( iGyneStep ) :
     self.__layout.addRow(checkBox7)
     self.__layout.addRow(checkBox8)
     # self.updateWidgetFromParameters(self.parameterNode())
-    qt.QTimer.singleShot(0, self.killButton)
+    # qt.QTimer.singleShot(0, self.killButton)
 
   def onEntry(self,comingFrom,transitionType):
   
@@ -47,10 +42,10 @@ class iGyneSelectApplicatorStep( iGyneStep ) :
     pNode = self.parameterNode()
     pNode.SetParameter('currentStep', self.stepid)    
     # self.updateWidgetFromParameterNode(pNode)
-    qt.QTimer.singleShot(0, self.killButton)
+    # qt.QTimer.singleShot(0, self.killButton)
 
   def onExit(self, goingTo, transitionType):
-    if goingTo.id() != 'SelectProcedure' and goingTo.id() != 'SelectApplicator':
+    if goingTo.id() != 'SelectProcedure' and goingTo.id() != 'LoadModel':
       return
     pNode = self.parameterNode()
     # if goingTo.id() == 'LoadDiagnosticSeries':

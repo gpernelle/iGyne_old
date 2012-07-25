@@ -69,6 +69,8 @@ class iGynePyWidget:
 #    allSteps.append( registerROIStep )
 
 ##     Add transition for the first step which let's the user choose between simple and advanced mode
+    # self.workflow.addTransition( selectProcedureStep, selectApplicatorStep )
+    # self.workflow.addTransition( selectApplicatorStep, loadModelStep )
     self.workflow.addTransition( selectProcedureStep, selectApplicatorStep )
     self.workflow.addTransition( selectApplicatorStep, loadModelStep )
 #    self.workflow.addTransition( selectModalityStep, LoadModelStep )

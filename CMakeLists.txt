@@ -4,6 +4,7 @@ endif()
 
 ADD_SUBDIRECTORY(Wizard)
 ADD_SUBDIRECTORY(Metrics)
+ADD_SUBDIRECTORY(Template)
 
 SET(iG_PYTHON_SCRIPTS
     iGynePy.py
