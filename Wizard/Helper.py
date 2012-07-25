@@ -31,7 +31,6 @@ class Helper( object ):
   @staticmethod
   def Error( message ):
     '''
-    
     '''
 
     print "[iGynePy " + time.strftime( "%m/%d/%Y %H:%M:%S" ) + "]: ERROR: " + str( message )

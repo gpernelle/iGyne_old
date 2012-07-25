@@ -1,5 +1,4 @@
 from __main__ import qt, ctk, slicer
-
 from iGyneStep import *
 from Helper import *
 import PythonQt

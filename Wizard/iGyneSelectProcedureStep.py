@@ -1,5 +1,4 @@
 from __main__ import qt, ctk
-
 from iGyneStep import *
 from Helper import *
 
@@ -33,11 +32,6 @@ class iGyneSelectProcedureStep( iGyneStep ) :
     qt.QTimer.singleShot(0, self.killButton)
   
   
-  def killButton(self):
-    # hide useless button
-    bl = slicer.util.findChildren(text='Applicator Selection')
-    if len(bl):
-      bl[0].hide()
 
   # def validate(self, desiredBranchId):
     
