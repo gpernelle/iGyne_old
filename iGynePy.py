@@ -29,7 +29,7 @@ class iGynePyWidget:
     self.__mrmlManager = None
     self.__logic = None
 
-    if not parent:
+    if not parent: 
       self.setup()
 
       # after setup, be ready for events
@@ -55,7 +55,7 @@ class iGynePyWidget:
     # create all wizard steps
     selectProcedureStep = iGyneWizard.iGyneSelectProcedureStep( 'SelectProcedure'  )
     selectApplicatorStep = iGyneWizard.iGyneSelectApplicatorStep( 'SelectApplicator'  )
-    LoadModelStep = iGyneWizard.iGyneLoadModelStep( 'LoadModel'  )
+    loadModelStep = iGyneWizard.iGyneLoadModelStep( 'LoadModel'  )
 #    segmentROIStep = iGyneWizard.iGyneSegmentROIStep( 'SegmentROI'  )
 #    registerROIStep = iGyneWizard.iGyneRegisterROIStep( 'RegisterROI'  )
 
@@ -64,7 +64,7 @@ class iGynePyWidget:
 
     allSteps.append( selectProcedureStep )
     allSteps.append( selectApplicatorStep )
-    allSteps.append( LoadModelStep )
+    allSteps.append( loadModelStep )
 #    allSteps.append( segmentROIStep )
 #    allSteps.append( registerROIStep )
 
@@ -104,7 +104,7 @@ class iGynePyWidget:
       if currentStep == 'SelectApplicator':
         self.workflow.setInitialStep(selectApplicatorStep)
       if currentStep == 'LoadModel':
-        self.workflow.setInitialStep(LoadModelStep)
+        self.workflow.setInitialStep(loadModelStep)
 #      if currentStep == 'SegmentROI':
 #        self.workflow.setInitialStep(segmentROIStep)
 #      if currentStep == 'RegisterROI':
