@@ -3,7 +3,6 @@ from iGyneStep import *
 from iGyneSelectProcedureStep import *
 from iGyneSelectApplicatorStep import *
 from iGyneLoadModelStep import *
-#from iGyneSegmentROIStep import *
-#from iGyneRegistrationStep import *
+from iGyneFirstRegistrationStep import *
 #from iGyneLoadDiagnosticSeriesStep import *
  

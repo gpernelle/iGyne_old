@@ -56,7 +56,7 @@ class iGynePyWidget:
     selectProcedureStep = iGyneWizard.iGyneSelectProcedureStep( 'SelectProcedure'  )
     selectApplicatorStep = iGyneWizard.iGyneSelectApplicatorStep( 'SelectApplicator'  )
     loadModelStep = iGyneWizard.iGyneLoadModelStep( 'LoadModel'  )
-#    segmentROIStep = iGyneWizard.iGyneSegmentROIStep( 'SegmentROI'  )
+    firstRegistrationStep = iGyneWizard.iGyneFirstRegistrationStep( 'FirstRegistration'  )
 #    registerROIStep = iGyneWizard.iGyneRegisterROIStep( 'RegisterROI'  )
 
     # add the wizard steps to an array for convenience
@@ -65,7 +65,7 @@ class iGynePyWidget:
     allSteps.append( selectProcedureStep )
     allSteps.append( selectApplicatorStep )
     allSteps.append( loadModelStep )
-#    allSteps.append( segmentROIStep )
+    allSteps.append( firstRegistrationStep )
 #    allSteps.append( registerROIStep )
 
 ##     Add transition for the first step which let's the user choose between simple and advanced mode
@@ -73,9 +73,9 @@ class iGynePyWidget:
     # self.workflow.addTransition( selectApplicatorStep, loadModelStep )
     self.workflow.addTransition( selectProcedureStep, selectApplicatorStep )
     self.workflow.addTransition( selectApplicatorStep, loadModelStep )
-#    self.workflow.addTransition( selectModalityStep, LoadModelStep )
-#    self.workflow.addTransition( LoadModelStep, segmentROIStep )
-#    self.workflow.addTransition( segmentROIStep, registerROIStep )
+    self.workflow.addTransition( loadModelStep, firstRegistrationStep )
+#    self.workflow.addTransition( LoadModelStep, firstRegistrationStep )
+#    self.workflow.addTransition( firstRegistrationStep, registerROIStep )
 
     nNodes = slicer.mrmlScene.GetNumberOfNodesByClass('vtkMRMLScriptedModuleNode')
 
@@ -107,8 +107,8 @@ class iGynePyWidget:
         self.workflow.setInitialStep(selectApplicatorStep)
       if currentStep == 'LoadModel':
         self.workflow.setInitialStep(loadModelStep)
-#      if currentStep == 'SegmentROI':
-#        self.workflow.setInitialStep(segmentROIStep)
+      if currentStep == 'FirstRegistration':
+        self.workflow.setInitialStep(firstRegistrationStep)
 #      if currentStep == 'RegisterROI':
 #        self.workflow.setInitialStep(registerROIStep)
     else:

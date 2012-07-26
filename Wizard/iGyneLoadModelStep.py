@@ -39,15 +39,15 @@ class iGyneLoadModelStep( iGyneStep ) :
     loadDataButton.connect('clicked()', self.loadData)
     
     self.__layout.addRow( baselineScanLabel, self.__baselineVolumeSelector )
-    # # the ROI parameters
-    # voiGroupBox = qt.QGroupBox()
-    # voiGroupBox.setTitle( 'Define VOI' )
-    # self.__layout.addRow( voiGroupBox )
+    # the ROI parameters
+    voiGroupBox = qt.QGroupBox()
+    voiGroupBox.setTitle( 'DICOM' )
+    self.__layout.addRow( voiGroupBox )
 
-    # voiGroupBoxLayout = qt.QFormLayout( voiGroupBox )
+    voiGroupBoxLayout = qt.QFormLayout( voiGroupBox )
 
-    # self.__roiWidget = PythonQt.qSlicerAnnotationsModuleWidgets.qMRMLAnnotationROIWidget()
-    # voiGroupBoxLayout.addRow( self.__roiWidget )
+    self.__roiWidget = ctk.ctkDICOMAppWidget()
+    voiGroupBoxLayout.addRow( self.__roiWidget )
 
     # the ROI parameters
     #voiGroupBox = qt.QGroupBox()
@@ -75,12 +75,11 @@ class iGyneLoadModelStep( iGyneStep ) :
       # self.__followupVolumeSelector.setCurrentNode(Helper.getNodeByID(followupVolumeID))
 
   def loadData(self):
-    slicer.util.loadScene("C:\Users\Guillaume\Dropbox\scene-for-template-and-obturator\Template.mrml", True)
+     slicer.util.openAddDataDialog()
     
   def loadTemplate(self):
     pathToScene = slicer.modules.igynepy.path.replace("iGynePy.py","iGynePyTemplate/Template/Template.mrml")
-    #slicer.util.loadScene( pathToScene, True)
-    slicer.util.loadScene("/home/guillaume/Work/Template/Template.mrml",True)
+    slicer.util.loadScene( pathToScene, True)
     # vl = slicer.modules.volumes.logic()
     # vol1 = vl.AddArchetypeVolume('http://www.slicer.org/slicerWiki/images/5/59/RegLib_C01_1.nrrd', 'Meningioma1', 0)
     # vol2 = vl.AddArchetypeVolume('http://www.slicer.org/slicerWiki/images/e/e3/RegLib_C01_2.nrrd', 'Meningioma2', 0)
@@ -100,11 +99,10 @@ class iGyneLoadModelStep( iGyneStep ) :
     # qt.QTimer.singleShot(0, self.killButton)
 
   def onExit(self, goingTo, transitionType):
-    if goingTo.id() != 'SelectApplicator' and goingTo.id() != 'LoadModel':
+    if goingTo.id() != 'SelectApplicator' and goingTo.id() != 'FirstRegistration':
       return
     pNode = self.parameterNode()
-    # if goingTo.id() == 'LoadDiagnosticSeries':
-      # self.doStepProcessing()
+
 
     super(iGyneLoadModelStep, self).onExit(goingTo, transitionType)
 

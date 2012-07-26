@@ -5,9 +5,7 @@ SET(iGWizard_PYTHON_SCRIPTS
   iGyneSelectProcedureStep.py
   iGyneSelectApplicatorStep.py
   iGyneLoadModelStep.py
-  iGyneRegistrationStep.py
-  iGyneLoadDiagnosticSeriesStep.py
-  iGyneRegisterStep.py
+  iGyneFirstRegistrationStep.py
  )
 
 SET(iGWizard_PYTHON_RESOURCES

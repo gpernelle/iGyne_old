@@ -121,6 +121,25 @@ class Helper( object ):
     return slicer.mrmlScene.GetNodeByID(id)
 
   @staticmethod
+  def getNodeByName(name):
+    """get the first MRML node that has the given name
+    - use a regular expression to match names post-pended with numbers"""
+ 
+    slicer.mrmlScene.InitTraversal()
+    node = slicer.mrmlScene.GetNextNode()
+    while node:
+      try:
+        nodeName = node.GetName()
+        if nodeName.find(name) == 0:
+          # prefix matches, is the rest all numbers?
+          if nodeName == name or nodeName[len(name):].isdigit():
+            return node
+      except:
+        pass
+      node = slicer.mrmlScene.GetNextNode()
+    return None
+
+  @staticmethod
   def readFileAsString(fname):
     s = ''
     with open(fname, 'r') as f:
