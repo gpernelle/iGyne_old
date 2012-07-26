@@ -10,13 +10,13 @@ TODO:
   add advanced option to specify segmentation
 '''
 
-class iGyneFirstRegistrationStep( iGyneStep ) :
+class iGyneSecondRegistrationStep( iGyneStep ) :
 
   def __init__( self, stepid ):
     self.initialize( stepid )
     self.setName( '4. Register the template' )
     self.setDescription( 'Register the template based on 3 fiducial points. Choose the points counterclockwise, starting from the one in the middle' )
-    self.__parent = super( iGyneFirstRegistrationStep, self )
+    self.__parent = super( iGyneSecondRegistrationStep, self )
     self.interactorObserverTags = []    
     self.styleObserverTags = []
     self.volume = None
@@ -108,7 +108,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
 
   def onEntry(self,comingFrom,transitionType):
   
-    super(iGyneFirstRegistrationStep, self).onEntry(comingFrom, transitionType)
+    super(iGyneSecondRegistrationStep, self).onEntry(comingFrom, transitionType)
     # setup the interface
     pNode = self.parameterNode()
     pNode.SetParameter('currentStep', self.stepid)    
@@ -116,13 +116,13 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     # qt.QTimer.singleShot(0, self.killButton)
 
   def onExit(self, goingTo, transitionType):
-    if goingTo.id() != 'LoadModel' and goingTo.id() != 'SecondRegistration':
+    if goingTo.id() != 'firstRegistration' and goingTo.id() != 'SecondRegistration':
       return
     pNode = self.parameterNode()
     # if goingTo.id() == 'LoadDiagnosticSeries':
       # self.doStepProcessing()
 
-    super(iGyneFirstRegistrationStep, self).onExit(goingTo, transitionType)
+    super(iGyneSecondRegistrationStep, self).onExit(goingTo, transitionType)
 
   def validate( self, desiredBranchId ):
     '''

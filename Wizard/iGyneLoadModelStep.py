@@ -29,42 +29,38 @@ class iGyneLoadModelStep( iGyneStep ) :
     # self.__followupVolumeSelector.nodeTypes = ['vtkMRMLScalarVolumeNode']
     # self.__followupVolumeSelector.setMRMLScene(slicer.mrmlScene)
     # self.__followupVolumeSelector.addEnabled = 0
-   
+	
+	#Load Template Button 
     loadTemplateButton = qt.QPushButton('Load template')
     self.__layout.addRow(loadTemplateButton)
     loadTemplateButton.connect('clicked()', self.loadTemplate)
 
+	#Load Scan Button
+    self.__fileFrame = ctk.ctkCollapsibleButton()
+    self.__fileFrame.text = "File Input"
+    self.__fileFrame.collapsed = 1
+    fileFrame = qt.QFormLayout(self.__fileFrame)
+    self.__layout.addRow(self.__fileFrame)
+   
     loadDataButton = qt.QPushButton('Load Scan')
-    self.__layout.addRow(loadDataButton)
     loadDataButton.connect('clicked()', self.loadData)
+    fileFrame.addRow(loadDataButton)
+    fileFrame.addRow( baselineScanLabel, self.__baselineVolumeSelector )
     
-    self.__layout.addRow( baselineScanLabel, self.__baselineVolumeSelector )
-    # the ROI parameters
+    # DICOM ToolBox
+    self.__DICOMFrame = ctk.ctkCollapsibleButton()
+    self.__DICOMFrame.text = "DICOM Input"
+    self.__DICOMFrame.collapsed = 1
+    dicomFrame = qt.QFormLayout(self.__DICOMFrame)
+    self.__layout.addRow(self.__DICOMFrame)
+
     voiGroupBox = qt.QGroupBox()
     voiGroupBox.setTitle( 'DICOM' )
-    self.__layout.addRow( voiGroupBox )
-
+    dicomFrame.addRow( voiGroupBox )
     voiGroupBoxLayout = qt.QFormLayout( voiGroupBox )
-
     self.__roiWidget = ctk.ctkDICOMAppWidget()
     voiGroupBoxLayout.addRow( self.__roiWidget )
 
-    # the ROI parameters
-    #voiGroupBox = qt.QGroupBox()
-    #voiGroupBox.setTitle( 'Define VOI' )
-    #self.__layout.addRow( voiGroupBox )
-
-    #voiGroupBoxLayout = qt.QFormLayout( voiGroupBox )
-
-    #self.__roiWidget = vtk.vtkSlicerFiducialListWidget.createWidget()
-    #voiGroupBoxLayout.addRow( self.__roiWidget )
-
-
-    # self.__layout.addRow( followupScanLabel, self.__followupVolumeSelector )
-
-    # self.updateWidgetFromParameters(self.parameterNode())
-
-    # qt.QTimer.singleShot(0, self.killButton)
 
   def updateWidgetFromParameters(self, parameterNode):
     baselineVolumeID = parameterNode.GetParameter('baselineVolumeID')
