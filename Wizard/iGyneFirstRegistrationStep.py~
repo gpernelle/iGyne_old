@@ -308,7 +308,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     prepare roi image for the next step
     '''
     pNode = self.parameterNode()
-    cropVolumeNode =slicer.mrmlScene.CreateNodeByClass('vtkMRMLCropVolumeParametersNode')
+    cropVolumeNode = slicer.mrmlScene.CreateNodeByClass('vtkMRMLCropVolumeParametersNode')
     cropVolumeNode.SetScene(slicer.mrmlScene)
     cropVolumeNode.SetName('iGyne_CropVolume_node')
     cropVolumeNode.SetIsotropicResampling(True)

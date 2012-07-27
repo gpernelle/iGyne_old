@@ -14,8 +14,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
 
   def __init__( self, stepid ):
     self.initialize( stepid )
-    self.setName( '5. Second Registration' )
-    self.setDescription( 'Register the template based on the volume segmentation' )
+    self.setName( '4. Register the template' )
+    self.setDescription( 'Register the template based on 3 fiducial points. Choose the points counterclockwise, starting from the one in the middle' )
     self.__parent = super( iGyneSecondRegistrationStep, self )
     self.interactorObserverTags = []    
     self.styleObserverTags = []
@@ -27,7 +27,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     '''
     self.__layout = self.__parent.createUserInterface()
      
-    self.loadTemplateButton = qt.QPushButton('Segment the volume')
+    self.loadTemplateButton = qt.QPushButton('Choose Fiducial Points')
     self.loadTemplateButton.checkable = True
     self.__layout.addRow(self.loadTemplateButton)
     self.loadTemplateButton.connect('toggled(bool)', self.onRunButtonToggled)

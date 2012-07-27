@@ -1,4 +1,4 @@
-from __main__ import qt, ctk
+from __main__ import qt, ctk, slicer
 
 from iGyneStep import *
 from Helper import *
@@ -9,7 +9,7 @@ class iGyneLoadModelStep( iGyneStep ) :
   def __init__( self, stepid ):
     self.initialize( stepid )
     self.setName( '3. Load the template' )
-    self.setDescription( 'Load the template. From this template, auto-crop and registration functions will be processed' )
+    self.setDescription( 'Load the template. From this template, auto-crop and registration functions will be processed.' )
     self.__parent = super( iGyneLoadModelStep, self )
 
   def createUserInterface( self ):
@@ -46,6 +46,7 @@ class iGyneLoadModelStep( iGyneStep ) :
     loadDataButton.connect('clicked()', self.loadData)
     fileFrame.addRow(loadDataButton)
     fileFrame.addRow( baselineScanLabel, self.__baselineVolumeSelector )
+
     
     # DICOM ToolBox
     self.__DICOMFrame = ctk.ctkCollapsibleButton()
@@ -60,15 +61,8 @@ class iGyneLoadModelStep( iGyneStep ) :
     voiGroupBoxLayout = qt.QFormLayout( voiGroupBox )
     self.__roiWidget = ctk.ctkDICOMAppWidget()
     voiGroupBoxLayout.addRow( self.__roiWidget )
-
-
-  def updateWidgetFromParameters(self, parameterNode):
-    baselineVolumeID = parameterNode.GetParameter('baselineVolumeID')
-    # followupVolumeID = parameterNode.GetParameter('followupVolumeID')
-    if baselineVolumeID != None:
-      self.__baselineVolumeSelector.setCurrentNode(Helper.getNodeByID(baselineVolumeID))
-    # if followupVolumeID != None:
-      # self.__followupVolumeSelector.setCurrentNode(Helper.getNodeByID(followupVolumeID))
+    
+    self.updateWidgetFromParameters(self.parameterNode())
 
   def loadData(self):
      slicer.util.openAddDataDialog()
@@ -76,34 +70,70 @@ class iGyneLoadModelStep( iGyneStep ) :
   def loadTemplate(self):
     pathToScene = slicer.modules.igynepy.path.replace("iGynePy.py","iGynePyTemplate/Template/Template.mrml")
     slicer.util.loadScene( pathToScene, True)
-    # vl = slicer.modules.volumes.logic()
-    # vol1 = vl.AddArchetypeVolume('http://www.slicer.org/slicerWiki/images/5/59/RegLib_C01_1.nrrd', 'Meningioma1', 0)
-    # vol2 = vl.AddArchetypeVolume('http://www.slicer.org/slicerWiki/images/e/e3/RegLib_C01_2.nrrd', 'Meningioma2', 0)
-    # if vol1 != None and vol2 != None:
-      # self.__baselineVolumeSelector.setCurrentNode(vol1)
-      # self.__followupVolumeSelector.setCurrentNode(vol1)
-      # Helper.SetBgFgVolumes(vol1.GetID(), vol2.GetID())
 
+  def validate( self, desiredBranchId ):
+    '''
+    '''
+    self.__parent.validate( desiredBranchId ) 
 
+    ## check here that the selectors are not empty
+    baseline = self.__baselineVolumeSelector.currentNode()
+    if baseline != None:
+      baselineID = baseline.GetID()
+      if baselineID != '':
+    
+        pNode = self.parameterNode()
+        pNode.SetParameter('baselineVolumeID', baselineID)
+        self.__parent.validationSucceeded(desiredBranchId)
+      else:
+        self.__parent.validationFailed(desiredBranchId, 'Error','Please select a nrrd or a DICOM volume!')
+        
   def onEntry(self,comingFrom,transitionType):
   
     super(iGyneLoadModelStep, self).onEntry(comingFrom, transitionType)
     # setup the interface
     pNode = self.parameterNode()
     pNode.SetParameter('currentStep', self.stepid)    
-    # self.updateWidgetFromParameterNode(pNode)
-    # qt.QTimer.singleShot(0, self.killButton)
-
+    self.updateWidgetFromParameterNode(pNode)
+   
   def onExit(self, goingTo, transitionType):
+    self.doStepProcessing()
+    #error checking
     if goingTo.id() != 'SelectApplicator' and goingTo.id() != 'FirstRegistration':
       return
-    pNode = self.parameterNode()
+    super(iGyneLoadModelStep, self).onExit(goingTo, transitionType) 
 
 
+  def updateWidgetFromParameters(self, parameterNode):
+    baselineVolumeID = parameterNode.GetParameter('baselineVolumeID')
+    if baselineVolumeID != None:
+      self.__baselineVolumeSelector.setCurrentNode(Helper.getNodeByID(baselineVolumeID))
     super(iGyneLoadModelStep, self).onExit(goingTo, transitionType)
 
-  def validate( self, desiredBranchId ):
-    '''
-    '''
-    self.__parent.validate( desiredBranchId )    
-    self.__parent.validationSucceeded(desiredBranchId)
+        
+  def doStepProcessing(self):
+    # calculate the transform to align the ROI in the next step with the
+    # baseline volume
+    pNode = self.parameterNode()
+
+    baselineVolume = Helper.getNodeByID(pNode.GetParameter('baselineVolumeID'))
+    print(baselineVolume)
+    roiTransformID = pNode.GetParameter('roiTransformID')
+    roiTransformNode = None
+    
+    if roiTransformID != '':
+      roiTransformNode = Helper.getNodeByID(roiTransformID)
+    else:
+      roiTransformNode = slicer.mrmlScene.CreateNodeByClass('vtkMRMLLinearTransformNode')
+      slicer.mrmlScene.AddNode(roiTransformNode)
+      pNode.SetParameter('roiTransformID', roiTransformNode.GetID())
+
+    dm = vtk.vtkMatrix4x4()
+    baselineVolume.GetIJKToRASDirectionMatrix(dm)
+    dm.SetElement(0,3,0)
+    dm.SetElement(1,3,0)
+    dm.SetElement(2,3,0)
+    dm.SetElement(0,0,abs(dm.GetElement(0,0)))
+    dm.SetElement(1,1,abs(dm.GetElement(1,1)))
+    dm.SetElement(2,2,abs(dm.GetElement(2,2)))
+    roiTransformNode.SetAndObserveMatrixTransformToParent(dm)        
