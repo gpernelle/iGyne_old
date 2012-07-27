@@ -27,12 +27,12 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     '''
     self.__layout = self.__parent.createUserInterface()
      
-    self.loadTemplateButton = qt.QPushButton('Choose Fiducial Points')
+    self.loadTemplateButton = qt.QPushButton('Crop Volume')
     self.loadTemplateButton.checkable = True
     self.__layout.addRow(self.loadTemplateButton)
     self.loadTemplateButton.connect('toggled(bool)', self.onRunButtonToggled)
 	
-    self.firstRegButton = qt.QPushButton('Register Template')
+    self.firstRegButton = qt.QPushButton('Second Registration')
     self.firstRegButton.checkable = True
     self.__layout.addRow(self.firstRegButton)
     self.firstRegButton.connect('clicked()', self.firstRegistration)
@@ -45,66 +45,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       self.stop()
       self.loadTemplateButton.text = "Choose Fiducial Points"
 
-  def firstRegistration(self):
-    print("firstreg")
-  
-  
-  def start(self):
-    
-    self.removeObservers()
-    # get new slice nodes
-    layoutManager = slicer.app.layoutManager()
-    sliceNodeCount = slicer.mrmlScene.GetNumberOfNodesByClass('vtkMRMLSliceNode')
-    for nodeIndex in xrange(sliceNodeCount):
-      # find the widget for each node in scene
-      sliceNode = slicer.mrmlScene.GetNthNodeByClass(nodeIndex, 'vtkMRMLSliceNode')
-      sliceWidget = layoutManager.sliceWidget(sliceNode.GetLayoutName())      
-      if sliceWidget:     
-        # add obserservers and keep track of tags
-        style = sliceWidget.sliceView().interactorStyle()
-        self.sliceWidgetsPerStyle[style] = sliceWidget
-        events = ("LeftButtonPressEvent","LeftButtonReleaseEvent","MouseMoveEvent", "KeyPressEvent","KeyReleaseEvent","EnterEvent", "LeaveEvent")
-        for event in events:
-          tag = style.AddObserver(event, self.processEvent)   
-          self.styleObserverTags.append([style,tag])
-		  
-  def stop(self):
-
-    print("here")
-    self.removeObservers() 
-	
-  def removeObservers(self):
-    # remove observers and reset
-    for observee,tag in self.styleObserverTags:
-      observee.RemoveObserver(tag)
-    self.styleObserverTags = []
-    self.sliceWidgetsPerStyle = {}
-	
-  def processEvent(self,observee,event=None):
-    if self.volume == None :
-      #self.volume = slicer.mrmlScene.GetNthNodeByClass(4,"vtkMRMLAnnotationHierarchyNode")
-      self.volume = Helper.getNodeByName("Fiducial List_fixed")
-    #slicer.modules.reporting.logic().InitializeHierarchyForVolume(self.volume)
-    # newReport.SetVolumeNodeID(self.volume.GetID())
-    print(self.volume)
-    if self.sliceWidgetsPerStyle.has_key(observee) and event == "LeftButtonPressEvent":
-      sliceWidget = self.sliceWidgetsPerStyle[observee]
-      style = sliceWidget.sliceView().interactorStyle()          
-      xy = style.GetInteractor().GetEventPosition()
-      xyz = sliceWidget.convertDeviceToXYZ(xy)
-      ras = sliceWidget.convertXYZToRAS(xyz)
-      fiducial = slicer.mrmlScene.CreateNodeByClass('vtkMRMLAnnotationFiducialNode')
-      fiducial.SetReferenceCount(fiducial.GetReferenceCount()-1)
-      # associate it with the volume
-      fiducial.SetAttribute("AssociatedNodeID", self.volume.GetID())
-      # ??? Why the API is so inconsistent -- there's no SetPosition1() ???
-      fiducial.SetFiducialCoordinates(ras)
-      fiducial.Initialize(slicer.mrmlScene)
-      # adding to hierarchy is handled by the Reporting logic
-      hierarchylogic = slicer.vtkMRMLDisplayableHierarchyLogic()
-      hierarchylogic.AddChildToParent(fiducial,self.volume)
-      print(ras)
-  
 
   def onEntry(self,comingFrom,transitionType):
   
@@ -116,7 +56,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     # qt.QTimer.singleShot(0, self.killButton)
 
   def onExit(self, goingTo, transitionType):
-    if goingTo.id() != 'firstRegistration' and goingTo.id() != 'SecondRegistration':
+    if goingTo.id() != 'FirstRegistration' and goingTo.id() != 'SecondRegistration':
       return
     pNode = self.parameterNode()
     # if goingTo.id() == 'LoadDiagnosticSeries':

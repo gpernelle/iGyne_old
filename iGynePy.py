@@ -57,6 +57,7 @@ class iGynePyWidget:
     selectApplicatorStep = iGyneWizard.iGyneSelectApplicatorStep( 'SelectApplicator'  )
     loadModelStep = iGyneWizard.iGyneLoadModelStep( 'LoadModel'  )
     firstRegistrationStep = iGyneWizard.iGyneFirstRegistrationStep( 'FirstRegistration'  )
+    secondRegistrationStep = iGyneWizard.iGyneSecondRegistrationStep( 'SecondRegistration'  )
 #    registerROIStep = iGyneWizard.iGyneRegisterROIStep( 'RegisterROI'  )
 
     # add the wizard steps to an array for convenience
@@ -66,6 +67,7 @@ class iGynePyWidget:
     allSteps.append( selectApplicatorStep )
     allSteps.append( loadModelStep )
     allSteps.append( firstRegistrationStep )
+    allSteps.append( secondRegistrationStep )
 #    allSteps.append( registerROIStep )
 
 ##     Add transition for the first step which let's the user choose between simple and advanced mode
@@ -74,7 +76,7 @@ class iGynePyWidget:
     self.workflow.addTransition( selectProcedureStep, selectApplicatorStep )
     self.workflow.addTransition( selectApplicatorStep, loadModelStep )
     self.workflow.addTransition( loadModelStep, firstRegistrationStep )
-#    self.workflow.addTransition( LoadModelStep, firstRegistrationStep )
+    self.workflow.addTransition( firstRegistrationStep, secondRegistrationStep )
 #    self.workflow.addTransition( firstRegistrationStep, registerROIStep )
 
     nNodes = slicer.mrmlScene.GetNumberOfNodesByClass('vtkMRMLScriptedModuleNode')
@@ -109,8 +111,8 @@ class iGynePyWidget:
         self.workflow.setInitialStep(loadModelStep)
       if currentStep == 'FirstRegistration':
         self.workflow.setInitialStep(firstRegistrationStep)
-#      if currentStep == 'RegisterROI':
-#        self.workflow.setInitialStep(registerROIStep)
+      if currentStep == 'SecondRegistration':
+        self.workflow.setInitialStep(secondRegistrationStep)
     else:
       print 'currentStep in parameter node is empty!'
         
