@@ -20,12 +20,10 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.interactorObserverTags = []    
     self.styleObserverTags = []
     self.volume = None
-    self.__vrDisplayNode = None
     self.__threshold = [ -1, -1 ]
        
     # initialize VR stuff
-    self.__vrLogic = slicer.modules.volumerendering.logic()
-    self.__vrOpacityMap = None
+
 
     self.__roiSegmentationNode = None
     self.__roiVolume = None
@@ -85,20 +83,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
 
   def onThresholdChanged(self): 
     
-    if self.__vrOpacityMap == None:
-      return
-    
-
     range0 = self.__threshRange.minimumValue
     range1 = self.__threshRange.maximumValue
-
-    self.__vrOpacityMap.RemoveAllPoints()
-    self.__vrOpacityMap.AddPoint(0,0)
-    self.__vrOpacityMap.AddPoint(0,0)
-    self.__vrOpacityMap.AddPoint(range0-1,0)
-    self.__vrOpacityMap.AddPoint(range0,1)
-    self.__vrOpacityMap.AddPoint(range1,1)
-    self.__vrOpacityMap.AddPoint(range1+1,0)
 
     # update the label volume accordingly
     thresh = vtk.vtkImageThreshold()
@@ -148,48 +134,13 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     roiVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
     self.__roiVolume = roiVolume
     self.__roiSegmentationNode = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeSegmentationID'))
-    vrDisplayNodeID = pNode.GetParameter('vrDisplayNodeID')
-
-    if self.__vrDisplayNode == None:
-      if vrDisplayNodeID != '':
-        self.__vrDisplayNode = slicer.mrmlScene.GetNodeByID(vrDisplayNodeID)
-        # self.__vrDisplayNode = self.__vrLogic.CreateVolumeRenderingDisplayNode()
-      #viewNode = slicer.util.getNode('vtkMRMLViewNode1')
-      #self.__vrDisplayNode.AddViewNodeID(viewNode.GetID())
-      #self.__vrDisplayNode.SetCurrentVolumeMapper(2)
-
-    if self.__useThresholds:
-      self.__vrDisplayNode.SetAndObserveVolumeNodeID(roiVolume.GetID())
-      self.__vrLogic.UpdateDisplayNodeFromVolumeNode(self.__vrDisplayNode, roiVolume)
-      # logic will create a new ROI -- need to hide it
-      newROI = self.__vrDisplayNode.GetROINode()
-      newROI.VisibleOff()
-
-      self.__vrOpacityMap = self.__vrDisplayNode.GetVolumePropertyNode().GetVolumeProperty().GetScalarOpacity()
-      vrColorMap = self.__vrDisplayNode.GetVolumePropertyNode().GetVolumeProperty().GetRGBTransferFunction()
     
     # setup color transfer function once
     
     baselineROIVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
     baselineROIRange = baselineROIVolume.GetImageData().GetScalarRange()
 
-    vrColorMap.RemoveAllPoints()
-    vrColorMap.AddRGBPoint(0, 0, 0, 0) 
-    vrColorMap.AddRGBPoint(baselineROIRange[0]-1, 0, 0, 0) 
-    vrColorMap.AddRGBPoint(baselineROIRange[0], 0.8, 0.8, 0) 
-    vrColorMap.AddRGBPoint(baselineROIRange[1], 0.8, 0.8, 0) 
-    vrColorMap.AddRGBPoint(baselineROIRange[1]+1, 0, 0, 0) 
-
-    self.__vrDisplayNode.VisibilityOn()
-
     threshRange = [self.__threshRange.minimumValue, self.__threshRange.maximumValue]
-    self.__vrOpacityMap.RemoveAllPoints()
-    self.__vrOpacityMap.AddPoint(0,0)
-    self.__vrOpacityMap.AddPoint(0,0)
-    self.__vrOpacityMap.AddPoint(threshRange[0]-1,0)
-    self.__vrOpacityMap.AddPoint(threshRange[0],1)
-    self.__vrOpacityMap.AddPoint(threshRange[1],1)
-    self.__vrOpacityMap.AddPoint(threshRange[1]+1,0)
 
     labelsColorNode = slicer.modules.colors.logic().GetColorTableNodeID(10)
     self.__roiSegmentationNode.GetDisplayNode().SetAndObserveColorNodeID(labelsColorNode)

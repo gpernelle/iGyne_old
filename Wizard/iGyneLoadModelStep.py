@@ -129,7 +129,7 @@ class iGyneLoadModelStep( iGyneStep ) :
     pNode = self.parameterNode()
 
     baselineVolume = Helper.getNodeByID(pNode.GetParameter('baselineVolumeID'))
-    print(baselineVolume)
+    followupVolume = Helper.getNodeByID(pNode.GetParameter('followupVolumeID'))
     roiTransformID = pNode.GetParameter('roiTransformID')
     roiTransformNode = None
     
@@ -141,10 +141,11 @@ class iGyneLoadModelStep( iGyneStep ) :
       pNode.SetParameter('roiTransformID', roiTransformNode.GetID())
 
     dm = vtk.vtkMatrix4x4()
-    baselineVolume.GetIJKToRASDirectionMatrix(dm)
-    dm.SetElement(0,3,0)
-    dm.SetElement(1,3,0)
-    dm.SetElement(2,3,0)
+    bounds = [0,0,0,0,0,0]
+    followupVolume.GetRASBounds(bounds)
+    dm.SetElement(0,3,(bounds[0]+bounds[1])/float(2))
+    dm.SetElement(1,3,(bounds[2]+bounds[3])/float(2))
+    dm.SetElement(2,3,(bounds[4]+bounds[5])/float(2))
     dm.SetElement(0,0,abs(dm.GetElement(0,0)))
     dm.SetElement(1,1,abs(dm.GetElement(1,1)))
     dm.SetElement(2,2,abs(dm.GetElement(2,2)))

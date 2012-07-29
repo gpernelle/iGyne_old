@@ -31,6 +31,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     self.__vrOpacityMap = None
     self.__roiSegmentationNode = None
     self.__roiVolume = None
+    self.click = 0
     
     
 
@@ -39,10 +40,10 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     '''
     self.__layout = self.__parent.createUserInterface()
      
-    self.loadTemplateButton = qt.QPushButton('Choose Fiducial Points')
-    self.loadTemplateButton.checkable = True
-    self.__layout.addRow(self.loadTemplateButton)
-    self.loadTemplateButton.connect('toggled(bool)', self.onRunButtonToggled)
+    self.fiducialButton = qt.QPushButton('Choose Fiducial Points')
+    self.fiducialButton.checkable = True
+    self.__layout.addRow(self.fiducialButton)
+    self.fiducialButton.connect('toggled(bool)', self.onRunButtonToggled)
 	
     self.firstRegButton = qt.QPushButton('Run Registration')
     self.__registrationStatus = qt.QLabel('Register Template and Scan')
@@ -51,7 +52,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     self.__layout.addRow(self.firstRegButton)
     self.firstRegButton.connect('clicked()', self.firstRegistration)
     
-     #ROI
+     #VOI
     roiLabel = qt.QLabel( 'Select ROI:' )
     self.__roiSelector = slicer.qMRMLNodeComboBox()
     self.__roiSelector.nodeTypes = ['vtkMRMLAnnotationROINode']
@@ -61,7 +62,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     self.__layout.addRow( roiLabel, self.__roiSelector )
     self.__roiSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onROIChanged)
 
-    # the ROI parameters
+    # the VOI parameters
     voiGroupBox = qt.QGroupBox()
     voiGroupBox.setTitle( 'Define VOI' )
     self.__layout.addRow( voiGroupBox )
@@ -78,35 +79,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     if roi != None:
     
       pNode = self.parameterNode()
-      # create VR node first time a valid ROI is selected
-      if self.__vrDisplayNode == None:
-        self.__vrDisplayNode = self.__vrLogic.CreateVolumeRenderingDisplayNode()
-        viewNode = slicer.util.getNode('vtkMRMLViewNode1')
-        self.__vrDisplayNode.SetCurrentVolumeMapper(0)
-        self.__vrDisplayNode.AddViewNodeID(viewNode.GetID())
-
-        v = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
-        self.__vrDisplayNode.SetAndObserveVolumeNodeID(v.GetID())
-        self.__vrLogic.UpdateDisplayNodeFromVolumeNode(self.__vrDisplayNode, v)
-        self.__vrOpacityMap = self.__vrDisplayNode.GetVolumePropertyNode().GetVolumeProperty().GetScalarOpacity()
-        self.__vrColorMap = self.__vrDisplayNode.GetVolumePropertyNode().GetVolumeProperty().GetRGBTransferFunction()
-
-        # setup color transfer function once
-        self.__vrColorMap.RemoveAllPoints()
-        self.__vrColorMap.AddRGBPoint(0, 0.8, 0.8, 0)
-        self.__vrColorMap.AddRGBPoint(500, 0.8, 0.8, 0)
-
-
-      # update VR settings each time ROI changes
-      v = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
-      self.__vrDisplayNode.SetAndObserveROINodeID(roi.GetID())
-      self.__vrDisplayNode.SetCroppingEnabled(1)
-      self.__vrDisplayNode.VisibilityOn()
-
       roi.SetAndObserveTransformNodeID(self.__roiTransformNode.GetID())
-
-      # TODO: update opacity function based on ROI content
-      # self.__vrOpacityMap.RemoveAllPoints()
 
       if self.__roiObserverTag != None:
         self.__roi.RemoveObserver(self.__roiObserverTag)
@@ -172,13 +145,6 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     lThresh = 0.4*(intRange[0]+intRange[1])
     uThresh = intRange[1]
 
-    self.__vrOpacityMap.RemoveAllPoints()
-    self.__vrOpacityMap.AddPoint(0,0)
-    self.__vrOpacityMap.AddPoint(lThresh-1,0)
-    self.__vrOpacityMap.AddPoint(lThresh,1)
-    self.__vrOpacityMap.AddPoint(uThresh,1)
-    self.__vrOpacityMap.AddPoint(uThresh+1,0)
-
     # finally, update the focal point to be the center of ROI
     # Don't do this actually -- this breaks volume rendering
     camera = slicer.mrmlScene.GetNodeByID('vtkMRMLCameraNode1')
@@ -187,10 +153,10 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
   def onRunButtonToggled(self, checked):
     if checked:
       self.start()
-      self.loadTemplateButton.text = "Stop"  
+      self.fiducialButton.text = "Stop"  
     else:
       self.stop()
-      self.loadTemplateButton.text = "Choose Fiducial Points"
+      self.fiducialButton.text = "Choose Fiducial Points"
 
   def firstRegistration(self):
     print("firstreg")
@@ -245,20 +211,17 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       pNode = self.parameterNode()
       followupNode = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('followupVolumeID'))
       obturatorNode = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('obturatorID'))
+      roiNode = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('roiTransformID'))
       followupNode.SetAndObserveTransformNodeID(self.__followupTransform.GetID())
       obturatorNode.SetAndObserveTransformNodeID(self.__followupTransform.GetID())
-  
+      roiNode.SetAndObserveTransformNodeID(self.__followupTransform.GetID())
   
       Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),pNode.GetParameter('followupVolumeID'))
 
       pNode.SetParameter('followupTransformID', self.__followupTransform.GetID())
     
 
-    
-  
-  
-  def start(self):
-    
+  def start(self):    
     self.removeObservers()
     # get new slice nodes
     layoutManager = slicer.app.layoutManager()
@@ -277,7 +240,6 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
           self.styleObserverTags.append([style,tag])
 		  
   def stop(self):
-
     print("here")
     self.removeObservers() 
 	
@@ -303,6 +265,18 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       fiducial = slicer.mrmlScene.CreateNodeByClass('vtkMRMLAnnotationFiducialNode')
       fiducial.SetReferenceCount(fiducial.GetReferenceCount()-1)
       fiducial.SetFiducialCoordinates(ras)
+      if self.click == 0:
+        # fiducial.setName"fix_top")
+        self.click += 1
+      elif self.click == 1:
+        # fiducial.setName("fix_left")
+        self.click += 1
+      elif self.click == 2:
+        # fiducial.setName("fix_right")
+        self.click = 0
+        self.fiducialButton.setEnabled(0)
+        self.stop()
+        
       fiducial.Initialize(slicer.mrmlScene)
       # adding to hierarchy is handled by the Reporting logic
       self.fixedLandmarks.AddItem(fiducial)
@@ -325,17 +299,23 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     # use this transform node to align ROI with the axes of the baseline
     # volume
     roiTfmNodeID = pNode.GetParameter('roiTransformID')
+    
     if roiTfmNodeID != '':
       self.__roiTransformNode = Helper.getNodeByID(roiTfmNodeID)
     else:
       Helper.Error('Internal error! Error code CT-S2-NRT, please report!')
     baselineVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
+    self.__followupVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('followupVolumeID'))
     self.__baselineVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
     # get the roiNode from parameters node, if it exists, and initialize the
     # GUI
     self.updateWidgetFromParameterNode(pNode)
+    bounds = [0,0,0,0,0,0]
+    self.__followupVolume.GetRASBounds(bounds)
+    print(bounds)
     if self.__roi != None:
       self.__roi.VisibleOn()
+    self.__roi.SetRadiusXYZ(abs(bounds[0]-bounds[1])/float(2),abs(bounds[2]-bounds[3])/float(2),abs(bounds[4]-bounds[5])/float(2))
     pNode.SetParameter('currentStep', self.stepid)
 
   def onExit(self, goingTo, transitionType):
@@ -347,10 +327,6 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       self.__roi.VisibleOff()
     
     pNode = self.parameterNode()
-    if self.__vrDisplayNode != None:
-      self.__vrDisplayNode.VisibilityOff()
-      pNode.SetParameter('vrDisplayNodeID', self.__vrDisplayNode.GetID())
-
     pNode.SetParameter('roiNodeID', self.__roiSelector.currentNode().GetID())
 
     if goingTo.id() == 'SecondRegistration':
@@ -371,7 +347,6 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       self.__roiSelector.setCurrentNode(roi)
     
     self.onROIChanged()
-
    
   def doStepProcessing(self):
     '''
