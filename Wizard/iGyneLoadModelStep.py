@@ -11,6 +11,7 @@ class iGyneLoadModelStep( iGyneStep ) :
     self.setName( '3. Load the template' )
     self.setDescription( 'Load the template. From this template, auto-crop and registration functions will be processed.' )
     self.__parent = super( iGyneLoadModelStep, self )
+    self.loadTemplateButton = None
 
   def createUserInterface( self ):
  
@@ -31,9 +32,9 @@ class iGyneLoadModelStep( iGyneStep ) :
     # self.__followupVolumeSelector.addEnabled = 0
 	
 	#Load Template Button 
-    loadTemplateButton = qt.QPushButton('Load template')
-    self.__layout.addRow(loadTemplateButton)
-    loadTemplateButton.connect('clicked()', self.loadTemplate)
+    self.loadTemplateButton = qt.QPushButton('Load template')
+    self.__layout.addRow(self.loadTemplateButton)
+    self.loadTemplateButton.connect('clicked()', self.loadTemplate)
 
 	#Load Scan Button
     self.__fileFrame = ctk.ctkCollapsibleButton()
@@ -70,23 +71,34 @@ class iGyneLoadModelStep( iGyneStep ) :
   def loadTemplate(self):
     pathToScene = slicer.modules.igynepy.path.replace("iGynePy.py","iGynePyTemplate/Template/Template.mrml")
     slicer.util.loadScene( pathToScene, True)
+    self.loadTemplateButton.setEnabled(0)
 
   def validate( self, desiredBranchId ):
     '''
     '''
-    self.__parent.validate( desiredBranchId ) 
+    self.__parent.validate( desiredBranchId )
 
-    ## check here that the selectors are not empty
+    # check here that the selectors are not empty
     baseline = self.__baselineVolumeSelector.currentNode()
-    if baseline != None:
+    followup = slicer.mrmlScene.GetNodeByID("vtkMRMLModelNode4")
+    obturator = slicer.mrmlScene.GetNodeByID("vtkMRMLModelNode5")
+
+    if baseline != None and followup != None:
       baselineID = baseline.GetID()
-      if baselineID != '':
+      followupID = followup.GetID()
+      obturatorID = obturator.GetID()
+      if baselineID != '' and followupID != '' and baselineID != followupID:
     
         pNode = self.parameterNode()
         pNode.SetParameter('baselineVolumeID', baselineID)
+        pNode.SetParameter('followupVolumeID', followupID)
+        pNode.SetParameter('obturatorID', obturatorID)
+        
         self.__parent.validationSucceeded(desiredBranchId)
       else:
-        self.__parent.validationFailed(desiredBranchId, 'Error','Please select a nrrd or a DICOM volume!')
+        self.__parent.validationFailed(desiredBranchId, 'Error','Please select distinctive baseline and followup volumes!')
+    else:
+      self.__parent.validationFailed(desiredBranchId, 'Error','Please select both Template and scan/DICOM Volume!')
         
   def onEntry(self,comingFrom,transitionType):
   
@@ -94,7 +106,7 @@ class iGyneLoadModelStep( iGyneStep ) :
     # setup the interface
     pNode = self.parameterNode()
     pNode.SetParameter('currentStep', self.stepid)    
-    self.updateWidgetFromParameterNode(pNode)
+    self.updateWidgetFromParameters(self.parameterNode())
    
   def onExit(self, goingTo, transitionType):
     self.doStepProcessing()
@@ -108,7 +120,7 @@ class iGyneLoadModelStep( iGyneStep ) :
     baselineVolumeID = parameterNode.GetParameter('baselineVolumeID')
     if baselineVolumeID != None:
       self.__baselineVolumeSelector.setCurrentNode(Helper.getNodeByID(baselineVolumeID))
-    super(iGyneLoadModelStep, self).onExit(goingTo, transitionType)
+
 
         
   def doStepProcessing(self):

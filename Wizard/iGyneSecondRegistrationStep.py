@@ -1,4 +1,4 @@
-from __main__ import qt, ctk
+from __main__ import qt, ctk, slicer
 
 from iGyneStep import *
 from Helper import *
@@ -20,142 +20,213 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.interactorObserverTags = []    
     self.styleObserverTags = []
     self.volume = None
+    self.__vrDisplayNode = None
+    self.__threshold = [ -1, -1 ]
+       
+    # initialize VR stuff
+    self.__vrLogic = slicer.modules.volumerendering.logic()
+    self.__vrOpacityMap = None
+
+    self.__roiSegmentationNode = None
+    self.__roiVolume = None
     
 
   def createUserInterface( self ):
     '''
     '''
+
     self.__layout = self.__parent.createUserInterface()
-     
-    self.loadTemplateButton = qt.QPushButton('Segment the volume')
-    self.loadTemplateButton.checkable = True
-    self.__layout.addRow(self.loadTemplateButton)
-    self.loadTemplateButton.connect('toggled(bool)', self.onRunButtonToggled)
-	
-    self.firstRegButton = qt.QPushButton('Register Template')
-    self.firstRegButton.checkable = True
-    self.__layout.addRow(self.firstRegButton)
-    self.firstRegButton.connect('clicked()', self.firstRegistration)
 
-  def onRunButtonToggled(self, checked):
-    if checked:
-      self.start()
-      self.loadTemplateButton.text = "Stop"  
+    self.__basicFrame = ctk.ctkCollapsibleButton()
+    self.__basicFrame.text = "Basic settings"
+    self.__basicFrame.collapsed = 0
+    basicFrameLayout = qt.QFormLayout(self.__basicFrame)
+    self.__layout.addRow(self.__basicFrame)
+
+    self.__advancedFrame = ctk.ctkCollapsibleButton()
+    self.__advancedFrame.text = "Advanced settings"
+    self.__advancedFrame.collapsed = 1
+    advFrameLayout = qt.QFormLayout(self.__advancedFrame)
+    self.__layout.addRow(self.__advancedFrame)
+
+    threshLabel = qt.QLabel('Choose threshold:')
+    self.__threshRange = slicer.qMRMLRangeWidget()
+    self.__threshRange.decimals = 0
+    self.__threshRange.singleStep = 1
+
+    self.__useThresholdsCheck = qt.QCheckBox()
+    self.__useThresholdsCheck.setEnabled(0)
+    threshCheckLabel = qt.QLabel('Use thresholds for segmentation')
+
+    roiLabel = qt.QLabel( 'Select segmentation:' )
+    self.__roiLabelSelector = slicer.qMRMLNodeComboBox()
+    self.__roiLabelSelector.nodeTypes = ( 'vtkMRMLScalarVolumeNode', '' )
+    self.__roiLabelSelector.addAttribute('vtkMRMLScalarVolumeNode','LabelMap','1')
+    self.__roiLabelSelector.toolTip = "Choose the ROI segmentation"
+    self.__roiLabelSelector.nodeTypes = ['vtkMRMLScalarVolumeNode']
+    self.__roiLabelSelector.addEnabled = 0
+    self.__roiLabelSelector.setMRMLScene(slicer.mrmlScene)
+
+    basicFrameLayout.addRow(threshLabel, self.__threshRange)
+    advFrameLayout.addRow(threshCheckLabel, self.__useThresholdsCheck)
+    advFrameLayout.addRow( roiLabel, self.__roiLabelSelector )
+
+    self.__threshRange.connect('valuesChanged(double,double)', self.onThresholdChanged)
+    self.__useThresholdsCheck.connect('stateChanged(int)', self.onThresholdsCheckChanged)
+
+  def onThresholdsCheckChanged(self):
+    if self.__useThresholdsCheck.isChecked():
+      self.__roiLabelSelector.setEnabled(0)
+      self.__threshRange.setEnabled(1)
     else:
-      self.stop()
-      self.loadTemplateButton.text = "Choose Fiducial Points"
-
-  def firstRegistration(self):
-    print("firstreg")
-  
-  
-  def start(self):
+      self.__roiLabelSelector.setEnabled(1)
+      self.__threshRange.setEnabled(0)
     
-    self.removeObservers()
-    # get new slice nodes
-    layoutManager = slicer.app.layoutManager()
-    sliceNodeCount = slicer.mrmlScene.GetNumberOfNodesByClass('vtkMRMLSliceNode')
-    for nodeIndex in xrange(sliceNodeCount):
-      # find the widget for each node in scene
-      sliceNode = slicer.mrmlScene.GetNthNodeByClass(nodeIndex, 'vtkMRMLSliceNode')
-      sliceWidget = layoutManager.sliceWidget(sliceNode.GetLayoutName())      
-      if sliceWidget:     
-        # add obserservers and keep track of tags
-        style = sliceWidget.sliceView().interactorStyle()
-        self.sliceWidgetsPerStyle[style] = sliceWidget
-        events = ("LeftButtonPressEvent","LeftButtonReleaseEvent","MouseMoveEvent", "KeyPressEvent","KeyReleaseEvent","EnterEvent", "LeaveEvent")
-        for event in events:
-          tag = style.AddObserver(event, self.processEvent)   
-          self.styleObserverTags.append([style,tag])
-		  
-  def stop(self):
 
-    print("here")
-    self.removeObservers() 
-	
-  def removeObservers(self):
-    # remove observers and reset
-    for observee,tag in self.styleObserverTags:
-      observee.RemoveObserver(tag)
-    self.styleObserverTags = []
-    self.sliceWidgetsPerStyle = {}
-	
-  def processEvent(self,observee,event=None):
-    if self.volume == None :
-      #self.volume = slicer.mrmlScene.GetNthNodeByClass(4,"vtkMRMLAnnotationHierarchyNode")
-      self.volume = Helper.getNodeByName("Fiducial List_fixed")
-    #slicer.modules.reporting.logic().InitializeHierarchyForVolume(self.volume)
-    # newReport.SetVolumeNodeID(self.volume.GetID())
-    print(self.volume)
-    if self.sliceWidgetsPerStyle.has_key(observee) and event == "LeftButtonPressEvent":
-      sliceWidget = self.sliceWidgetsPerStyle[observee]
-      style = sliceWidget.sliceView().interactorStyle()          
-      xy = style.GetInteractor().GetEventPosition()
-      xyz = sliceWidget.convertDeviceToXYZ(xy)
-      ras = sliceWidget.convertXYZToRAS(xyz)
-      fiducial = slicer.mrmlScene.CreateNodeByClass('vtkMRMLAnnotationFiducialNode')
-      fiducial.SetReferenceCount(fiducial.GetReferenceCount()-1)
-      # associate it with the volume
-      fiducial.SetAttribute("AssociatedNodeID", self.volume.GetID())
-      # ??? Why the API is so inconsistent -- there's no SetPosition1() ???
-      fiducial.SetFiducialCoordinates(ras)
-      fiducial.Initialize(slicer.mrmlScene)
-      # adding to hierarchy is handled by the Reporting logic
-      hierarchylogic = slicer.vtkMRMLDisplayableHierarchyLogic()
-      hierarchylogic.AddChildToParent(fiducial,self.volume)
-      print(ras)
-  
-
-  def onEntry(self,comingFrom,transitionType):
-  
-    super(iGyneSecondRegistrationStep, self).onEntry(comingFrom, transitionType)
-    # setup the interface
-    pNode = self.parameterNode()
-    pNode.SetParameter('currentStep', self.stepid)    
-    # self.updateWidgetFromParameterNode(pNode)
-    # qt.QTimer.singleShot(0, self.killButton)
-
-  def onExit(self, goingTo, transitionType):
-    if goingTo.id() != 'firstRegistration' and goingTo.id() != 'SecondRegistration':
+  def onThresholdChanged(self): 
+    
+    if self.__vrOpacityMap == None:
       return
-    pNode = self.parameterNode()
-    # if goingTo.id() == 'LoadDiagnosticSeries':
-      # self.doStepProcessing()
+    
 
-    super(iGyneSecondRegistrationStep, self).onExit(goingTo, transitionType)
+    range0 = self.__threshRange.minimumValue
+    range1 = self.__threshRange.maximumValue
 
+    self.__vrOpacityMap.RemoveAllPoints()
+    self.__vrOpacityMap.AddPoint(0,0)
+    self.__vrOpacityMap.AddPoint(0,0)
+    self.__vrOpacityMap.AddPoint(range0-1,0)
+    self.__vrOpacityMap.AddPoint(range0,1)
+    self.__vrOpacityMap.AddPoint(range1,1)
+    self.__vrOpacityMap.AddPoint(range1+1,0)
+
+    # update the label volume accordingly
+    thresh = vtk.vtkImageThreshold()
+    thresh.SetInput(self.__roiVolume.GetImageData())
+    thresh.ThresholdBetween(range0, range1)
+    thresh.SetInValue(10)
+    thresh.SetOutValue(0)
+    thresh.ReplaceOutOn()
+    thresh.ReplaceInOn()
+    thresh.Update()
+
+    self.__roiSegmentationNode.SetAndObserveImageData(thresh.GetOutput())
+	
   def validate( self, desiredBranchId ):
     '''
     '''
-    self.__parent.validate( desiredBranchId )    
+    self.__parent.validate( desiredBranchId )
     self.__parent.validationSucceeded(desiredBranchId)
 
+  def onExit(self, goingTo, transitionType):
+    if goingTo.id() != 'DefineROI' and goingTo.id() != 'AnalyzeROI':
+      return
 
-  # def updateWidgetFromParameters(self, pNode):
+    self.__vrDisplayNode.VisibilityOff()
+
+    pNode = self.parameterNode()
+    pNode.SetParameter('thresholdRange', str(self.__threshRange.minimumValue)+','+str(self.__threshRange.maximumValue))
+
+    super(iGyneSecondRegistrationStep, self).onExit(goingTo, transitionType)
+
+  def onEntry(self,comingFrom,transitionType):
+    '''
+    Update GUI and visualization
+    '''
+    super(iGyneSecondRegistrationStep, self).onEntry(comingFrom, transitionType)
+
+    pNode = self.parameterNode()
+    self.updateWidgetFromParameters(pNode)
+
+    self.onThresholdsCheckChanged()
+	
+    Helper.SetBgFgVolumes(pNode.GetParameter('croppedBaselineVolumeID'),'')
+
+    # TODO: initialize volume selectors, fit ROI to slice viewers, create
+    # label volume, initialize the threshold, initialize volume rendering ?
+
+    roiVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
+    self.__roiVolume = roiVolume
+    self.__roiSegmentationNode = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeSegmentationID'))
+    vrDisplayNodeID = pNode.GetParameter('vrDisplayNodeID')
+
+    if self.__vrDisplayNode == None:
+      if vrDisplayNodeID != '':
+        self.__vrDisplayNode = slicer.mrmlScene.GetNodeByID(vrDisplayNodeID)
+        # self.__vrDisplayNode = self.__vrLogic.CreateVolumeRenderingDisplayNode()
+      #viewNode = slicer.util.getNode('vtkMRMLViewNode1')
+      #self.__vrDisplayNode.AddViewNodeID(viewNode.GetID())
+      #self.__vrDisplayNode.SetCurrentVolumeMapper(2)
+
+    if self.__useThresholds:
+      self.__vrDisplayNode.SetAndObserveVolumeNodeID(roiVolume.GetID())
+      self.__vrLogic.UpdateDisplayNodeFromVolumeNode(self.__vrDisplayNode, roiVolume)
+      # logic will create a new ROI -- need to hide it
+      newROI = self.__vrDisplayNode.GetROINode()
+      newROI.VisibleOff()
+
+      self.__vrOpacityMap = self.__vrDisplayNode.GetVolumePropertyNode().GetVolumeProperty().GetScalarOpacity()
+      vrColorMap = self.__vrDisplayNode.GetVolumePropertyNode().GetVolumeProperty().GetRGBTransferFunction()
+    
+    # setup color transfer function once
+    
+    baselineROIVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
+    baselineROIRange = baselineROIVolume.GetImageData().GetScalarRange()
+
+    vrColorMap.RemoveAllPoints()
+    vrColorMap.AddRGBPoint(0, 0, 0, 0) 
+    vrColorMap.AddRGBPoint(baselineROIRange[0]-1, 0, 0, 0) 
+    vrColorMap.AddRGBPoint(baselineROIRange[0], 0.8, 0.8, 0) 
+    vrColorMap.AddRGBPoint(baselineROIRange[1], 0.8, 0.8, 0) 
+    vrColorMap.AddRGBPoint(baselineROIRange[1]+1, 0, 0, 0) 
+
+    self.__vrDisplayNode.VisibilityOn()
+
+    threshRange = [self.__threshRange.minimumValue, self.__threshRange.maximumValue]
+    self.__vrOpacityMap.RemoveAllPoints()
+    self.__vrOpacityMap.AddPoint(0,0)
+    self.__vrOpacityMap.AddPoint(0,0)
+    self.__vrOpacityMap.AddPoint(threshRange[0]-1,0)
+    self.__vrOpacityMap.AddPoint(threshRange[0],1)
+    self.__vrOpacityMap.AddPoint(threshRange[1],1)
+    self.__vrOpacityMap.AddPoint(threshRange[1]+1,0)
+
+    labelsColorNode = slicer.modules.colors.logic().GetColorTableNodeID(10)
+    self.__roiSegmentationNode.GetDisplayNode().SetAndObserveColorNodeID(labelsColorNode)
+
+    Helper.SetLabelVolume(self.__roiSegmentationNode.GetID())
+
+    self.onThresholdChanged()
+    
+    pNode.SetParameter('currentStep', self.stepid)
+    
+
+
+  def updateWidgetFromParameters(self, pNode):
   
-    # baselineROIVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
-    # baselineROIRange = baselineROIVolume.GetImageData().GetScalarRange()
-    # self.__threshRange.minimum = baselineROIRange[0]
-    # self.__threshRange.maximum = baselineROIRange[1]
+    baselineROIVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
+    baselineROIRange = baselineROIVolume.GetImageData().GetScalarRange()
+    self.__threshRange.minimum = baselineROIRange[0]
+    self.__threshRange.maximum = baselineROIRange[1]
 
-    # if pNode.GetParameter('useSegmentationThresholds') == 'True':
-      # self.__useThresholds = True
-      # self.__useThresholdsCheck.setChecked(1)
+    if pNode.GetParameter('useSegmentationThresholds') == 'True':
+      self.__useThresholds = True
+      self.__useThresholdsCheck.setChecked(1)
 
-      # thresholdRange = pNode.GetParameter('thresholdRange')
-      # if thresholdRange != '':
-        # rangeArray = string.split(thresholdRange, ',')
-        # self.__threshRange.minimumValue = float(rangeArray[0])
-        # self.__threshRange.maximumValue = float(rangeArray[1])
-      # else:
-         # Helper.Error('Unexpected parameter values! Error code CT-S03-TNA. Please report')
-    # else:
-      # self.__useThresholdsCheck.setChecked(0)
-      # self.__useThresholds = False
+      thresholdRange = pNode.GetParameter('thresholdRange')
+      if thresholdRange != '':
+        rangeArray = string.split(thresholdRange, ',')
+        self.__threshRange.minimumValue = float(rangeArray[0])
+        self.__threshRange.maximumValue = float(rangeArray[1])
+      else:
+         Helper.Error('Unexpected parameter values! Error code CT-S03-TNA. Please report')
+    else:
+      self.__useThresholdsCheck.setChecked(0)
+      self.__useThresholds = False
 
-    # segmentationID = pNode.GetParameter('croppedBaselineVolumeSegmentationID')
-    # if segmentationID != '':
-      # self.__roiLabelSelector.setCurrentNode(Helper.getNodeByID(segmentationID))
-    # else:
-      # Helper.Error('Unexpected parameter values! Error CT-S03-SNA. Please report')
-    # self.__roiSegmentationNode = Helper.getNodeByID(segmentationID)
+    segmentationID = pNode.GetParameter('croppedBaselineVolumeSegmentationID')
+    if segmentationID != '':
+      self.__roiLabelSelector.setCurrentNode(Helper.getNodeByID(segmentationID))
+    else:
+      Helper.Error('Unexpected parameter values! Error CT-S03-SNA. Please report')
+    self.__roiSegmentationNode = Helper.getNodeByID(segmentationID)

@@ -15,11 +15,23 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     self.interactorObserverTags = []    
     self.styleObserverTags = []
     self.volume = None
+    self.fixedLandmarks = None
+    self.movingLandmarks = None
     self.__vrDisplayNode = None
     self.__roiTransformNode = None
     self.__baselineVolume = None
     self.__roi = None
     self.__roiObserverTag = None
+    self.RMS = 0
+    self.OutputMessage =""
+    self.__vrDisplayNode = None
+    self.__threshold = [ -1, -1 ]  
+    # initialize VR stuff
+    self.__vrLogic = slicer.modules.volumerendering.logic()
+    self.__vrOpacityMap = None
+    self.__roiSegmentationNode = None
+    self.__roiVolume = None
+    
     
 
   def createUserInterface( self ):
@@ -32,8 +44,10 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     self.__layout.addRow(self.loadTemplateButton)
     self.loadTemplateButton.connect('toggled(bool)', self.onRunButtonToggled)
 	
-    self.firstRegButton = qt.QPushButton('Register Template')
-    self.firstRegButton.checkable = True
+    self.firstRegButton = qt.QPushButton('Run Registration')
+    self.__registrationStatus = qt.QLabel('Register Template and Scan')
+    self.__layout.addRow(self.__registrationStatus, self.firstRegButton)
+    self.firstRegButton.checkable = False
     self.__layout.addRow(self.firstRegButton)
     self.firstRegButton.connect('clicked()', self.firstRegistration)
     
@@ -180,6 +194,67 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
 
   def firstRegistration(self):
     print("firstreg")
+    # rigidly register followup to baseline
+    # TODO: do this in a separate step and allow manual adjustment?
+    # TODO: add progress reporting (BRAINSfit does not report progress though)
+    pNode = self.parameterNode()
+    baselineVolumeID = pNode.GetParameter('baselineVolumeID')
+    followupVolumeID = pNode.GetParameter('followupVolumeID')
+    self.__followupTransform = slicer.mrmlScene.CreateNodeByClass('vtkMRMLLinearTransformNode')
+    slicer.mrmlScene.AddNode(self.__followupTransform)
+    sliceNodeCount = slicer.mrmlScene.GetNumberOfNodesByClass('vtkMRMLAnnotationHierarchyNode')
+    self.movingLandmarks = vtk.vtkCollection()
+    for nodeIndex in xrange(sliceNodeCount):
+      sliceNode = slicer.mrmlScene.GetNthNodeByClass(nodeIndex, 'vtkMRMLAnnotationHierarchyNode') 
+      if sliceNode.GetName() == "Fiducial List_moved":
+        sliceNode.GetAssociatedChildrenNodes(self.movingLandmarks)
+    
+    
+
+    parameters = {}
+    parameters["fixedLandmarks"] = slicer.mrmlScene.GetNodeByID("vtkMRMLAnnotationHierarchyNode4")
+    parameters["movingLandmarks"] = slicer.mrmlScene.GetNodeByID("vtkMRMLAnnotationHierarchyNode2")
+    parameters["saveTransform"] = self.__followupTransform
+    parameters["transformType"] = "Rigid"
+    parameters["rms"] = self.RMS
+    parameters["outputMessage"] = self.OutputMessage
+
+
+    # self.__cliNode = None
+    # self.__cliNode = slicer.cli.run(slicer.modules.brainsfit, self.__cliNode, parameters)
+    
+    fidreg = slicer.modules.fiducialregistration
+    print(self.OutputMessage)
+    print(self.RMS)
+    self.__cliNode = None
+    self.__cliNode = slicer.cli.run(fidreg, self.__cliNode, parameters)
+    print(self.OutputMessage)
+    print(self.RMS)
+    
+    self.__cliObserverTag = self.__cliNode.AddObserver('ModifiedEvent', self.processRegistrationCompletion)
+    self.__registrationStatus.setText('Wait ...')
+    self.firstRegButton.setEnabled(0)
+
+
+  def processRegistrationCompletion(self, node, event):
+    status = node.GetStatusString()
+    self.__registrationStatus.setText('Registration '+status)
+    if status == 'Completed':
+      self.firstRegButton.setEnabled(1)
+  
+      pNode = self.parameterNode()
+      followupNode = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('followupVolumeID'))
+      obturatorNode = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('obturatorID'))
+      followupNode.SetAndObserveTransformNodeID(self.__followupTransform.GetID())
+      obturatorNode.SetAndObserveTransformNodeID(self.__followupTransform.GetID())
+  
+  
+      Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),pNode.GetParameter('followupVolumeID'))
+
+      pNode.SetParameter('followupTransformID', self.__followupTransform.GetID())
+    
+
+    
   
   
   def start(self):
@@ -214,29 +289,24 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     self.sliceWidgetsPerStyle = {}
 	
   def processEvent(self,observee,event=None):
-    if self.volume == None :
-      #self.volume = slicer.mrmlScene.GetNthNodeByClass(4,"vtkMRMLAnnotationHierarchyNode")
-      self.volume = Helper.getNodeByName("Fiducial List_fixed")
-    #slicer.modules.reporting.logic().InitializeHierarchyForVolume(self.volume)
-    # newReport.SetVolumeNodeID(self.volume.GetID())
-    print(self.volume)
+    if self.fixedLandmarks == None :
+      self.fixedLandmarks = vtk.vtkCollection()
+
     if self.sliceWidgetsPerStyle.has_key(observee) and event == "LeftButtonPressEvent":
       sliceWidget = self.sliceWidgetsPerStyle[observee]
       style = sliceWidget.sliceView().interactorStyle()          
       xy = style.GetInteractor().GetEventPosition()
       xyz = sliceWidget.convertDeviceToXYZ(xy)
       ras = sliceWidget.convertXYZToRAS(xyz)
+      logic = slicer.modules.annotations.logic()
+      logic.SetActiveHierarchyNodeID("vtkMRMLAnnotationHierarchyNode4")
       fiducial = slicer.mrmlScene.CreateNodeByClass('vtkMRMLAnnotationFiducialNode')
       fiducial.SetReferenceCount(fiducial.GetReferenceCount()-1)
-      # associate it with the volume
-      fiducial.SetAttribute("AssociatedNodeID", self.volume.GetID())
-      # ??? Why the API is so inconsistent -- there's no SetPosition1() ???
       fiducial.SetFiducialCoordinates(ras)
       fiducial.Initialize(slicer.mrmlScene)
       # adding to hierarchy is handled by the Reporting logic
-      hierarchylogic = slicer.vtkMRMLDisplayableHierarchyLogic()
-      hierarchylogic.AddChildToParent(fiducial,self.volume)
-      print(ras)
+      self.fixedLandmarks.AddItem(fiducial)
+
       
   def validate( self, desiredBranchId ):
     '''

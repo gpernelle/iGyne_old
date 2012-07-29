@@ -4,7 +4,7 @@ import iGyneWizard
 
 class iGynePy:
   def __init__( self, parent ):
-    parent.title = """iGyne"""
+    parent.title = """iGynePy"""
     parent.categories = ["""Wizards"""]
     parent.contributors = ["""Andrey Fedorov""", """Xiaojun Chen""", """Guillaume Pernelle""", """Ron Kikinis"""]
     parent.helpText = """ Igyne help....""";
