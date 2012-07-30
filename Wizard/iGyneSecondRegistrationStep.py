@@ -3,6 +3,7 @@ from __main__ import qt, ctk, slicer
 from iGyneStep import *
 from Helper import *
 from EditorLib import *
+import math
 
 import string
 
@@ -22,6 +23,14 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.styleObserverTags = []
     self.volume = None
     self.__threshold = [ -1, -1 ]
+    self.pointId = 0
+    self.vtkMatInitial = vtk.vtkMatrix4x4()
+    self.glyphPoints = vtk.vtkPoints()
+    self.glyphInputData= vtk.vtkPolyData()
+    self.glyphBalls = vtk.vtkSphereSource()
+    self.glyphPoints3D = vtk.vtkGlyph3D()
+    self.pointId = 0
+    # self.transformNode = vtk.vtkMRMLLinearTransformNode()
        
     # initialize VR stuff
 
@@ -81,27 +90,87 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.__secondReg.connect('clicked()', self.ICPRegistration)
     self.__layout.addRow(self.__secondReg)
 
+  def setPointData(self,fHoleOriginX,fHoleOriginY):
+    fTipPoint,fTipPointTrans=[0,0,0,0],[0,0,0,0]
+    for k in xrange(10):
+      for i in xrange(36):
+        
+        fTipPoint[0]=fHoleOriginX+1.25*math.cos(math.pi/180.0*i*10)
+        fTipPoint[1]=fHoleOriginY+1.25*math.sin(math.pi/180.0*i*10)
+        fTipPoint[2]=k
+        fTipPoint[3]=float(1)
+        self.vtkMatInitial.MultiplyPoint(fTipPoint, fTipPointTrans)
+
+        self.glyphPoints.InsertPoint(self.pointId, fTipPointTrans[0], fTipPointTrans[1],fTipPointTrans[2])
+        self.pointId += 1
+        print(self.pointId,self.vtkMatInitial )
+  
   def ICPRegistration(self):
     scene = slicer.mrmlScene
-    inputSurface = scene.GetNodeByID("vtkMRMLModelNode6")
+
+    transformNode= scene.GetNodeByID("vtkMRMLLinearTransformNode4")
+    self.vtkMatInitial = transformNode.GetMatrixTransformToParent()
+    
+    self.setPointData(50,28.019)
+    self.setPointData(40.209,24.456)
+    self.setPointData(35,14)
+    self.setPointData(24.647,15.363)
+    self.setPointData(15,19.359)
+    self.setPointData(15,88.641)
+    self.setPointData(24.647,92.637)
+    self.setPointData(35,94)
+    self.setPointData(45.353,92.637)
+    self.setPointData(55,88.641)
+    self.setPointData(55,19.359)
+    self.setPointData(45.353,15.363)
+    self.setPointData(30.642,4.19)
+    self.setPointData(22.059,5.704)
+    self.setPointData(22.059,102.296)
+    self.setPointData(30.642,103.81)
+    self.setPointData(39.358,103.81)
+    self.setPointData(47.941,102.296)
+    self.setPointData(47.941,5.704)
+    self.setPointData(39.358,4.19)
+    print(self.glyphPoints)
+    self.glyphInputData.SetPoints(self.glyphPoints)
+    self.glyphInputData.Update()
+
+    self.glyphBalls.SetRadius(0.05)
+    self.glyphBalls.SetThetaResolution(6)
+    self.glyphBalls.SetPhiResolution(10)
+
+    self.glyphPoints3D.SetInput(self.glyphInputData)
+    self.glyphPoints3D.SetSource(self.glyphBalls.GetOutput())
+    self.glyphPoints3D.Update()  
+    print(self.glyphPoints3D)
+    inputSurface = scene.GetNodeByID("vtkMRMLModelNode4")
     targetSurface = scene.GetNodeByID("vtkMRMLModelNode4")
-    outputSurface = scene.GetNodeByID("vtkMRMLModelNode4")
-    outputSurface2 = scene.GetNodeByID("vtkMRMLModelNode4")     
+    # outputSurface = scene.GetNodeByID("vtkMRMLModelNode4")
+    # outputSurface2 = scene.GetNodeByID("vtkMRMLModelNode5")     
     icpTransform = vtk.vtkIterativeClosestPointTransform()
-    icpTransform.SetSource(inputSurface.GetPolyData())
+    icpTransform.SetSource(self.glyphInputData)
     icpTransform.SetTarget(targetSurface.GetPolyData())
     icpTransform.GetLandmarkTransform().SetModeToRigidBody()
     icpTransform.SetMeanDistanceModeToAbsoluteValue()
-    icpTransform.SetMaximumNumberOfIterations(50)
+    icpTransform.SetCheckMeanDistance(0)
+    icpTransform.SetMaximumMeanDistance(0.01)
+    icpTransform.SetMaximumNumberOfIterations(300)
     icpTransform.SetMaximumNumberOfLandmarks(1000)
+    icpTransform.Update()
+    nIterations = icpTransform.GetNumberOfIterations()
+    FinalMatrix = vtk.vtkMatrix4x4()
+    print(icpTransform.GetMatrix())
+    FinalMatrix.Multiply4x4(icpTransform.GetMatrix(),self.vtkMatInitial,FinalMatrix)
+    transformNode.SetAndObserveMatrixTransformToParent(FinalMatrix)
+    print(FinalMatrix)
     
-    transformFilter = vtk.vtkTransformPolyDataFilter()
-    transformFilter.SetInput(inputSurface.GetPolyData())
-    transformFilter.SetTransform(icpTransform)        
-    transformFilter.Update()
     
-    outputSurface.SetAndObservePolyData(transformFilter.GetOutput())
-    outputSurface2.SetAndObservePolyData(transformFilter.GetOutput())
+    # outputSurface.SetAndObservePolyData(transformFilter.GetOutput())
+    # outputSurface2.SetAndObservePolyData(transformFilter.GetOutput())
+    # transform = outputSurface.GetMatrixtransformToParent()
+    # transform2 = outputSurface2.GetMatrixtransformToParent()
+    # transform.ApplyTransformMatrix(icpTransform.GetMatrix())
+    # transform2.ApplyTransformMatrix(icpTransform.GetMatrix())
     
     
   def onThresholdsCheckChanged(self):

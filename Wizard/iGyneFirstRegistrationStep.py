@@ -32,6 +32,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     self.__roiSegmentationNode = None
     self.__roiVolume = None
     self.click = 0
+    self.register = 0
     
     
 
@@ -212,6 +213,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),pNode.GetParameter('followupVolumeID'))
 
       pNode.SetParameter('followupTransformID', self.__followupTransform.GetID())
+      self.registered = 1
     
 
   def start(self):    
@@ -259,15 +261,16 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       fiducial.SetReferenceCount(fiducial.GetReferenceCount()-1)
       fiducial.SetFiducialCoordinates(ras)
       if self.click == 0:
-        # fiducial.setName"fix_top")
+        fiducial.SetName("top")
         self.click += 1
       elif self.click == 1:
-        # fiducial.setName("fix_left")
+        fiducial.SetName("left")
         self.click += 1
       elif self.click == 2:
-        # fiducial.setName("fix_right")
+        fiducial.SetName("right")
         self.click = 0
         self.fiducialButton.setEnabled(0)
+        self.firstRegistration()
         self.stop()
         
       fiducial.Initialize(slicer.mrmlScene)
@@ -279,7 +282,11 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     '''
     '''
     self.__parent.validate( desiredBranchId )    
-    self.__parent.validationSucceeded(desiredBranchId)  
+    self.__parent.validationSucceeded(desiredBranchId)
+    if self.registered == 1:
+      self.__parent.validationSucceeded(desiredBranchId)
+    else:
+      self.__parent.validationFailed(desiredBranchId, 'Error',"Haven't you forgotten to register the template?")    
 
   def onEntry(self,comingFrom,transitionType):
     super(iGyneFirstRegistrationStep, self).onEntry(comingFrom, transitionType)
