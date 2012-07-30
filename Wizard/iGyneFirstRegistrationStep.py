@@ -159,7 +159,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       self.fiducialButton.text = "Choose Fiducial Points"
 
   def firstRegistration(self):
-    print("firstreg")
+
     # rigidly register followup to baseline
     # TODO: do this in a separate step and allow manual adjustment?
     # TODO: add progress reporting (BRAINSfit does not report progress though)
@@ -184,18 +184,11 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     parameters["transformType"] = "Rigid"
     parameters["rms"] = self.RMS
     parameters["outputMessage"] = self.OutputMessage
-
-
-    # self.__cliNode = None
-    # self.__cliNode = slicer.cli.run(slicer.modules.brainsfit, self.__cliNode, parameters)
     
     fidreg = slicer.modules.fiducialregistration
-    print(self.OutputMessage)
-    print(self.RMS)
     self.__cliNode = None
     self.__cliNode = slicer.cli.run(fidreg, self.__cliNode, parameters)
-    print(self.OutputMessage)
-    print(self.RMS)
+
     
     self.__cliObserverTag = self.__cliNode.AddObserver('ModifiedEvent', self.processRegistrationCompletion)
     self.__registrationStatus.setText('Wait ...')
@@ -378,7 +371,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       roiRange = outputVolume.GetImageData().GetScalarRange()
 
       # default threshold is half-way of the range
-      thresholdParameter = str(0.5*(roiRange[0]+roiRange[1]))+','+str(roiRange[1])
+      thresholdParameter = str(0.3*(roiRange[0]+roiRange[1]))+','+str(roiRange[1])
       pNode.SetParameter('thresholdRange', thresholdParameter)
       pNode.SetParameter('useSegmentationThresholds', 'True')
 
