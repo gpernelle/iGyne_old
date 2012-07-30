@@ -81,17 +81,18 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.__secondReg.connect('clicked()', self.ICPRegistration)
     self.__layout.addRow(self.__secondReg)
 
-  def ICPRegistration(self)
+  def ICPRegistration(self):
     scene = slicer.mrmlScene
     inputSurface = scene.GetNodeByID("vtkMRMLModelNode6")
     targetSurface = scene.GetNodeByID("vtkMRMLModelNode4")
-    outputSurface = scene.CreateNodeByClass("vtkMRMLModelNode")  
+    outputSurface = scene.GetNodeByID("vtkMRMLModelNode4")
+    outputSurface2 = scene.GetNodeByID("vtkMRMLModelNode4")     
     icpTransform = vtk.vtkIterativeClosestPointTransform()
     icpTransform.SetSource(inputSurface.GetPolyData())
     icpTransform.SetTarget(targetSurface.GetPolyData())
     icpTransform.GetLandmarkTransform().SetModeToRigidBody()
     icpTransform.SetMeanDistanceModeToAbsoluteValue()
-    icpTransform.SetMaximumNumberOfIterations(20)
+    icpTransform.SetMaximumNumberOfIterations(50)
     icpTransform.SetMaximumNumberOfLandmarks(1000)
     
     transformFilter = vtk.vtkTransformPolyDataFilter()
@@ -100,6 +101,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     transformFilter.Update()
     
     outputSurface.SetAndObservePolyData(transformFilter.GetOutput())
+    outputSurface2.SetAndObservePolyData(transformFilter.GetOutput())
+    
     
   def onThresholdsCheckChanged(self):
     if self.__useThresholdsCheck.isChecked():
