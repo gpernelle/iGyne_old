@@ -201,7 +201,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     thresh.ReplaceInOn()
     thresh.Update()
 
-    self.__modelNode = slicer.mrmlScene.CreateNodeByClass('vtkMRMLModelNode')
+    # self.__modelNode = slicer.mrmlScene.CreateNodeByClass('vtkMRMLModelNode')
     self.__roiSegmentationNode.SetAndObserveImageData(thresh.GetOutput())
     Helper.SetBgFgVolumes(pNode.GetParameter('croppedBaselineVolumeID'),'')
     self.__secondReg.setEnabled(1)
@@ -276,7 +276,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.__parent.validationSucceeded(desiredBranchId)
 
   def onExit(self, goingTo, transitionType):
-    if goingTo.id() != 'DefineROI' and goingTo.id() != 'AnalyzeROI':
+    if goingTo.id() != 'FirstRegistration' and goingTo.id() != 'NeedleSegmentation':
       return
 
     pNode = self.parameterNode()
