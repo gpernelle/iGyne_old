@@ -204,7 +204,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.__modelNode = slicer.mrmlScene.CreateNodeByClass('vtkMRMLModelNode')
     self.__roiSegmentationNode.SetAndObserveImageData(thresh.GetOutput())
     Helper.SetBgFgVolumes(pNode.GetParameter('croppedBaselineVolumeID'),'')
-    selh.__secondReg.setEnabled(1)
+    self.__secondReg.setEnabled(1)
 
     # set up the model maker node 
     parameters = {} 
