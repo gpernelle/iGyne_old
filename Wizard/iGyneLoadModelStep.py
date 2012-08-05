@@ -24,6 +24,7 @@ class iGyneLoadModelStep( iGyneStep ) :
     self.__baselineVolumeSelector.setMRMLScene(slicer.mrmlScene)
     self.__baselineVolumeSelector.addEnabled = 0
 
+
     # followupScanLabel = qt.QLabel( 'Followup scan:' )
     # self.__followupVolumeSelector = slicer.qMRMLNodeComboBox()
     # self.__followupVolumeSelector.toolTip = "Choose the followup scan"

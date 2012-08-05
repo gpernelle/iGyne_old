@@ -58,8 +58,9 @@ class iGynePyWidget:
     loadModelStep = iGyneWizard.iGyneLoadModelStep( 'LoadModel'  )
     firstRegistrationStep = iGyneWizard.iGyneFirstRegistrationStep( 'FirstRegistration'  )
     secondRegistrationStep = iGyneWizard.iGyneSecondRegistrationStep( 'SecondRegistration'  )
+    needlePlanningStep = iGyneWizard.iGyneNeedlePlanningStep( 'NeedlePlanning'  )
     needleSegmentationStep = iGyneWizard.iGyneNeedleSegmentationStep( 'NeedleSegmentation'  )
-#    registerROIStep = iGyneWizard.iGyneRegisterROIStep( 'RegisterROI'  )
+
 
     # add the wizard steps to an array for convenience
     allSteps = []
@@ -69,18 +70,18 @@ class iGynePyWidget:
     allSteps.append( loadModelStep )
     allSteps.append( firstRegistrationStep )
     allSteps.append( secondRegistrationStep )
+    allSteps.append( needlePlanningStep )
     allSteps.append( needleSegmentationStep )
 #    allSteps.append( registerROIStep )
 
 ##     Add transition for the first step which let's the user choose between simple and advanced mode
-    # self.workflow.addTransition( selectProcedureStep, selectApplicatorStep )
-    # self.workflow.addTransition( selectApplicatorStep, loadModelStep )
     self.workflow.addTransition( selectProcedureStep, selectApplicatorStep )
     self.workflow.addTransition( selectApplicatorStep, loadModelStep )
     self.workflow.addTransition( loadModelStep, firstRegistrationStep )
     self.workflow.addTransition( firstRegistrationStep, secondRegistrationStep )
-    self.workflow.addTransition( secondRegistrationStep, needleSegmentationStep )
-#    self.workflow.addTransition( firstRegistrationStep, registerROIStep )
+    self.workflow.addTransition( secondRegistrationStep, needlePlanningStep )
+    self.workflow.addTransition( needlePlanningStep, needleSegmentationStep )
+
 
     nNodes = slicer.mrmlScene.GetNumberOfNodesByClass('vtkMRMLScriptedModuleNode')
 
@@ -116,6 +117,8 @@ class iGynePyWidget:
         self.workflow.setInitialStep(firstRegistrationStep)
       if currentStep == 'SecondRegistration':
         self.workflow.setInitialStep(secondRegistrationStep)
+      if currentStep == 'NeedlePlanning':
+        self.workflow.setInitialStep(needlePlanningStep)
       if currentStep == 'NeedleSegmentation':
         self.workflow.setInitialStep(needleSegmentationStep)
     else:
