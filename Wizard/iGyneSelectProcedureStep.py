@@ -29,8 +29,7 @@ class iGyneSelectProcedureStep( iGyneStep ) :
     groupboxLayout.setVerticalSpacing(700)
     groupboxLayout.addRow(t)
     groupboxLayout.addRow(t2)
-    groupboxLayout.addRow(t)
-   
+
 
     
     
@@ -59,8 +58,212 @@ class iGyneSelectProcedureStep( iGyneStep ) :
    
 ###############################################################################
 #################################################################################
+  def createSpinbox(self, popup, popupSpinbox):
+
+    popupLayout = qt.QHBoxLayout(popup)  
+    popupLayout.addWidget(popupSpinbox) 
+
+    sizePolicy1 = qt.QSizePolicy()
+    sizePolicy1.setHorizontalStretch(0)
+    sizePolicy1.setVerticalStretch(0)
+    sizePolicy1.setHeightForWidth(popupSpinbox.sizePolicy.hasHeightForWidth())
+    popupSpinbox.setStyleSheet("background-color: rgb(255, 255, 255)")
+    popupSpinbox.setSizePolicy(sizePolicy1)
+    popupSpinbox.setMaximum(300)
+    popupSpinbox.setValue(170)  
+
+  def setNeedleCoordinates(self):
+    self.p = [[0 for j in range(63)] for j in range(3)]
+    self.p[0][0]=35
+    self.p[1][0]=34
+    self.p[0][1]=25
+    self.p[1][1]=36.679
+    self.p[0][2]=17.679
+    self.p[1][2]=44
+    self.p[0][3]=15
+    self.p[1][3]=54
+    self.p[0][4]=17.679
+    self.p[1][4]=64
+    self.p[0][5]=25
+    self.p[1][5]=71.321
+    self.p[0][6]=35
+    self.p[1][6]=74
+    self.p[0][7]=45
+    self.p[1][7]=71.321
+    self.p[0][8]=52.321
+    self.p[1][8]=64
+    self.p[0][9]=55
+    self.p[1][9]=54
+    self.p[0][10]=52.321
+    self.p[1][10]=44
+    self.p[0][11]=45
+    self.p[1][11]=36.679
+    self.p[0][12]=29.791
+    self.p[1][12]=24.456
+    self.p[0][13]=20
+    self.p[1][13]=28.019
+    self.p[0][14]=12.019
+    self.p[1][14]=34.716
+    self.p[0][15]=6.809
+    self.p[1][15]=43.739
+    self.p[0][16]=5
+    self.p[1][16]=54
+    self.p[0][17]=6.809
+    self.p[1][17]=64.261
+    self.p[0][18]=12.019
+    self.p[1][18]=73.284
+    self.p[0][19]=20
+    self.p[1][19]=79.981
+    self.p[0][20]=29.791
+    self.p[1][20]=83.544
+    self.p[0][21]=40.209
+    self.p[1][21]=83.544
+    self.p[0][22]=50
+    self.p[1][22]=79.981
+    self.p[0][23]=57.981
+    self.p[1][23]=73.284
+    self.p[0][24]=63.191
+    self.p[1][24]=64.262
+    self.p[0][25]=65
+    self.p[1][25]=54
+    self.p[0][26]=63.191
+    self.p[1][26]=43.739
+    self.p[0][27]=57.981
+    self.p[1][27]=34.716
+    self.p[0][28]=50
+    self.p[1][28]=28.019
+    self.p[0][29]=40.209
+    self.p[1][29]=24.456
+    self.p[0][30]=35
+    self.p[1][30]=14
+    self.p[0][31]=24.647
+    self.p[1][31]=15.363
+    self.p[0][32]=15
+    self.p[1][32]=19.359
+    self.p[0][33]=15
+    self.p[1][33]=88.641
+    self.p[0][34]=24.647
+    self.p[1][34]=92.637
+    self.p[0][35]=35
+    self.p[1][35]=94
+    self.p[0][36]=45.353
+    self.p[1][36]=92.637
+    self.p[0][37]=55
+    self.p[1][37]=88.641
+    self.p[0][38]=55
+    self.p[1][38]=19.359
+    self.p[0][39]=45.353
+    self.p[1][39]=15.363
+    self.p[0][40]=30.642
+    self.p[1][40]=4.19
+    self.p[0][41]=22.059
+    self.p[1][41]=5.704
+    self.p[0][42]=22.059
+    self.p[1][42]=102.296
+    self.p[0][43]=30.642
+    self.p[1][43]=103.81
+    self.p[0][44]=39.358
+    self.p[1][44]=103.81
+    self.p[0][45]=47.941
+    self.p[1][45]=102.296
+    self.p[0][46]=47.941
+    self.p[1][46]=5.704
+    self.p[0][47]=39.358
+    self.p[1][47]=4.19
+    self.p[0][48]=29.7
+    self.p[1][48]=44.82
+    self.p[0][49]=24.4
+    self.p[1][49]=54
+    self.p[0][50]=29.7
+    self.p[1][50]=63.18
+    self.p[0][51]=40.3
+    self.p[1][51]=63.18
+    self.p[0][52]=45.6
+    self.p[1][52]=54
+    self.p[0][53]=40.3
+    self.p[1][53]=44.82
+    self.p[0][54]=35
+    self.p[1][54]=54
+    self.p[0][55]=9
+    self.p[1][55]=12
+    self.p[0][56]=5
+    self.p[1][56]=18
+    self.p[0][57]=5
+    self.p[1][57]=90
+    self.p[0][58]=9
+    self.p[1][58]=96
+    self.p[0][59]=61
+    self.p[1][59]=96
+    self.p[0][60]=65
+    self.p[1][60]=90
+    self.p[0][61]=65
+    self.p[1][61]=18
+    self.p[0][62]=61
+    self.p[1][62]=12
+
+  def computerPolydataAndMatrix(self):
+
+    Cylinder = vtk.vtkCylinderSource()
+
+    Cylinder.SetResolution(1000)
+    Cylinder.SetCapping(1) 
+    Cylinder.SetHeight( float(200.0) )
+    Cylinder.SetRadius( float(1.0) )
+    self.m_polyCylinder=Cylinder.GetOutput()
+
+    self.m_vtkmat = vtk.vtkMatrix4x4()
+    self.m_vtkmat.Identity()
+
+    RestruMatrix=vtk.vtkMatrix4x4()
+    WorldMatrix=vtk.vtkMatrix4x4()
+    Restru2WorldMatrix=vtk.vtkMatrix4x4()
+
+    RestruMatrix.SetElement(0,0,0)
+    RestruMatrix.SetElement(1,0,0)
+    RestruMatrix.SetElement(2,0,0)
+    RestruMatrix.SetElement(3,0,1)
+
+    RestruMatrix.SetElement(0,1,1)
+    RestruMatrix.SetElement(1,1,0)
+    RestruMatrix.SetElement(2,1,0)
+    RestruMatrix.SetElement(3,1,1)
+
+    RestruMatrix.SetElement(0,2,0)
+    RestruMatrix.SetElement(1,2,1)
+    RestruMatrix.SetElement(2,2,0)
+    RestruMatrix.SetElement(3,2,1)
+
+    RestruMatrix.SetElement(0,3,0)
+    RestruMatrix.SetElement(1,3,0)
+    RestruMatrix.SetElement(2,3,1)
+    RestruMatrix.SetElement(3,3,1)
+
+    WorldMatrix.SetElement(0,0,0)
+    WorldMatrix.SetElement(1,0,0)
+    WorldMatrix.SetElement(2,0,0)
+    WorldMatrix.SetElement(3,0,1)
+
+    WorldMatrix.SetElement(0,1,1)
+    WorldMatrix.SetElement(1,1,0)
+    WorldMatrix.SetElement(2,1,0)
+    WorldMatrix.SetElement(3,1,1)
+
+    WorldMatrix.SetElement(0,2,0)
+    WorldMatrix.SetElement(1,2,0)
+    WorldMatrix.SetElement(2,2,-1)
+    WorldMatrix.SetElement(3,2,1)
+
+    WorldMatrix.SetElement(0,3,0)
+    WorldMatrix.SetElement(1,3,1)
+    WorldMatrix.SetElement(2,3,0)
+    WorldMatrix.SetElement(3,3,1)
+
+    WorldMatrix.Invert()
+    Restru2WorldMatrix.Multiply4x4(RestruMatrix,WorldMatrix,self.m_vtkmat)
 
   def setupUi(self, TemplateSheetWidget):
+    self.computerPolydataAndMatrix() 
+    self.setNeedleCoordinates()
     TemplateSheetWidget.setObjectName(("TemplateSheetWidget"))
     TemplateSheetWidget.resize(552, 682)
     self.label = qt.QLabel(TemplateSheetWidget)
@@ -1467,9 +1670,485 @@ class iGyneSelectProcedureStep( iGyneStep ) :
     self.RegistrationProcessingLabel.setGeometry(qt.QRect(462, 60, 54, 12))
     self.RegistrationProcessingLabel.setText((""))
     self.RegistrationProcessingLabel.setObjectName(("RegistrationProcessingLabel"))
+#------------------------------------------------------------------------------------
+    # self.AddVolumePushButton.connect( "clicked()", self.addVolume())
+    # self.LoadTemplatePushButton.connect( "clicked()", self.loadTemplate())
+    self.SelectNeedlesPushButton.connect( "clicked()", self.selectNeedles())
 
-    self.retranslateUi(TemplateSheetWidget)
-    # qt.QMetaObject.connectSlotsByName(TemplateSheetWidget)
+    self.IuRadioButton.connect( "clicked()", self.showIuNeedle())
+    self.AaRadioButton.connect( "clicked()", self.showAaNeedle())
+    self.AbRadioButton.connect( "clicked()", self.showAbNeedle())
+    self.AcRadioButton.connect( "clicked()", self.showAcNeedle())
+    self.AdRadioButton.connect( "clicked()", self.showAdNeedle())
+    self.AeRadioButton.connect( "clicked()", self.showAeNeedle())
+    self.AfRadioButton.connect( "clicked()", self.showAfNeedle())
+    self.BaRadioButton.connect( "clicked()", self.showBaNeedle())
+    self.BbRadioButton.connect( "clicked()", self.showBbNeedle())
+    self.BcRadioButton.connect( "clicked()", self.showBcNeedle())
+    self.BdRadioButton.connect( "clicked()", self.showBdNeedle())
+    self.BeRadioButton.connect( "clicked()", self.showBeNeedle())
+    self.BfRadioButton.connect( "clicked()", self.showBfNeedle())
+    self.BgRadioButton.connect( "clicked()", self.showBgNeedle())
+    self.BhRadioButton.connect( "clicked()", self.showBhNeedle())
+    self.BiRadioButton.connect( "clicked()", self.showBiNeedle())
+    self.BjRadioButton.connect( "clicked()", self.showBjNeedle())
+    self.BkRadioButton.connect( "clicked()", self.showBkNeedle())
+    self.BlRadioButton.connect( "clicked()", self.showBlNeedle())
+    self.CaRadioButton.connect( "clicked()", self.showCaNeedle())
+    self.CbRadioButton.connect( "clicked()", self.showCbNeedle())
+    self.CcRadioButton.connect( "clicked()", self.showCcNeedle())
+    self.CdRadioButton.connect( "clicked()", self.showCdNeedle())
+    self.CeRadioButton.connect( "clicked()", self.showCeNeedle())
+    self.CfRadioButton.connect( "clicked()", self.showCfNeedle())
+    self.CgRadioButton.connect( "clicked()", self.showCgNeedle())
+    self.ChRadioButton.connect( "clicked()", self.showChNeedle())
+    self.CiRadioButton.connect( "clicked()", self.showCiNeedle())
+    self.CjRadioButton.connect( "clicked()", self.showCjNeedle())
+    self.CkRadioButton.connect( "clicked()", self.showCkNeedle())
+    self.ClRadioButton.connect( "clicked()", self.showClNeedle())
+    self.CmRadioButton.connect( "clicked()", self.showCmNeedle())
+    self.CnRadioButton.connect( "clicked()", self.showCnNeedle())
+    self.CoRadioButton.connect( "clicked()", self.showCoNeedle())
+    self.CpRadioButton.connect( "clicked()", self.showCpNeedle())
+    self.CqRadioButton.connect( "clicked()", self.showCqNeedle())
+    self.CrRadioButton.connect( "clicked()", self.showCrNeedle())
+    self.DaRadioButton.connect( "clicked()", self.showDaNeedle())
+    self.DbRadioButton.connect( "clicked()", self.showDbNeedle())
+    self.DcRadioButton.connect( "clicked()", self.showDcNeedle())
+    self.DdRadioButton.connect( "clicked()", self.showDdNeedle())
+    self.DeRadioButton.connect( "clicked()", self.showDeNeedle())
+    self.DfRadioButton.connect( "clicked()", self.showDfNeedle())
+    self.DgRadioButton.connect( "clicked()", self.showDgNeedle())
+    self.DhRadioButton.connect( "clicked()", self.showDhNeedle())
+    self.DiRadioButton.connect( "clicked()", self.showDiNeedle())
+    self.DjRadioButton.connect( "clicked()", self.showDjNeedle())
+    self.EaRadioButton.connect( "clicked()", self.showEaNeedle())
+    self.EbRadioButton.connect( "clicked()", self.showEbNeedle())
+    self.EcRadioButton.connect( "clicked()", self.showEcNeedle())
+    self.EdRadioButton.connect( "clicked()", self.showEdNeedle())
+    self.EeRadioButton.connect( "clicked()", self.showEeNeedle())
+    self.EfRadioButton.connect( "clicked()", self.showEfNeedle())
+    self.EgRadioButton.connect( "clicked()", self.showEgNeedle())
+    self.EhRadioButton.connect( "clicked()", self.showEhNeedle())
+    self.FaRadioButton.connect( "clicked()", self.showFaNeedle())
+    self.FbRadioButton.connect( "clicked()", self.showFbNeedle())
+    self.FcRadioButton.connect( "clicked()", self.showFcNeedle())
+    self.FdRadioButton.connect( "clicked()", self.showFdNeedle())
+    self.FeRadioButton.connect( "clicked()", self.showFeNeedle())
+    self.FfRadioButton.connect( "clicked()", self.showFfNeedle())
+    self.FgRadioButton.connect( "clicked()", self.showFgNeedle())
+    self.FhRadioButton.connect( "clicked()", self.showFhNeedle())
+     
+    self.ShowNeedlesPushButton.connect( "clicked()", self.showNeedles())
+    # self.CADmodel2ImageRegPushButton.connect( "clicked()", self.registerCADmodelToImage()) 
+    # self.ObturatorSpinBox.connect("valueChanged(int)", self.pushObutrator())
+
+    self.IuColorPushButton.connect( "clicked()",self.setIuColor())
+    self.AaColorPushButton.connect( "clicked()", self.setAaColor())
+    self.AbColorPushButton.connect( "clicked()", self.setAbColor())
+    self.AcColorPushButton.connect( "clicked()", self.setAcColor())
+    self.AdColorPushButton.connect( "clicked()", self.setAdColor())
+    self.AeColorPushButton.connect( "clicked()", self.setAeColor())
+    self.AfColorPushButton.connect( "clicked()", self.setAfColor())
+    self.BaColorPushButton.connect( "clicked()",self.setBaColor())
+    self.BbColorPushButton.connect( "clicked()", self.setBbColor())
+    self.BcColorPushButton.connect( "clicked()", self.setBcColor())
+    self.BdColorPushButton.connect( "clicked()", self.setBdColor())
+    self.BeColorPushButton.connect( "clicked()", self.setBeColor())
+    self.BfColorPushButton.connect( "clicked()", self.setBfColor())
+    self.BgColorPushButton.connect( "clicked()", self.setBgColor())
+    self.BhColorPushButton.connect( "clicked()", self.setBhColor())
+    self.BiColorPushButton.connect( "clicked()", self.setBiColor())
+    self.BjColorPushButton.connect( "clicked()", self.setBjColor())
+    self.BkColorPushButton.connect( "clicked()", self.setBkColor())
+    self.BlColorPushButton.connect( "clicked()", self.setBlColor())
+    self.CaColorPushButton.connect( "clicked()", self.setCaColor())
+    self.CbColorPushButton.connect( "clicked()", self.setCbColor())
+    self.CcColorPushButton.connect( "clicked()", self.setCcColor())
+    self.CdColorPushButton.connect( "clicked()", self.setCdColor())
+    self.CeColorPushButton.connect( "clicked()", self.setCeColor())
+    self.CfColorPushButton.connect( "clicked()", self.setCfColor())
+    self.CgColorPushButton.connect( "clicked()", self.setCgColor())
+    self.ChColorPushButton.connect( "clicked()", self.setChColor())
+    self.CiColorPushButton.connect( "clicked()", self.setCiColor())
+    self.CjColorPushButton.connect( "clicked()", self.setCjColor())
+    self.CkColorPushButton.connect( "clicked()", self.setCkColor())
+    self.ClColorPushButton.connect( "clicked()", self.setClColor())
+    self.CmColorPushButton.connect( "clicked()", self.setCmColor())
+    self.CnColorPushButton.connect( "clicked()", self.setCnColor())
+    self.CoColorPushButton.connect( "clicked()", self.setCoColor())
+    self.CpColorPushButton.connect( "clicked()", self.setCpColor())
+    self.CqColorPushButton.connect( "clicked()", self.setCqColor())
+    self.CrColorPushButton.connect( "clicked()", self.setCrColor())
+    self.DaColorPushButton.connect( "clicked()", self.setDaColor())
+    self.DbColorPushButton.connect( "clicked()", self.setDbColor())
+    self.DcColorPushButton.connect( "clicked()", self.setDcColor())
+    self.DdColorPushButton.connect( "clicked()", self.setDdColor())
+    self.DeColorPushButton.connect( "clicked()", self.setDeColor())
+    self.DfColorPushButton.connect( "clicked()", self.setDfColor())
+    self.DgColorPushButton.connect( "clicked()", self.setDgColor())
+    self.DhColorPushButton.connect( "clicked()", self.setDhColor())
+    self.DiColorPushButton.connect( "clicked()", self.setDiColor())
+    self.DjColorPushButton.connect( "clicked()", self.setDjColor())
+    self.EaColorPushButton.connect( "clicked()", self.setEaColor())
+    self.EbColorPushButton.connect( "clicked()", self.setEbColor())
+    self.EcColorPushButton.connect( "clicked()", self.setEcColor())
+    self.EdColorPushButton.connect( "clicked()", self.setEdColor())
+    self.EeColorPushButton.connect( "clicked()", self.setEeColor())
+    self.EfColorPushButton.connect( "clicked()", self.setEfColor())
+    self.EgColorPushButton.connect( "clicked()", self.setEgColor())
+    self.EhColorPushButton.connect( "clicked()", self.setEhColor())  
+    self.FaColorPushButton.connect( "clicked()", self.setFaColor())
+    self.FbColorPushButton.connect( "clicked()", self.setFbColor())
+    self.FcColorPushButton.connect( "clicked()", self.setFcColor())
+    self.FdColorPushButton.connect( "clicked()", self.setFdColor())
+    self.FeColorPushButton.connect( "clicked()", self.setFeColor())
+    self.FfColorPushButton.connect( "clicked()", self.setFfColor())
+    self.FgColorPushButton.connect( "clicked()", self.setFgColor())
+    self.FhColorPushButton.connect( "clicked()", self.setFhColor())  
+     
+    popup = ctk.ctkPopupWidget(self.BaColorPushButton)
+    self.popupSpinboxBa = qt.QSpinBox(popup)
+    self.createSpinbox(popup,self.popupSpinboxBa)
+    self.popupSpinboxBa.connect("valueChanged(int)", self.pushBaNeedle())
+
+    popupBb = ctk.ctkPopupWidget(self.BbColorPushButton)
+    self.popupSpinboxBb = qt.QSpinBox(popupBb)
+    self.createSpinbox(popupBb,self.popupSpinboxBb)
+    self.popupSpinboxBb.connect("valueChanged(int)", self.pushBbNeedle())
+
+    popupBc = ctk.ctkPopupWidget(self.BcColorPushButton)
+    self.popupSpinboxBc = qt.QSpinBox(popupBc)
+    self.createSpinbox(popupBc,self.popupSpinboxBc)
+    self.popupSpinboxBc.connect("valueChanged(int)", self.pushBcNeedle())
+
+    popupBd = ctk.ctkPopupWidget(self.BdColorPushButton)
+    self.popupSpinboxBd = qt.QSpinBox(popupBd)
+    self.createSpinbox(popupBd,self.popupSpinboxBd)
+    self.popupSpinboxBd.connect("valueChanged(int)", self.pushBdNeedle())
+
+    popupBe = ctk.ctkPopupWidget(self.BeColorPushButton)
+    self.popupSpinboxBe = qt.QSpinBox(popupBe)
+    self.createSpinbox(popupBe,self.popupSpinboxBe)
+    self.popupSpinboxBe.connect("valueChanged(int)", self.pushBeNeedle())
+
+    popupBf = ctk.ctkPopupWidget(self.BfColorPushButton)
+    self.popupSpinboxBf = qt.QSpinBox(popupBf)
+    self.createSpinbox(popupBf,self.popupSpinboxBf)
+    self.popupSpinboxBf.connect("valueChanged(int)", self.pushBfNeedle())
+
+    popupBg = ctk.ctkPopupWidget(self.BgColorPushButton)
+    self.popupSpinboxBg = qt.QSpinBox(popupBg)
+    self.createSpinbox(popupBg,self.popupSpinboxBg)
+    self.popupSpinboxBg.connect("valueChanged(int)", self.pushBgNeedle())
+
+    popupBh = ctk.ctkPopupWidget(self.BhColorPushButton)
+    self.popupSpinboxBh = qt.QSpinBox(popupBh)
+    self.createSpinbox(popupBh,self.popupSpinboxBh)
+    self.popupSpinboxBh.connect("valueChanged(int)", self.pushBhNeedle())
+
+    popupBi = ctk.ctkPopupWidget(self.BiColorPushButton)
+    self.popupSpinboxBi = qt.QSpinBox(popupBi)
+    self.createSpinbox(popupBi,self.popupSpinboxBi)
+    self.popupSpinboxBi.connect("valueChanged(int)", self.pushBiNeedle())
+
+    popupBj = ctk.ctkPopupWidget(self.BjColorPushButton)
+    self.popupSpinboxBj = qt.QSpinBox(popupBj)
+    self.createSpinbox(popupBj,self.popupSpinboxBj)
+    self.popupSpinboxBj.connect("valueChanged(int)", self.pushBjNeedle())
+
+    popupBk = ctk.ctkPopupWidget(self.BkColorPushButton)
+    self.popupSpinboxBk = qt.QSpinBox(popupBk)
+    self.createSpinbox(popupBk,self.popupSpinboxBk)
+    self.popupSpinboxBk.connect("valueChanged(int)", self.pushBkNeedle())
+
+    popupBl = ctk.ctkPopupWidget(self.BlColorPushButton)
+    self.popupSpinboxBl = qt.QSpinBox(popupBl)
+    self.createSpinbox(popupBl,self.popupSpinboxBl)
+    self.popupSpinboxBl.connect("valueChanged(int)", self.pushBlNeedle())
+
+    popupAa = ctk.ctkPopupWidget(self.AaColorPushButton)
+    self.popupSpinboxAa = qt.QSpinBox(popupAa)
+    self.createSpinbox(popupAa,self.popupSpinboxAa)
+    self.popupSpinboxAa.connect("valueChanged(int)", self.pushAaNeedle())
+
+    popupAb = ctk.ctkPopupWidget(self.AbColorPushButton)
+    self.popupSpinboxAb = qt.QSpinBox(popupAb)
+    self.createSpinbox(popupAb,self.popupSpinboxAb)
+    self.popupSpinboxAb.connect("valueChanged(int)", self.pushAbNeedle())
+
+    popupAc = ctk.ctkPopupWidget(self.AcColorPushButton)
+    self.popupSpinboxAc = qt.QSpinBox(popupAc)
+    self.createSpinbox(popupAc,self.popupSpinboxAc)
+    self.popupSpinboxAc.connect("valueChanged(int)", self.pushAcNeedle())
+
+    popupAd = ctk.ctkPopupWidget(self.AdColorPushButton)
+    self.popupSpinboxAd = qt.QSpinBox(popupAd)
+    self.createSpinbox(popupAd,self.popupSpinboxAd)
+    self.popupSpinboxAd.connect("valueChanged(int)", self.pushAdNeedle())
+
+    popupAe = ctk.ctkPopupWidget(self.AeColorPushButton)
+    self.popupSpinboxAe = qt.QSpinBox(popupAe)
+    self.createSpinbox(popupAe,self.popupSpinboxAe)
+    self.popupSpinboxAe.connect("valueChanged(int)", self.pushAeNeedle())
+
+    popupAf = ctk.ctkPopupWidget(self.AfColorPushButton)
+    self.popupSpinboxAf = qt.QSpinBox(popupAf)
+    self.createSpinbox(popupAf,self.popupSpinboxAf)
+    self.popupSpinboxAf.connect("valueChanged(int)", self.pushAfNeedle())
+
+    popupCa = ctk.ctkPopupWidget(self.CaColorPushButton)
+    self.popupSpinboxCa = qt.QSpinBox(popupCa)
+    self.createSpinbox(popupCa,self.popupSpinboxCa)
+    self.popupSpinboxCa.connect("valueChanged(int)", self.pushCaNeedle())
+
+    popupCb = ctk.ctkPopupWidget(self.CbColorPushButton)
+    self.popupSpinboxCb = qt.QSpinBox(popupCb)
+    self.createSpinbox(popupCb,self.popupSpinboxCb)
+    self.popupSpinboxCb.connect("valueChanged(int)", self.pushCbNeedle())
+
+    popupCc = ctk.ctkPopupWidget(self.CcColorPushButton)
+    self.popupSpinboxCc = qt.QSpinBox(popupCc)
+    self.createSpinbox(popupCc,self.popupSpinboxCc)
+    self.popupSpinboxCc.connect("valueChanged(int)", self.pushCcNeedle())
+
+    popupCd = ctk.ctkPopupWidget(self.CdColorPushButton)
+    self.popupSpinboxCd = qt.QSpinBox(popupCd)
+    self.createSpinbox(popupCd,self.popupSpinboxCd)
+    self.popupSpinboxCd.connect("valueChanged(int)", self.pushCdNeedle())
+
+    popupCe = ctk.ctkPopupWidget(self.CeColorPushButton)
+    self.popupSpinboxCe = qt.QSpinBox(popupCe)
+    self.createSpinbox(popupCe,self.popupSpinboxCe)
+    self.popupSpinboxCe.connect("valueChanged(int)", self.pushCeNeedle())
+
+    popupCf = ctk.ctkPopupWidget(self.CfColorPushButton)
+    self.popupSpinboxCf = qt.QSpinBox(popupCf)
+    self.createSpinbox(popupCf,self.popupSpinboxCf)
+    self.popupSpinboxCf.connect("valueChanged(int)", self.pushCfNeedle())
+
+    popupCg = ctk.ctkPopupWidget(self.CgColorPushButton)
+    self.popupSpinboxCg = qt.QSpinBox(popupCg)
+    self.createSpinbox(popupCg,self.popupSpinboxCg)
+    self.popupSpinboxCg.connect("valueChanged(int)", self.pushCgNeedle())
+
+    popupCh = ctk.ctkPopupWidget(self.ChColorPushButton)
+    self.popupSpinboxCh = qt.QSpinBox(popupCh)
+    self.createSpinbox(popupCh,self.popupSpinboxCh)
+    self.popupSpinboxCh.connect("valueChanged(int)", self.pushChNeedle())
+
+    popupCi = ctk.ctkPopupWidget(self.CiColorPushButton)
+    self.popupSpinboxCi = qt.QSpinBox(popupCi)
+    self.createSpinbox(popupCi,self.popupSpinboxCi)
+    self.popupSpinboxCi.connect("valueChanged(int)", self.pushCiNeedle())
+
+    popupCj = ctk.ctkPopupWidget(self.CjColorPushButton)
+    self.popupSpinboxCj = qt.QSpinBox(popupCj)
+    self.createSpinbox(popupCj,self.popupSpinboxCj)
+    self.popupSpinboxCj.connect("valueChanged(int)", self.pushCjNeedle())
+
+    popupCk = ctk.ctkPopupWidget(self.CkColorPushButton)
+    self.popupSpinboxCk = qt.QSpinBox(popupCk)
+    self.createSpinbox(popupCk,self.popupSpinboxCk)
+    self.popupSpinboxCk.connect("valueChanged(int)", self.pushCkNeedle())
+
+    popupCl = ctk.ctkPopupWidget(self.ClColorPushButton)
+    self.popupSpinboxCl = qt.QSpinBox(popupCl)
+    self.createSpinbox(popupCl,self.popupSpinboxCl)
+    self.popupSpinboxCl.connect("valueChanged(int)", self.pushClNeedle())
+
+    popupCm = ctk.ctkPopupWidget(self.CmColorPushButton)
+    self.popupSpinboxCm = qt.QSpinBox(popupCm)
+    self.createSpinbox(popupCm,self.popupSpinboxCm)
+    self.popupSpinboxCm.connect("valueChanged(int)", self.pushCmNeedle())
+
+    popupCn = ctk.ctkPopupWidget(self.CnColorPushButton)
+    self.popupSpinboxCn = qt.QSpinBox(popupCn)
+    self.createSpinbox(popupCn,self.popupSpinboxCn)
+    self.popupSpinboxCn.connect("valueChanged(int)", self.pushCnNeedle())
+
+    popupCo = ctk.ctkPopupWidget(self.CoColorPushButton)
+    self.popupSpinboxCo = qt.QSpinBox(popupCo)
+    self.createSpinbox(popupCo,self.popupSpinboxCo)
+    self.popupSpinboxCo.connect("valueChanged(int)", self.pushCoNeedle())
+
+    popupCp = ctk.ctkPopupWidget(self.CpColorPushButton)
+    self.popupSpinboxCp = qt.QSpinBox(popupCp)
+    self.createSpinbox(popupCp,self.popupSpinboxCp)
+    self.popupSpinboxCp.connect("valueChanged(int)", self.pushCpNeedle())
+
+    popupCq = ctk.ctkPopupWidget(self.CqColorPushButton)
+    self.popupSpinboxCq = qt.QSpinBox(popupCq)
+    self.createSpinbox(popupCq,self.popupSpinboxCq)
+    self.popupSpinboxCq.connect("valueChanged(int)", self.pushCqNeedle())
+
+    popupCr = ctk.ctkPopupWidget(self.CrColorPushButton)
+    self.popupSpinboxCr = qt.QSpinBox(popupCr)
+    self.createSpinbox(popupCr,self.popupSpinboxCr)
+    self.popupSpinboxCr.connect("valueChanged(int)", self.pushCrNeedle())
+
+    popupDa = ctk.ctkPopupWidget(self.DaColorPushButton)
+    self.popupSpinboxDa = qt.QSpinBox(popupDa)
+    self.createSpinbox(popupDa,self.popupSpinboxDa)
+    self.popupSpinboxDa.connect("valueChanged(int)", self.pushDaNeedle())
+
+    popupDb = ctk.ctkPopupWidget(self.DbColorPushButton)
+    self.popupSpinboxDb = qt.QSpinBox(popupDb)
+    self.createSpinbox(popupDb,self.popupSpinboxDb)
+    self.popupSpinboxDb.connect("valueChanged(int)", self.pushDbNeedle())
+
+    popupDc = ctk.ctkPopupWidget(self.DcColorPushButton)
+    self.popupSpinboxDc = qt.QSpinBox(popupDc)
+    self.createSpinbox(popupDc,self.popupSpinboxDc)
+    self.popupSpinboxDc.connect("valueChanged(int)", self.pushDcNeedle())
+
+    popupDd = ctk.ctkPopupWidget(self.DdColorPushButton)
+    self.popupSpinboxDd = qt.QSpinBox(popupDd)
+    self.createSpinbox(popupDd,self.popupSpinboxDd)
+    self.popupSpinboxDd.connect("valueChanged(int)", self.pushDdNeedle())
+
+    popupDe = ctk.ctkPopupWidget(self.DeColorPushButton)
+    self.popupSpinboxDe = qt.QSpinBox(popupDe)
+    self.createSpinbox(popupDe,self.popupSpinboxDe)
+    self.popupSpinboxDe.connect("valueChanged(int)", self.pushDeNeedle())
+
+    popupDf = ctk.ctkPopupWidget(self.DfColorPushButton)
+    self.popupSpinboxDf = qt.QSpinBox(popupDf)
+    self.createSpinbox(popupDf,self.popupSpinboxDf)
+    self.popupSpinboxDf.connect("valueChanged(int)", self.pushDfNeedle())
+
+    popupDg = ctk.ctkPopupWidget(self.DgColorPushButton)
+    self.popupSpinboxDg = qt.QSpinBox(popupDg)
+    self.createSpinbox(popupDg,self.popupSpinboxDg)
+    self.popupSpinboxDg.connect("valueChanged(int)", self.pushDgNeedle())
+
+    popupDh = ctk.ctkPopupWidget(self.DhColorPushButton)
+    self.popupSpinboxDh = qt.QSpinBox(popupDh)
+    self.createSpinbox(popupDh,self.popupSpinboxDh)
+    self.popupSpinboxDh.connect("valueChanged(int)", self.pushDhNeedle())
+
+    popupDi = ctk.ctkPopupWidget(self.DiColorPushButton)
+    self.popupSpinboxDi = qt.QSpinBox(popupDi)
+    self.createSpinbox(popupDi,self.popupSpinboxDi)
+    self.popupSpinboxDi.connect("valueChanged(int)", self.pushDiNeedle())
+
+    popupDj = ctk.ctkPopupWidget(self.DjColorPushButton)
+    self.popupSpinboxDj = qt.QSpinBox(popupDj)
+    self.createSpinbox(popupDj,self.popupSpinboxDj)
+    self.popupSpinboxDj.connect("valueChanged(int)", self.pushDjNeedle())
+
+    popupEa = ctk.ctkPopupWidget(self.EaColorPushButton)
+    self.popupSpinboxEa = qt.QSpinBox(popupEa)
+    self.createSpinbox(popupEa,self.popupSpinboxEa)
+    self.popupSpinboxEa.connect("valueChanged(int)", self.pushEaNeedle())
+
+    popupEb = ctk.ctkPopupWidget(self.EbColorPushButton)
+    self.popupSpinboxEb = qt.QSpinBox(popupEb)
+    self.createSpinbox(popupEb,self.popupSpinboxEb)
+    self.popupSpinboxEb.connect("valueChanged(int)", self.pushEbNeedle())
+
+    popupEc = ctk.ctkPopupWidget(self.EcColorPushButton)
+    self.popupSpinboxEc = qt.QSpinBox(popupEc)
+    self.createSpinbox(popupEc,self.popupSpinboxEc)
+    self.popupSpinboxEc.connect("valueChanged(int)", self.pushEcNeedle())
+
+    popupEd = ctk.ctkPopupWidget(self.EdColorPushButton)
+    self.popupSpinboxEd = qt.QSpinBox(popupEd)
+    self.createSpinbox(popupEd,self.popupSpinboxEd)
+    self.popupSpinboxEd.connect("valueChanged(int)", self.pushEdNeedle())
+
+    popupEe = ctk.ctkPopupWidget(self.EeColorPushButton)
+    self.popupSpinboxEe = qt.QSpinBox(popupEe)
+    self.createSpinbox(popupEe,self.popupSpinboxEe)
+    self.popupSpinboxEe.connect("valueChanged(int)", self.pushEeNeedle())
+
+    popupEf = ctk.ctkPopupWidget(self.EfColorPushButton)
+    self.popupSpinboxEf = qt.QSpinBox(popupEf)
+    self.createSpinbox(popupEf,self.popupSpinboxEf)
+    self.popupSpinboxEf.connect("valueChanged(int)", self.pushEfNeedle())
+
+    popupEg = ctk.ctkPopupWidget(self.EgColorPushButton)
+    self.popupSpinboxEg = qt.QSpinBox(popupEg)
+    self.createSpinbox(popupEg,self.popupSpinboxEg)
+    self.popupSpinboxEg.connect("valueChanged(int)", self.pushEgNeedle())
+
+    popupEh = ctk.ctkPopupWidget(self.EhColorPushButton)
+    self.popupSpinboxEh = qt.QSpinBox(popupEh)
+    self.createSpinbox(popupEh,self.popupSpinboxEh)
+    self.popupSpinboxEh.connect("valueChanged(int)", self.pushEhNeedle())
+
+    popupFa = ctk.ctkPopupWidget(self.FaColorPushButton)
+    self.popupSpinboxFa = qt.QSpinBox(popupFa)
+    self.createSpinbox(popupFa,self.popupSpinboxFa)
+    self.popupSpinboxFa.connect("valueChanged(int)", self.pushFaNeedle())
+
+    popupFb = ctk.ctkPopupWidget(self.FbColorPushButton)
+    self.popupSpinboxFb = qt.QSpinBox(popupFb)
+    self.createSpinbox(popupFb,self.popupSpinboxFb)
+    self.popupSpinboxFb.connect("valueChanged(int)", self.pushFbNeedle())
+
+    popupFc = ctk.ctkPopupWidget(self.FcColorPushButton)
+    self.popupSpinboxFc = qt.QSpinBox(popupFc)
+    self.createSpinbox(popupFc,self.popupSpinboxFc)
+    self.popupSpinboxFc.connect("valueChanged(int)", self.pushFcNeedle())
+
+    popupFd = ctk.ctkPopupWidget(self.FdColorPushButton)
+    self.popupSpinboxFd = qt.QSpinBox(popupFd)
+    self.createSpinbox(popupFd,self.popupSpinboxFd)
+    self.popupSpinboxFd.connect("valueChanged(int)", self.pushFdNeedle())
+
+    popupFe = ctk.ctkPopupWidget(self.FeColorPushButton)
+    self.popupSpinboxFe = qt.QSpinBox(popupFe)
+    self.createSpinbox(popupFe,self.popupSpinboxFe)
+    self.popupSpinboxFe.connect("valueChanged(int)", self.pushFeNeedle())
+
+    popupFf = ctk.ctkPopupWidget(self.FfColorPushButton)
+    self.popupSpinboxFf = qt.QSpinBox(popupFf)
+    self.createSpinbox(popupFf,self.popupSpinboxFf)
+    self.popupSpinboxFf.connect("valueChanged(int)", self.pushFfNeedle())
+
+    popupFg = ctk.ctkPopupWidget(self.FgColorPushButton)
+    self.popupSpinboxFg = qt.QSpinBox(popupFg)
+    self.createSpinbox(popupFg,self.popupSpinboxFg)
+    self.popupSpinboxFg.connect("valueChanged(int)", self.pushFgNeedle())
+
+    popupFh = ctk.ctkPopupWidget(self.FhColorPushButton)
+    self.popupSpinboxFh = qt.QSpinBox(popupFh)
+    self.createSpinbox(popupFh,self.popupSpinboxFh)
+    self.popupSpinboxFh.connect("valueChanged(int)", self.pushFhNeedle())
+
+    popupIu = ctk.ctkPopupWidget(self.IuColorPushButton)
+    self.popupSpinboxIu = qt.QSpinBox(popupIu)
+    self.createSpinbox(popupIu,self.popupSpinboxIu)
+    self.popupSpinboxIu.connect("valueChanged(int)", self.pushIuNeedle())
+
+    mrmlScene = slicer.mrmlScene
+    self.ObturatorNode = mrmlScene.GetNodeByID("vtkMRMLModelNode5")
+
+    if self.ObturatorNode :
+    
+      self.setNeedleCoordinates()
+      self.computerPolydataAndMatrix()    
+    
+      self.m_poly = vtk.vtkPolyData()  
+      self.m_poly.DeepCopy(self.ObturatorNode.GetPolyData())
+
+      for i in xrange(63):
+        filename= "vtkMRMLModelNode"+str(i+6)
+        mrmlScene=slicer.mrmlScene
+        NeedleNode = mrmlScene.GetNodeByID(filename)
+
+        if NeedleNode:
+          displayNode =NeedleNode.GetModelDisplayNode()
+          nVisibility=displayNode.GetVisibility()  
+
+          if nVisibility==1 :
+            self.setRadioButton(i,True)
+          else:
+            self.setRadioButton(i,False)  
+
+      self.retranslateUi(TemplateSheetWidget)
+      # qt.QMetaObject.connectSlotsByName(TemplateSheetWidget)
 
   def retranslateUi(self, TemplateSheetWidget):
     TemplateSheetWidget.setWindowTitle(qt.QApplication.translate("TemplateSheetWidget", "TemplateSheetWidget", None, qt.QApplication.UnicodeUTF8))
@@ -1541,3 +2220,1589 @@ class iGyneSelectProcedureStep( iGyneStep ) :
     self.FdColorPushButton.setText(qt.QApplication.translate("TemplateSheetWidget", "Fd", None, qt.QApplication.UnicodeUTF8))
     self.FeColorPushButton.setText(qt.QApplication.translate("TemplateSheetWidget", "Fe", None, qt.QApplication.UnicodeUTF8))
     self.FfColorPushButton.setText(qt.QApplication.translate("TemplateSheetWidget", "Ff", None, qt.QApplication.UnicodeUTF8))
+
+  ##-----------------------------------------------------------------------------
+  def showIuNeedle(self):
+
+    self.showOneNeedle(54,self.IuRadioButton) 
+
+
+  ##-----------------------------------------------------------------------------
+  def showAaNeedle(self):
+
+    self.showOneNeedle(48,self.AaRadioButton) 
+
+
+  ##-----------------------------------------------------------------------------
+  def showAbNeedle(self):
+
+    self.showOneNeedle(49,self.AbRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showAcNeedle(self):
+
+    self.showOneNeedle(50,self.AcRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showAdNeedle(self):
+
+    self.showOneNeedle(51,self.AdRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showAeNeedle(self):
+
+    self.showOneNeedle(52,self.AeRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showAfNeedle(self):
+
+    self.showOneNeedle(53,self.AfRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showBaNeedle(self):
+
+    self.showOneNeedle(0,self.BaRadioButton) 
+
+
+  ##-----------------------------------------------------------------------------
+  def showBbNeedle(self):
+
+    self.showOneNeedle(1,self.BbRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showBcNeedle(self):
+
+    self.showOneNeedle(2,self.BcRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showBdNeedle(self):
+
+    self.showOneNeedle(3,self.BdRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showBeNeedle(self):
+
+    self.showOneNeedle(4,self.BeRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showBfNeedle(self):
+
+    self.showOneNeedle(5,self.BfRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showBgNeedle(self):
+
+    self.showOneNeedle(6,self.BgRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showBhNeedle(self):
+
+    self.showOneNeedle(7,self.BhRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showBiNeedle(self):
+
+    self.showOneNeedle(8,self.BiRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showBjNeedle(self):
+
+    self.showOneNeedle(9,self.BjRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showBkNeedle(self):
+
+    self.showOneNeedle(10,self.BkRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showBlNeedle(self):
+
+    self.showOneNeedle(11,self.BlRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showCaNeedle(self):
+
+    self.showOneNeedle(12,self.CaRadioButton) 
+
+
+  ##-----------------------------------------------------------------------------
+  def showCbNeedle(self):
+
+    self.showOneNeedle(13,self.CbRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showCcNeedle(self):
+
+    self.showOneNeedle(14,self.CcRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showCdNeedle(self):
+
+    self.showOneNeedle(15,self.CdRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showCeNeedle(self):
+
+    self.showOneNeedle(16,self.CeRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showCfNeedle(self):
+
+    self.showOneNeedle(17,self.CfRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showCgNeedle(self):
+
+    self.showOneNeedle(18,self.CgRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showChNeedle(self):
+
+    self.showOneNeedle(19,self.ChRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showCiNeedle(self):
+
+    self.showOneNeedle(20,self.CiRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showCjNeedle(self):
+
+    self.showOneNeedle(21,self.CjRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showCkNeedle(self):
+
+    self.showOneNeedle(22,self.CkRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showClNeedle(self):
+
+    self.showOneNeedle(23,self.ClRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showCmNeedle(self):
+
+    self.showOneNeedle(24,self.CmRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showCnNeedle(self):
+
+    self.showOneNeedle(25,self.CnRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showCoNeedle(self):
+
+    self.showOneNeedle(26,self.CoRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showCpNeedle(self):
+
+    self.showOneNeedle(27,self.CpRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showCqNeedle(self):
+
+    self.showOneNeedle(28,self.CqRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showCrNeedle(self):
+
+    self.showOneNeedle(29,self.CrRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showDaNeedle(self):
+
+    self.showOneNeedle(30,self.DaRadioButton) 
+
+
+  ##-----------------------------------------------------------------------------
+  def showDbNeedle(self):
+
+    self.showOneNeedle(31,self.DbRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showDcNeedle(self):
+
+    self.showOneNeedle(32,self.DcRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showDdNeedle(self):
+
+    self.showOneNeedle(33,self.DdRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showDeNeedle(self):
+
+    self.showOneNeedle(34,self.DeRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showDfNeedle(self):
+
+    self.showOneNeedle(35,self.DfRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showDgNeedle(self):
+
+    self.showOneNeedle(36,self.DgRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showDhNeedle(self):
+
+    self.showOneNeedle(37,self.DhRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showDiNeedle(self):
+
+    self.showOneNeedle(38,self.DiRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showDjNeedle(self):
+
+    self.showOneNeedle(39,self.DjRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showEaNeedle(self):
+
+    self.showOneNeedle(40,self.EaRadioButton) 
+
+
+  ##-----------------------------------------------------------------------------
+  def showEbNeedle(self):
+
+    self.showOneNeedle(41,self.EbRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showEcNeedle(self):
+
+    self.showOneNeedle(42,self.EcRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showEdNeedle(self):
+
+    self.showOneNeedle(43,self.EdRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showEeNeedle(self):
+
+    self.showOneNeedle(44,self.EeRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showEfNeedle(self):
+
+    self.showOneNeedle(45,self.EfRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showEgNeedle(self):
+
+    self.showOneNeedle(46,self.EgRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showEhNeedle(self):
+
+    self.showOneNeedle(47,self.EhRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showFaNeedle(self):
+
+    self.showOneNeedle(55,self.FaRadioButton) 
+
+
+  ##-----------------------------------------------------------------------------
+  def showFbNeedle(self):
+
+    self.showOneNeedle(56,self.FbRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showFcNeedle(self):
+
+    self.showOneNeedle(57,self.FcRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showFdNeedle(self):
+
+    self.showOneNeedle(58,self.FdRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showFeNeedle(self):
+
+    self.showOneNeedle(59,self.FeRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showFfNeedle(self):
+
+    self.showOneNeedle(60,self.FfRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showFgNeedle(self):
+
+    self.showOneNeedle(61,self.FgRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def showFhNeedle(self):
+
+    self.showOneNeedle(62,self.FhRadioButton)
+
+
+  ##-----------------------------------------------------------------------------
+  def pushIuNeedle(self):
+    nDepth = self.popupSpinboxIu.value
+
+    self.pushOneNeedle(54, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushAaNeedle(self):
+    nDepth = self.popupSpinboxAa.value
+
+    self.pushOneNeedle(48, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushAbNeedle(self):
+    nDepth = self.popupSpinboxAb.value
+
+    self.pushOneNeedle(49, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushAcNeedle(self):
+    nDepth = self.popupSpinboxAc.value
+
+    self.pushOneNeedle(50, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushAdNeedle(self):
+    nDepth = self.popupSpinboxAd.value
+
+    self.pushOneNeedle(51, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushAeNeedle(self):
+    nDepth = self.popupSpinboxAe.value
+
+    self.pushOneNeedle(52, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushAfNeedle(self):
+    nDepth = self.popupSpinboxAf.value
+
+    self.pushOneNeedle(53, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushBaNeedle(self):
+    nDepth = self.popupSpinboxBa.value
+
+    self.pushOneNeedle(0, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushBbNeedle(self):
+    nDepth = self.popupSpinboxBb.value
+
+    self.pushOneNeedle(1, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushBcNeedle(self):
+    nDepth = self.popupSpinboxBc.value
+
+    self.pushOneNeedle(2, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushBdNeedle(self):
+    nDepth = self.popupSpinboxBd.value
+
+    self.pushOneNeedle(3, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushBeNeedle(self):
+    nDepth = self.popupSpinboxBe.value
+    nDepth = self.popupSpinboxBe.value
+
+    self.pushOneNeedle(4, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushBfNeedle(self):
+    nDepth = self.popupSpinboxBf.value
+
+    self.pushOneNeedle(5, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushBgNeedle(self):
+    nDepth = self.popupSpinboxBg.value
+
+    self.pushOneNeedle(6, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushBhNeedle(self):
+    nDepth = self.popupSpinboxBh.value
+
+    self.pushOneNeedle(7, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushBiNeedle(self):
+    nDepth = self.popupSpinboxBi.value
+
+    self.pushOneNeedle(8, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushBjNeedle(self):
+    nDepth = self.popupSpinboxBj.value
+
+    self.pushOneNeedle(9, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushBkNeedle(self):
+    nDepth = self.popupSpinboxBk.value
+
+    self.pushOneNeedle(10, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushBlNeedle(self):
+    nDepth = self.popupSpinboxBl.value
+
+    self.pushOneNeedle(11, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushCaNeedle(self):
+    nDepth = self.popupSpinboxCa.value
+
+    self.pushOneNeedle(12, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushCbNeedle(self):
+    nDepth = self.popupSpinboxCb.value
+
+    self.pushOneNeedle(13, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushCcNeedle(self):
+    nDepth = self.popupSpinboxCc.value
+
+    self.pushOneNeedle(14, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushCdNeedle(self):
+    nDepth = self.popupSpinboxCd.value
+
+    self.pushOneNeedle(15, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushCeNeedle(self):
+    nDepth = self.popupSpinboxCe.value
+
+    self.pushOneNeedle(16, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushCfNeedle(self):
+    nDepth = self.popupSpinboxCf.value
+
+    self.pushOneNeedle(17, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushCgNeedle(self):
+    nDepth = self.popupSpinboxCg.value
+
+    self.pushOneNeedle(18, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushChNeedle(self):
+    nDepth = self.popupSpinboxCh.value
+
+    self.pushOneNeedle(19, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushCiNeedle(self):
+    nDepth = self.popupSpinboxCi.value
+
+    self.pushOneNeedle(20, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushCjNeedle(self):
+    nDepth = self.popupSpinboxCj.value
+
+    self.pushOneNeedle(21, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushCkNeedle(self):
+    nDepth = self.popupSpinboxCk.value
+
+    self.pushOneNeedle(22, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushClNeedle(self):
+    nDepth = self.popupSpinboxCl.value
+
+    self.pushOneNeedle(23, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushCmNeedle(self):
+    nDepth = self.popupSpinboxCm.value
+
+    self.pushOneNeedle(24, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushCnNeedle(self):
+    nDepth = self.popupSpinboxCn.value
+
+    self.pushOneNeedle(25, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushCoNeedle(self):
+    nDepth = self.popupSpinboxCo.value
+
+    self.pushOneNeedle(26, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushCpNeedle(self):
+    nDepth = self.popupSpinboxCp.value
+
+    self.pushOneNeedle(27, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushCqNeedle(self):
+    nDepth = self.popupSpinboxCq.value
+
+    self.pushOneNeedle(28, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushCrNeedle(self):
+    nDepth = self.popupSpinboxCr.value
+
+    self.pushOneNeedle(29, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushDaNeedle(self):
+    nDepth = self.popupSpinboxDa.value
+
+    self.pushOneNeedle(30, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushDbNeedle(self):
+    nDepth = self.popupSpinboxDb.value
+
+    self.pushOneNeedle(31, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushDcNeedle(self):
+    nDepth = self.popupSpinboxDc.value
+
+    self.pushOneNeedle(32, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushDdNeedle(self):
+    nDepth = self.popupSpinboxDd.value
+
+    self.pushOneNeedle(33, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushDeNeedle(self):
+    nDepth = self.popupSpinboxDe.value
+
+    self.pushOneNeedle(34, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushDfNeedle(self):
+    nDepth = self.popupSpinboxDf.value
+
+    self.pushOneNeedle(35, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushDgNeedle(self):
+    nDepth = self.popupSpinboxDg.value
+
+    self.pushOneNeedle(36, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushDhNeedle(self):
+    nDepth = self.popupSpinboxDh.value
+
+    self.pushOneNeedle(37, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushDiNeedle(self):
+    nDepth = self.popupSpinboxDi.value
+
+    self.pushOneNeedle(38, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushDjNeedle(self):
+    nDepth = self.popupSpinboxDj.value
+
+    self.pushOneNeedle(39, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushEaNeedle(self):
+    nDepth = self.popupSpinboxEa.value
+
+    self.pushOneNeedle(40, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushEbNeedle(self):
+    nDepth = self.popupSpinboxEb.value
+
+    self.pushOneNeedle(41, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushEcNeedle(self):
+    nDepth = self.popupSpinboxEc.value
+
+    self.pushOneNeedle(42, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushEdNeedle(self):
+    nDepth = self.popupSpinboxEd.value
+
+    self.pushOneNeedle(43, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushEeNeedle(self):
+    nDepth = self.popupSpinboxEe.value
+
+    self.pushOneNeedle(44, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushEfNeedle(self):
+    nDepth = self.popupSpinboxEf.value
+
+    self.pushOneNeedle(45, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushEgNeedle(self):
+    nDepth = self.popupSpinboxEg.value
+
+    self.pushOneNeedle(46, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushEhNeedle(self):
+    nDepth = self.popupSpinboxEh.value
+
+    self.pushOneNeedle(47, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushFaNeedle(self):
+    nDepth = self.popupSpinboxFa.value
+
+    self.pushOneNeedle(55, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushFbNeedle(self):
+    nDepth = self.popupSpinboxFb.value
+
+    self.pushOneNeedle(56, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushFcNeedle(self):
+    nDepth = self.popupSpinboxFc.value
+
+    self.pushOneNeedle(57, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushFdNeedle(self):
+    nDepth = self.popupSpinboxFd.value
+
+    self.pushOneNeedle(58, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushFeNeedle(self):
+    nDepth = self.popupSpinboxFe.value
+
+    self.pushOneNeedle(59, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushFfNeedle(self):
+    nDepth = self.popupSpinboxFf.value
+
+    self.pushOneNeedle(60, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushFgNeedle(self):
+    nDepth = self.popupSpinboxFg.value
+
+    self.pushOneNeedle(61, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def pushFhNeedle(self):
+    nDepth = self.popupSpinboxFh.value
+
+    self.pushOneNeedle(62, nDepth)   
+
+
+  ##-----------------------------------------------------------------------------
+  def setIuColor(self):
+    
+    self.setOneNeedleColor(54,self.IuColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setAaColor(self):
+    
+    self.setOneNeedleColor(48,self.AaColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setAbColor(self):
+    
+    self.setOneNeedleColor(49,self.AbColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setAcColor(self):
+    
+    self.setOneNeedleColor(50,self.AcColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setAdColor(self):
+    
+    self.setOneNeedleColor(51,self.AdColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setAeColor(self):
+    
+    self.setOneNeedleColor(52,self.AeColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setAfColor(self):
+    
+    self.setOneNeedleColor(53,self.AfColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setBaColor(self):
+    
+    self.setOneNeedleColor(0,self.BaColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setBbColor(self):
+    
+    self.setOneNeedleColor(1,self.BbColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setBcColor(self):
+    
+    self.setOneNeedleColor(2,self.BcColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setBdColor(self):
+    
+    self.setOneNeedleColor(3,self.BdColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setBeColor(self):
+    
+    self.setOneNeedleColor(4,self.BeColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setBfColor(self):
+    
+    self.setOneNeedleColor(5,self.BfColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setBgColor(self):
+    
+    self.setOneNeedleColor(6,self.BgColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setBhColor(self):
+    
+    self.setOneNeedleColor(7,self.BhColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setBiColor(self):
+    
+    self.setOneNeedleColor(8,self.BiColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setBjColor(self):
+    
+    self.setOneNeedleColor(9,self.BjColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setBkColor(self):
+    
+    self.setOneNeedleColor(10,self.BkColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setBlColor(self):
+    
+    self.setOneNeedleColor(11,self.BlColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setCaColor(self):
+    
+    self.setOneNeedleColor(12,self.CaColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setCbColor(self):
+    
+    self.setOneNeedleColor(13,self.CbColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setCcColor(self):
+    
+    self.setOneNeedleColor(14,self.CcColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setCdColor(self):
+    
+    self.setOneNeedleColor(15,self.CdColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setCeColor(self):
+    
+    self.setOneNeedleColor(16,self.CeColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setCfColor(self):
+    
+    self.setOneNeedleColor(17,self.CfColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setCgColor(self):
+    
+    self.setOneNeedleColor(18,self.CgColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setChColor(self):
+    
+    self.setOneNeedleColor(19,self.ChColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setCiColor(self):
+    
+    self.setOneNeedleColor(20,self.CiColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setCjColor(self):
+    
+    self.setOneNeedleColor(21,self.CjColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setCkColor(self):
+    
+    self.setOneNeedleColor(22,self.CkColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setClColor(self):
+    
+    self.setOneNeedleColor(23,self.ClColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setCmColor(self):
+    
+    self.setOneNeedleColor(24,self.CmColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setCnColor(self):
+    
+    self.setOneNeedleColor(25,self.CnColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setCoColor(self):
+    
+    self.setOneNeedleColor(26,self.CoColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setCpColor(self):
+    
+    self.setOneNeedleColor(27,self.CpColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setCqColor(self):
+    
+    self.setOneNeedleColor(28,self.CqColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setCrColor(self):
+    
+    self.setOneNeedleColor(29,self.CrColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setDaColor(self):
+    
+    self.setOneNeedleColor(30,self.DaColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setDbColor(self):
+    
+    self.setOneNeedleColor(31,self.DbColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setDcColor(self):
+    
+    self.setOneNeedleColor(32,self.DcColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setDdColor(self):
+    
+    self.setOneNeedleColor(33,self.DdColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setDeColor(self):
+    
+    self.setOneNeedleColor(34,self.DeColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setDfColor(self):
+    
+    self.setOneNeedleColor(35,self.DfColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setDgColor(self):
+    
+    self.setOneNeedleColor(36,self.DgColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setDhColor(self):
+    
+    self.setOneNeedleColor(37,self.DhColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setDiColor(self):
+    
+    self.setOneNeedleColor(38,self.DiColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setDjColor(self):
+    
+    self.setOneNeedleColor(39,self.DjColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setEaColor(self):
+    
+    self.setOneNeedleColor(40,self.EaColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setEbColor(self):
+    
+    self.setOneNeedleColor(41,self.EbColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setEcColor(self):
+    
+    self.setOneNeedleColor(42,self.EcColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setEdColor(self):
+    
+    self.setOneNeedleColor(43,self.EdColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setEeColor(self):
+    
+    self.setOneNeedleColor(44,self.EeColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setEfColor(self):
+    
+    self.setOneNeedleColor(45,self.EfColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setEgColor(self):
+    
+    self.setOneNeedleColor(46,self.EgColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setEhColor(self):
+    
+    self.setOneNeedleColor(47,self.EhColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setFaColor(self):
+    
+    self.setOneNeedleColor(55,self.FaColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setFbColor(self):
+    
+    self.setOneNeedleColor(56,self.FbColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setFcColor(self):
+    
+    self.setOneNeedleColor(57,self.FcColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setFdColor(self):
+    
+    self.setOneNeedleColor(58,self.FdColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setFeColor(self):
+    
+    self.setOneNeedleColor(59,self.FeColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setFfColor(self):
+    
+    self.setOneNeedleColor(60,self.FfColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setFgColor(self):
+    
+    self.setOneNeedleColor(61,self.FgColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def setFhColor(self):
+    
+    self.setOneNeedleColor(62,self.FhColorPushButton)  
+
+
+  ##-----------------------------------------------------------------------------
+  def pushObNeedle(self):
+    nDepth = self.popupSpinboxOb.value
+    mrmlScene=slicer.mrmlScene  
+    self.ObturatorNode = mrmlScene.GetNodeByID("vtkMRMLModelNode5")
+
+    vtkmat = vtk.vtkMatrix4x4()
+    vtkmat.Identity()
+    vtkmat.SetElement(2,3,nDepth)
+
+    TransformPolyDataFilter=vtk.vtkTransformPolyDataFilter()
+    Transform=vtk.vtkTransform()
+    TransformPolyDataFilter.SetInput(self.m_poly)
+    Transform.SetMatrix(vtkmat)
+    TransformPolyDataFilter.SetTransform(Transform)
+    TransformPolyDataFilter.Update()
+
+    triangles=vtk.vtkTriangleFilter()
+    triangles.SetInput(TransformPolyDataFilter.GetOutput())
+    self.ObturatorNode.SetAndObservePolyData(triangles.GetOutput())    
+
+  ##-----------------------------------------------------------------------------
+  def showOneNeedle(self,i,RadioButton):
+    
+    filename= "vtkMRMLModelNode"+str(i+6)
+    mrmlScene=slicer.mrmlScene
+    NeedleNode = mrmlScene.GetNodeByID(filename)
+    if NeedleNode:
+      displayNode =NeedleNode.GetModelDisplayNode()
+
+    nVisibility=displayNode.GetVisibility()  
+
+    if(nVisibility==1):
+      displayNode.SetVisibility(0)
+      displayNode.SetSliceIntersectionVisibility(0)
+      RadioButton.setChecked(False)
+    else:
+      displayNode.SetVisibility(1)
+      displayNode.SetSliceIntersectionVisibility(1)
+      RadioButton.setChecked(True)
+
+
+  ##-----------------------------------------------------------------------------
+  def showOneNeedle(self,i,bShowNeedels):
+
+    filename= "vtkMRMLModelNode"+str(i+6)
+    mrmlScene=slicer.mrmlScene
+    NeedleNode = mrmlScene.GetNodeByID(filename)
+    if NeedleNode:
+      displayNode =NeedleNode.GetModelDisplayNode()
+
+      if bShowNeedels:
+        displayNode.SetVisibility(1)
+        displayNode.SetSliceIntersectionVisibility(1)    
+
+      else:
+        displayNode.SetVisibility(0)
+        displayNode.SetSliceIntersectionVisibility(0)    
+
+
+  ##-----------------------------------------------------------------------------
+  def pushOneNeedle(self,i,nDepth):
+    filename= "vtkMRMLModelNode"+str(i+6)
+    mrmlScene=slicer.mrmlScene
+    NeedleNode = mrmlScene.GetNodeByID(filename)
+
+    vtkmat = vtk.vtkMatrix4x4()
+    vtkmat.DeepCopy(self.m_vtkmat) 
+
+    vtkmat.SetElement(0,3,self.m_vtkmat.GetElement(0,3)+self.p[0][i])
+    vtkmat.SetElement(1,3,self.m_vtkmat.GetElement(1,3)+self.p[1][i])
+    vtkmat.SetElement(2,3,self.m_vtkmat.GetElement(2,3)+110.0-nDepth)
+
+    TransformPolyDataFilter=vtk.vtkTransformPolyDataFilter()
+    Transform=vtk.vtkTransform()
+    TransformPolyDataFilter.SetInput(self.m_polyCylinder)
+    Transform.SetMatrix(vtkmat)
+    TransformPolyDataFilter.SetTransform(Transform)
+    TransformPolyDataFilter.Update()
+
+    triangles=vtk.vtkTriangleFilter()
+    triangles.SetInput(TransformPolyDataFilter.GetOutput())
+    if NeedleNode:
+      NeedleNode.SetAndObservePolyData(triangles.GetOutput())
+    
+  ##-----------------------------------------------------------------------------
+  def setOneNeedleColor(self,i,ColorPushButton):
+
+    color = qt.QColorDialog.getColor(qt.QColor(), self)
+    sColor = "background-color: rgb(" + str(color.red())+ "," + str(color.green()) + "," + str(color.blue())
+
+    if color.isValid():
+
+      filename= "vtkMRMLModelNode"+str(i+6)
+      mrmlScene=slicer.mrmlScene
+      NeedleNode = mrmlScene.GetNodeByID(filename)
+      if NeedleNode:
+        displayNode =NeedleNode.GetModelDisplayNode()
+
+        displayNode.SetColor(color.red()/float(255.0),color.green()/float(255.0),color.blue()/float(255.0))
+        ColorPushButton.setStyleSheet(sColor)
+      
+
+  ##-----------------------------------------------------------------------------
+  def showNeedles(self):
+
+    if self.ShowNeedlesPushButton.isChecked():
+      for i in xrange(63): 
+        self.showOneNeedle(i,True)
+
+      self.ShowNeedlesPushButton.setChecked(True)
+      self.IuRadioButton.setChecked(True)
+      self.AaRadioButton.setChecked(True)
+      self.AbRadioButton.setChecked(True)
+      self.AcRadioButton.setChecked(True)
+      self.AdRadioButton.setChecked(True)
+      self.AeRadioButton.setChecked(True)
+      self.AfRadioButton.setChecked(True)
+      self.BaRadioButton.setChecked(True)
+      self.BbRadioButton.setChecked(True)
+      self.BcRadioButton.setChecked(True)
+      self.BdRadioButton.setChecked(True)
+      self.BeRadioButton.setChecked(True)
+      self.BfRadioButton.setChecked(True)
+      self.BgRadioButton.setChecked(True)
+      self.BhRadioButton.setChecked(True)
+      self.BiRadioButton.setChecked(True)
+      self.BjRadioButton.setChecked(True)
+      self.BkRadioButton.setChecked(True)
+      self.BlRadioButton.setChecked(True)
+      self.CaRadioButton.setChecked(True)
+      self.CbRadioButton.setChecked(True)
+      self.CcRadioButton.setChecked(True)
+      self.CdRadioButton.setChecked(True)
+      self.CeRadioButton.setChecked(True)
+      self.CfRadioButton.setChecked(True)
+      self.CgRadioButton.setChecked(True)
+      self.ChRadioButton.setChecked(True)
+      self.CiRadioButton.setChecked(True)
+      self.CjRadioButton.setChecked(True)
+      self.CkRadioButton.setChecked(True)
+      self.ClRadioButton.setChecked(True)
+      self.CmRadioButton.setChecked(True)
+      self.CnRadioButton.setChecked(True)
+      self.CoRadioButton.setChecked(True)
+      self.CpRadioButton.setChecked(True)
+      self.CqRadioButton.setChecked(True)
+      self.CrRadioButton.setChecked(True)
+      self.DaRadioButton.setChecked(True)
+      self.DbRadioButton.setChecked(True)
+      self.DcRadioButton.setChecked(True)
+      self.DdRadioButton.setChecked(True)
+      self.DeRadioButton.setChecked(True)
+      self.DfRadioButton.setChecked(True)
+      self.DgRadioButton.setChecked(True)
+      self.DhRadioButton.setChecked(True)
+      self.DiRadioButton.setChecked(True)
+      self.DjRadioButton.setChecked(True)
+      self.EaRadioButton.setChecked(True)
+      self.EbRadioButton.setChecked(True)
+      self.EcRadioButton.setChecked(True)
+      self.EdRadioButton.setChecked(True)
+      self.EeRadioButton.setChecked(True)
+      self.EfRadioButton.setChecked(True)
+      self.EgRadioButton.setChecked(True)
+      self.EhRadioButton.setChecked(True)
+      self.FaRadioButton.setChecked(True)
+      self.FbRadioButton.setChecked(True)
+      self.FcRadioButton.setChecked(True)
+      self.FdRadioButton.setChecked(True)
+      self.FeRadioButton.setChecked(True)
+      self.FfRadioButton.setChecked(True)
+      self.FgRadioButton.setChecked(True)
+      self.FhRadioButton.setChecked(True)
+    else:
+      for i in xrange(63):
+        self.showOneNeedle(i,False)
+
+      self.ShowNeedlesPushButton.setChecked(False)
+      self.IuRadioButton.setChecked(False)
+      self.AaRadioButton.setChecked(False)
+      self.AbRadioButton.setChecked(False)
+      self.AcRadioButton.setChecked(False)
+      self.AdRadioButton.setChecked(False)
+      self.AeRadioButton.setChecked(False)
+      self.AfRadioButton.setChecked(False)
+      self.BaRadioButton.setChecked(False)
+      self.BbRadioButton.setChecked(False)
+      self.BcRadioButton.setChecked(False)
+      self.BdRadioButton.setChecked(False)
+      self.BeRadioButton.setChecked(False)
+      self.BfRadioButton.setChecked(False)
+      self.BgRadioButton.setChecked(False)
+      self.BhRadioButton.setChecked(False)
+      self.BiRadioButton.setChecked(False)
+      self.BjRadioButton.setChecked(False)
+      self.BkRadioButton.setChecked(False)
+      self.BlRadioButton.setChecked(False)
+      self.CaRadioButton.setChecked(False)
+      self.CbRadioButton.setChecked(False)
+      self.CcRadioButton.setChecked(False)
+      self.CdRadioButton.setChecked(False)
+      self.CeRadioButton.setChecked(False)
+      self.CfRadioButton.setChecked(False)
+      self.CgRadioButton.setChecked(False)
+      self.ChRadioButton.setChecked(False)
+      self.CiRadioButton.setChecked(False)
+      self.CjRadioButton.setChecked(False)
+      self.CkRadioButton.setChecked(False)
+      self.ClRadioButton.setChecked(False)
+      self.CmRadioButton.setChecked(False)
+      self.CnRadioButton.setChecked(False)
+      self.CoRadioButton.setChecked(False)
+      self.CpRadioButton.setChecked(False)
+      self.CqRadioButton.setChecked(False)
+      self.CrRadioButton.setChecked(False)
+      self.DaRadioButton.setChecked(False)
+      self.DbRadioButton.setChecked(False)
+      self.DcRadioButton.setChecked(False)
+      self.DdRadioButton.setChecked(False)
+      self.DeRadioButton.setChecked(False)
+      self.DfRadioButton.setChecked(False)
+      self.DgRadioButton.setChecked(False)
+      self.DhRadioButton.setChecked(False)
+      self.DiRadioButton.setChecked(False)
+      self.DjRadioButton.setChecked(False)
+      self.EaRadioButton.setChecked(False)
+      self.EbRadioButton.setChecked(False)
+      self.EcRadioButton.setChecked(False)
+      self.EdRadioButton.setChecked(False)
+      self.EeRadioButton.setChecked(False)
+      self.EfRadioButton.setChecked(False)
+      self.EgRadioButton.setChecked(False)
+      self.EhRadioButton.setChecked(False)
+      self.FaRadioButton.setChecked(False)
+      self.FbRadioButton.setChecked(False)
+      self.FcRadioButton.setChecked(False)
+      self.FdRadioButton.setChecked(False)
+      self.FeRadioButton.setChecked(False)
+      self.FfRadioButton.setChecked(False)
+      self.FgRadioButton.setChecked(False)
+      self.FhRadioButton.setChecked(False)
+
+  def selectNeedles(self):
+
+    mrmlScene=slicer.mrmlScene
+    ModelFromImageNode = slicer.vtkMRMLModelNode()
+    ModelFromImageNode = mrmlScene.GetNodeByID("vtkMRMLModelNode70")
+
+    if ModelFromImageNode!=None :
+   
+      collide = vtk.vtkCollisionDetectionFilter()
+      matrix0 = vtk.vtkMatrix4x4()
+      matrix1 = vtk.vtkMatrix4x4()    
+      matrix2 = vtk.vtkMatrix4x4()  
+
+      collide.SetInput(0,ModelFromImageNode.GetPolyData())
+      collide.SetMatrix(0, matrix0)
+
+      transformNode = mrmlScene.GetNodeByID("vtkMRMLLinearTransformNode4")
+      vtkmatInitial = transformNode.GetMatrixTransformToParent()
+
+      nContacts=0
+      for i in xrange(63):
+
+        sfilename="vtkMRMLModelNode"+ str(i+6)
+
+        NeedleNode = mrmlScene.GetNodeByID(filename)
+
+        vtkmat = vtk.vtkMatrix4x4()
+        vtkmat.DeepCopy(self.m_vtkmat) 
+
+        vtkmat.SetElement(0,3,self.m_vtkmat.GetElement(0,3)+self.p[0][i])
+        vtkmat.SetElement(1,3,self.m_vtkmat.GetElement(1,3)+self.p[1][i])
+        vtkmat.SetElement(2,3,self.m_vtkmat.GetElement(2,3)-100.0)
+
+        matrix1.Multiply4x4(vtkmatInitial,vtkmat,matrix1)
+
+        TransformPolyDataFilter=vtk.vtkTransformPolyDataFilter()
+        Transform=vtk.vtkTransform()
+        TransformPolyDataFilter.SetInput(self.m_polyCylinder)
+        Transform.SetMatrix(matrix1)
+        TransformPolyDataFilter.SetTransform(Transform)
+        TransformPolyDataFilter.Update()
+
+        triangles=vtk.vtkTriangleFilter()
+        triangles.SetInput(TransformPolyDataFilter.GetOutput())
+
+        collide.SetInput(1,triangles.GetOutput())
+        collide.SetMatrix(1, matrix2)
+        collide.SetBoxTolerance(0.0)
+        collide.SetCellTolerance(0.0)
+        collide.SetNumberOfCellsPerBucket(2)
+        collide.SetCollisionModeToAllContacts()
+        collide.GenerateScalarsOn()
+        collide.Update()
+
+        nContacts=collide.GetNumberOfContacts()
+        if NeedleNode:  
+          displayNode =NeedleNode.GetModelDisplayNode()
+
+          if nContacts>0:
+            
+            displayNode.SetVisibility(1)
+            displayNode.SetSliceIntersectionVisibility(1)
+            self.setRadioButton(i,True)
+            
+          else:
+            
+            displayNode.SetVisibility(0)
+            displayNode.SetSliceIntersectionVisibility(0)
+            self.setRadioButton(i,False)
+          
+        
+      
+    
+
+  ##-----------------------------------------------------------------------------
+  def setRadioButton(self,i,bShowNeedels):
+    option = {0:self.BaRadioButton.setChecked(bShowNeedels),
+         1:self.BbRadioButton.setChecked(bShowNeedels),
+         2:self.BcRadioButton.setChecked(bShowNeedels),
+         3:self.BdRadioButton.setChecked(bShowNeedels),
+         4:self.BeRadioButton.setChecked(bShowNeedels),
+         5:self.BfRadioButton.setChecked(bShowNeedels),
+         6:self.BgRadioButton.setChecked(bShowNeedels),
+         7:self.BhRadioButton.setChecked(bShowNeedels),
+         8:self.BiRadioButton.setChecked(bShowNeedels),
+         9:self.BjRadioButton.setChecked(bShowNeedels),
+         10:self.BkRadioButton.setChecked(bShowNeedels),
+         11:self.BlRadioButton.setChecked(bShowNeedels),
+         12:self.CaRadioButton.setChecked(bShowNeedels),
+         13:self.CbRadioButton.setChecked(bShowNeedels),
+         14:self.CcRadioButton.setChecked(bShowNeedels),
+         15:self.CdRadioButton.setChecked(bShowNeedels),
+         16:self.CeRadioButton.setChecked(bShowNeedels),
+         17:self.CfRadioButton.setChecked(bShowNeedels),
+         18:self.CgRadioButton.setChecked(bShowNeedels),
+         19:self.ChRadioButton.setChecked(bShowNeedels),
+         20:self.CiRadioButton.setChecked(bShowNeedels),
+         21:self.CjRadioButton.setChecked(bShowNeedels),
+         22:self.CkRadioButton.setChecked(bShowNeedels),
+         23:self.ClRadioButton.setChecked(bShowNeedels),
+         24:self.CmRadioButton.setChecked(bShowNeedels),
+         25:self.CnRadioButton.setChecked(bShowNeedels),
+         26:self.CoRadioButton.setChecked(bShowNeedels),
+         27:self.CpRadioButton.setChecked(bShowNeedels),
+         28:self.CqRadioButton.setChecked(bShowNeedels),
+         29:self.CrRadioButton.setChecked(bShowNeedels),
+         30:self.DaRadioButton.setChecked(bShowNeedels),
+         31:self.DbRadioButton.setChecked(bShowNeedels),
+         32:self.DcRadioButton.setChecked(bShowNeedels),
+         33:self.DdRadioButton.setChecked(bShowNeedels),
+         34:self.DeRadioButton.setChecked(bShowNeedels),
+         35:self.DfRadioButton.setChecked(bShowNeedels),
+         36:self.DgRadioButton.setChecked(bShowNeedels),
+         37:self.DhRadioButton.setChecked(bShowNeedels),
+         38:self.DiRadioButton.setChecked(bShowNeedels),
+         39:self.DjRadioButton.setChecked(bShowNeedels),
+         40:self.EaRadioButton.setChecked(bShowNeedels),
+         41:self.EbRadioButton.setChecked(bShowNeedels),
+         42:self.EcRadioButton.setChecked(bShowNeedels),
+         43:self.EdRadioButton.setChecked(bShowNeedels),
+         44:self.EeRadioButton.setChecked(bShowNeedels),
+         45:self.EfRadioButton.setChecked(bShowNeedels),
+         46:self.EgRadioButton.setChecked(bShowNeedels),
+         47:self.EhRadioButton.setChecked(bShowNeedels),
+         48:self.AaRadioButton.setChecked(bShowNeedels),
+         49:self.AbRadioButton.setChecked(bShowNeedels),
+         50:self.AcRadioButton.setChecked(bShowNeedels),
+         51:self.AdRadioButton.setChecked(bShowNeedels),
+         52:self.AeRadioButton.setChecked(bShowNeedels),
+         53:self.AfRadioButton.setChecked(bShowNeedels),
+         54:self.IuRadioButton.setChecked(bShowNeedels), 
+         55:self.FaRadioButton.setChecked(bShowNeedels),
+         56:self.FbRadioButton.setChecked(bShowNeedels),
+         57:self.FcRadioButton.setChecked(bShowNeedels),
+         58:self.FdRadioButton.setChecked(bShowNeedels),
+         59:self.FeRadioButton.setChecked(bShowNeedels),
+         60:self.FfRadioButton.setChecked(bShowNeedels),
+         61:self.FgRadioButton.setChecked(bShowNeedels),
+         62:self.FhRadioButton.setChecked(bShowNeedels)}
+         
+    option[i]
+    
+        
+
