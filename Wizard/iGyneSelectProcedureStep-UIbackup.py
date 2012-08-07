@@ -1,25 +1,17 @@
-from __main__ import qt, ctk, slicer
+from __main__ import qt, ctk
 
 from iGyneStep import *
 from Helper import *
-from EditorLib import *
-import math
+from iGyneUI import *
+import PythonQt
 
-import string
-
-'''
-TODO:
-  add advanced option to specify segmentation
-'''
-
-class iGyneNeedlePlanningStep( iGyneStep ) :
+class iGyneSelectProcedureStep( iGyneStep ) :
 
   def __init__( self, stepid ):
     self.initialize( stepid )
-    self.setName( '6. Needle Segmentation' )
-    self.setDescription( 'Segment the needles' )
-    self.__parent = super( iGyneNeedlePlanningStep, self )
-    
+    self.setName( '1. Select the Procedure' )
+    self.setDescription( 'Select the procedure used in this iGyne case.' )
+    self.__parent = super( iGyneSelectProcedureStep, self )
 
   def createUserInterface( self ):
     '''
@@ -2019,46 +2011,33 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     # TemplateSheetLayout.addWidget(t6)
     self.__layout.addWidget(TemplateSheetWidget)
     
+
+
     
+    
+   
+  def onEntry(self, comingFrom, transitionType):
+
+    super(iGyneSelectProcedureStep, self).onEntry(comingFrom, transitionType)
+    pNode = self.parameterNode()
+    pNode.SetParameter('currentStep', self.stepid)
+    # self.updateWidgetFromParameterNode(pNode)    
+    # qt.QTimer.singleShot(0, self.killButton)
+
+  def onExit(self, goingTo, transitionType):
+
+    super(iGyneSelectProcedureStep, self).onExit(goingTo, transitionType) 
+
+  # def updateWidgetFromParameters(self, parameterNode):
+
+     # procedure = parameterNode.GetParameter('procedure')
+
   def validate( self, desiredBranchId ):
     '''
     '''
-    self.__parent.validate( desiredBranchId )
+    self.__parent.validate( desiredBranchId )    
     self.__parent.validationSucceeded(desiredBranchId)
-
-  def onExit(self, goingTo, transitionType):
-    if goingTo.id() != 'SecondRegistration' and goingTo.id() != 'NeedleSegmentation':
-      return
-
-    pNode = self.parameterNode()
    
-
-    super(iGyneNeedlePlanningStep, self).onExit(goingTo, transitionType)
-
-  def onEntry(self,comingFrom,transitionType):
-    '''
-    Update GUI and visualization
-    '''
-    super(iGyneNeedlePlanningStep, self).onEntry(comingFrom, transitionType)
-    pNode = self.parameterNode()
-    self.updateWidgetFromParameters(pNode)
-    Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
-    
-    # setup color transfer function once
-      
-    labelsColorNode = slicer.modules.colors.logic().GetColorTableNodeID(10)
-    self.__needleSegmentationNode.GetDisplayNode().SetAndObserveColorNodeID(labelsColorNode)
-    Helper.SetLabelVolume(self.__roiSegmentationNode.GetID())
-    self.onThresholdChanged()
-    pNode.SetParameter('currentStep', self.stepid)
-    
-
-
-  def updateWidgetFromParameters(self, pNode):
-  
-    baselineVolume = Helper.getNodeByID(pNode.GetParameter('baselineVolumeID'))
-    
-  
 ###############################################################################
 #################################################################################
   def createSpinbox(self, popup, popupSpinbox):
@@ -5962,5 +5941,4 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     displayNode.SetVisibility(0)
 
     mrmlScene.AddNode(modelNode)           
-
 
