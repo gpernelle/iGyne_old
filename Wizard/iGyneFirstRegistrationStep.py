@@ -167,7 +167,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     pNode = self.parameterNode()
     baselineVolumeID = pNode.GetParameter('baselineVolumeID')
     followupVolumeID = pNode.GetParameter('followupVolumeID')
-    self.__followupTransform = slicer.mrmlScene.CreateNodeByClass('vtkMRMLLinearTransformNode')
+    self.__followupTransform = slicer.mrmlScene.GetNodeByID('vtkMRMLLinearTransformNode4')
     slicer.mrmlScene.AddNode(self.__followupTransform)
     sliceNodeCount = slicer.mrmlScene.GetNumberOfNodesByClass('vtkMRMLAnnotationHierarchyNode')
     self.movingLandmarks = vtk.vtkCollection()

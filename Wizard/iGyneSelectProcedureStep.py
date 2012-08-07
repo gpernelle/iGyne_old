@@ -17,16 +17,20 @@ class iGyneSelectProcedureStep( iGyneStep ) :
 
     self.__layout = self.__parent.createUserInterface()
     
-    checkButton1 = qt.QCheckBox("EBRT")
-    radioButton2 = qt.QRadioButton("Brachy HDR Intracav")
-    radioButton3 = qt.QRadioButton("Brachy HDR Interstitial")
-    radioButton4 = qt.QRadioButton("Brachy LDR Intracav")
-    radioButton5 = qt.QRadioButton("Brachy LDR Interstitial")
-    self.__layout.addRow(checkButton1)
-    self.__layout.addRow(radioButton2)
-    self.__layout.addRow(radioButton3)
-    self.__layout.addRow(radioButton4)
-    self.__layout.addRow(radioButton5)
+    # checkButton1 = qt.QCheckBox("EBRT")
+    # radioButton2 = qt.QRadioButton("Brachy HDR Intracav")
+    # radioButton3 = qt.QRadioButton("Brachy HDR Interstitial")
+    # radioButton4 = qt.QRadioButton("Brachy LDR Intracav")
+    # radioButton5 = qt.QRadioButton("Brachy LDR Interstitial")
+    # self.__layout.addRow(checkButton1)
+    # self.__layout.addRow(radioButton2)
+    # self.__layout.addRow(radioButton3)
+    # self.__layout.addRow(radioButton4)
+    # self.__layout.addRow(radioButton5)
+    self.templateButton = qt.QRadioButton("Template")
+    self.noTemplateButton = qt.QRadioButton("No Template")
+    self.__layout.addRow(self.templateButton)
+    self.__layout.addRow(self.noTemplateButton)
 
       
   def onEntry(self, comingFrom, transitionType):
@@ -37,7 +41,14 @@ class iGyneSelectProcedureStep( iGyneStep ) :
 
 
   def onExit(self, goingTo, transitionType):
-
+    
+    # if self.templateButton.isChecked():
+      # goingTo.id() = 'SelectApplicator'
+    # else:
+      # goingTo.id() = 'NeedleSegmentation'
+    print(goingTo)
+    if goingTo.id() != 'SelectApplicator' and goingTo.id() != 'NeedleSegmentation':
+      return
     super(iGyneSelectProcedureStep, self).onExit(goingTo, transitionType) 
 
   def validate( self, desiredBranchId ):

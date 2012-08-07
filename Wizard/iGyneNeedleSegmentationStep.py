@@ -88,7 +88,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.__parent.validationSucceeded(desiredBranchId)
 
   def onExit(self, goingTo, transitionType):
-    if goingTo.id() != 'SecondRegistration' and goingTo.id() != 'NeedleSegmentation':
+    if goingTo.id() != 'NeedlePlanning' and goingTo.id() != 'NeedleSegmentation':
       return
 
     pNode = self.parameterNode()

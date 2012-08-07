@@ -104,7 +104,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
 
         self.glyphPoints.InsertPoint(self.pointId, fTipPointTrans[0], fTipPointTrans[1],fTipPointTrans[2])
         self.pointId += 1
-        print(self.pointId,self.vtkMatInitial )
+        # print(self.pointId,self.vtkMatInitial )
   
   def ICPRegistration(self):
     scene = slicer.mrmlScene
@@ -112,6 +112,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     transformNodeID = pNode.GetParameter('followupTransformID')
     transformNode = Helper.getNodeByID(transformNodeID)
     self.vtkMatInitial = transformNode.GetMatrixTransformToParent()
+    print(self.vtkMatInitial)
     
     self.setPointData(50,28.019)
     self.setPointData(40.209,24.456)
@@ -133,7 +134,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.setPointData(47.941,102.296)
     self.setPointData(47.941,5.704)
     self.setPointData(39.358,4.19)
-    print(self.glyphPoints)
+    # print(self.glyphPoints)
     self.glyphInputData.SetPoints(self.glyphPoints)
     self.glyphInputData.Update()
 
@@ -146,7 +147,16 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.glyphPoints3D.Update()  
     print(self.glyphPoints3D)
     inputSurface = scene.GetNodeByID("vtkMRMLModelNode4")
-    targetSurface = scene.GetNodeByID("vtkMRMLModelNode6")
+    # targetSurface = scene.GetNodeByID("vtkMRMLModelNode6")
+    
+    numNodes = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLModelNode" ) 
+    segmentationModel = None 
+    for n in xrange(numNodes): 
+      node = slicer.mrmlScene.GetNthNodeByClass( n, "vtkMRMLModelNode" ) 
+      if node.GetName() == "baselineROI_segmentation_10_Post-Gyrus": 
+        segmentationModel = node 
+        break 
+    targetSurface = segmentationModel
     # outputSurface = scene.GetNodeByID("vtkMRMLModelNode4")
     # outputSurface2 = scene.GetNodeByID("vtkMRMLModelNode5")     
     icpTransform = vtk.vtkIterativeClosestPointTransform()
@@ -161,20 +171,11 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     icpTransform.Update()
     nIterations = icpTransform.GetNumberOfIterations()
     FinalMatrix = vtk.vtkMatrix4x4()
-    print(icpTransform.GetMatrix())
+    # print(icpTransform.GetMatrix())
     FinalMatrix.Multiply4x4(icpTransform.GetMatrix(),self.vtkMatInitial,FinalMatrix)
     transformNode.SetAndObserveMatrixTransformToParent(FinalMatrix)
     # transformNode2.SetAndObserveMatrixTransformToParent(FinalMatrix)
-    print(FinalMatrix)
-    
-    
-    # outputSurface.SetAndObservePolyData(transformFilter.GetOutput())
-    # outputSurface2.SetAndObservePolyData(transformFilter.GetOutput())
-    # transform = outputSurface.GetMatrixtransformToParent()
-    # transform2 = outputSurface2.GetMatrixtransformToParent()
-    # transform.ApplyTransformMatrix(icpTransform.GetMatrix())
-    # transform2.ApplyTransformMatrix(icpTransform.GetMatrix())
-    
+    # print(FinalMatrix)
     
   def onThresholdsCheckChanged(self):
     if self.__useThresholdsCheck.isChecked():
@@ -228,20 +229,20 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     # - make a new hierarchy node if needed 
     # 
     numNodes = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLModelHierarchyNode" ) 
-    outHierarchy = None 
+    self.segmentationModel = None 
     for n in xrange(numNodes): 
       node = slicer.mrmlScene.GetNthNodeByClass( n, "vtkMRMLModelHierarchyNode" ) 
       if node.GetName() == "Segmentation Model": 
-        outHierarchy = node 
+        self.segmentationModel = node 
         break 
 
-    if not outHierarchy: 
-      outHierarchy = slicer.vtkMRMLModelHierarchyNode() 
-      outHierarchy.SetScene( slicer.mrmlScene ) 
-      outHierarchy.SetName( "Segmentation Model" ) 
-      slicer.mrmlScene.AddNode( outHierarchy ) 
+    if not self.segmentationModel: 
+      self.segmentationModel = slicer.vtkMRMLModelHierarchyNode() 
+      self.segmentationModel.SetScene( slicer.mrmlScene ) 
+      self.segmentationModel.SetName( "Segmentation Model" ) 
+      slicer.mrmlScene.AddNode( self.segmentationModel ) 
 
-    parameters["ModelSceneFile"] = outHierarchy 
+    parameters["ModelSceneFile"] = self.segmentationModel 
     modelMaker = slicer.modules.modelmaker 
     self.__cliNode = None
     self.__cliNode = slicer.cli.run(modelMaker, self.__cliNode, parameters) 
@@ -276,7 +277,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.__parent.validationSucceeded(desiredBranchId)
 
   def onExit(self, goingTo, transitionType):
-    if goingTo.id() != 'FirstRegistration' and goingTo.id() != 'NeedleSegmentation':
+    if goingTo.id() != 'FirstRegistration' and goingTo.id() != 'NeedlePlanning':
       return
 
     pNode = self.parameterNode()
