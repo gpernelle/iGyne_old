@@ -53,7 +53,8 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
       sizePolicy.setHeightForWidth(self.label.sizePolicy.hasHeightForWidth())
       self.label.setSizePolicy(sizePolicy)
       self.label.setText((""))
-      self.label.setPixmap(qt.QPixmap((":/Icons/GyneSheetVert.png")))
+      pathToImage = slicer.modules.igynepy.path.replace("iGynePy.py","iGynePyTemplate/Template/TemplateSheet.png")
+      self.label.setPixmap(qt.QPixmap(pathToImage))
       self.label.setObjectName("label")
       self.CqColorPushButton = qt.QPushButton(TemplateSheetWidget)
       self.CqColorPushButton.setEnabled(True)
@@ -2048,11 +2049,12 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     
     # setup color transfer function once
       
-    labelsColorNode = slicer.modules.colors.logic().GetColorTableNodeID(10)
-    self.__needleSegmentationNode.GetDisplayNode().SetAndObserveColorNodeID(labelsColorNode)
-    Helper.SetLabelVolume(self.__roiSegmentationNode.GetID())
-    self.onThresholdChanged()
+    # labelsColorNode = slicer.modules.colors.logic().GetColorTableNodeID(10)
+   
+    # Helper.SetLabelVolume(self.__roiSegmentationNode.GetID())
+    # self.onThresholdChanged()
     pNode.SetParameter('currentStep', self.stepid)
+    self.loadNeedles()
     
 
 
@@ -3915,29 +3917,13 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     option[i]
     
 
-  def loadTemplate(self):
+  def loadNeedles(self):
     pNode = self.parameterNode()
-    alreadyloaded = pNode.GetParameter("Template-loaded")
-    if alreadyloaded != "1":
-      pathToScene = slicer.modules.igynepy.path.replace("iGynePy.py","iGynePyTemplate/Template/Template.mrml")
-      slicer.util.loadScene( pathToScene, True)
-      
-      pNode.SetParameter("Template-loaded","1")
+    alreadyloaded = pNode.GetParameter("Needles-loaded")
     
-    
-    ObutratorNode = slicer.mrmlScene.GetNodeByID("vtkMRMLModelNode5")
-
-    if ObutratorNode!=None:
-      print("obturator loaded")
-      self.setNeedleCoordinates()
-      self.computerPolydataAndMatrix()    
+    # if alreadyloaded != "1":
+    if 1 == 1:
       
-      self.m_poly = vtk.vtkPolyData()  
-      self.m_poly.DeepCopy(ObutratorNode.GetPolyData())
-      
-    NeedleNode = slicer.mrmlScene.GetNodeByID("vtkMRMLModelNode6")
-    if NeedleNode==None:
-      print("no needle node loaded")
       vtkmat = vtk.vtkMatrix4x4()
       vtkmat.DeepCopy(self.m_vtkmat)
    
@@ -3958,23 +3944,9 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
         triangles.SetInput(TransformPolyDataFilter.GetOutput())  
         print(Transform) 
         self.AddModel(i,triangles.GetOutput())
-        
-    else:
-      for i in xrange(63):
+         
+      pNode.SetParameter("Needles-loaded","1")
       
-        filename= "vtkMRMLModelNode"+str(i+6)
-        mrmlScene=slicer.mrmlScene
-        NeedleNode = mrmlScene.GetNodeByID(filename)
-        if NeedleNode !=None:
-          displayNode =NeedleNode.GetModelDisplayNode()
-
-          nVisibility=displayNode.GetVisibility()  
-
-          if nVisibility==1:
-            self.setRadioButton(i,true) 
-          else:
-            self.setRadioButton(i,false)          
-
   def AddModel(self,i,polyData):
     modelNode = slicer.vtkMRMLModelNode()
     displayNode = slicer.vtkMRMLModelDisplayNode()

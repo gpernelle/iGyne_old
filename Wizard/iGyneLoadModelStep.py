@@ -2032,73 +2032,73 @@ class iGyneLoadModelStep( iGyneStep ) :
       self.m_poly = vtk.vtkPolyData()  
       self.m_poly.DeepCopy(ObutratorNode.GetPolyData())
       
-    NeedleNode = slicer.mrmlScene.GetNodeByID("vtkMRMLModelNode6")
-    if NeedleNode==None:
-      print("no needle node loaded")
-      vtkmat = vtk.vtkMatrix4x4()
-      vtkmat.DeepCopy(self.m_vtkmat)
+    # NeedleNode = slicer.mrmlScene.GetNodeByID("vtkMRMLModelNode6")
+    # if NeedleNode==None:
+      # print("no needle node loaded")
+      # vtkmat = vtk.vtkMatrix4x4()
+      # vtkmat.DeepCopy(self.m_vtkmat)
    
-      for i in xrange(63):
+      # for i in xrange(63):
       
-        vtkmat.SetElement(0,3,self.m_vtkmat.GetElement(0,3)+self.p[0][i])
-        vtkmat.SetElement(1,3,self.m_vtkmat.GetElement(1,3)+self.p[1][i])
-        vtkmat.SetElement(2,3,self.m_vtkmat.GetElement(2,3)+(30.0-150.0)/2.0)
+        # vtkmat.SetElement(0,3,self.m_vtkmat.GetElement(0,3)+self.p[0][i])
+        # vtkmat.SetElement(1,3,self.m_vtkmat.GetElement(1,3)+self.p[1][i])
+        # vtkmat.SetElement(2,3,self.m_vtkmat.GetElement(2,3)+(30.0-150.0)/2.0)
 
-        TransformPolyDataFilter=vtk.vtkTransformPolyDataFilter()
-        Transform=vtk.vtkTransform()        
-        TransformPolyDataFilter.SetInput(self.m_polyCylinder)
-        Transform.SetMatrix(vtkmat)
-        TransformPolyDataFilter.SetTransform(Transform)
-        TransformPolyDataFilter.Update()
+        # TransformPolyDataFilter=vtk.vtkTransformPolyDataFilter()
+        # Transform=vtk.vtkTransform()        
+        # TransformPolyDataFilter.SetInput(self.m_polyCylinder)
+        # Transform.SetMatrix(vtkmat)
+        # TransformPolyDataFilter.SetTransform(Transform)
+        # TransformPolyDataFilter.Update()
 
-        triangles=vtk.vtkTriangleFilter()
-        triangles.SetInput(TransformPolyDataFilter.GetOutput())  
-        print(Transform) 
-        self.AddModel(i,triangles.GetOutput())
+        # triangles=vtk.vtkTriangleFilter()
+        # triangles.SetInput(TransformPolyDataFilter.GetOutput())  
+        # print(Transform) 
+        # self.AddModel(i,triangles.GetOutput())
         
-    else:
-      for i in xrange(63):
+    # else:
+      # for i in xrange(63):
       
-        filename= "vtkMRMLModelNode"+str(i+6)
-        mrmlScene=slicer.mrmlScene
-        NeedleNode = mrmlScene.GetNodeByID(filename)
-        if NeedleNode !=None:
-          displayNode =NeedleNode.GetModelDisplayNode()
+        # filename= "vtkMRMLModelNode"+str(i+6)
+        # mrmlScene=slicer.mrmlScene
+        # NeedleNode = mrmlScene.GetNodeByID(filename)
+        # if NeedleNode !=None:
+          # displayNode =NeedleNode.GetModelDisplayNode()
 
-          nVisibility=displayNode.GetVisibility()  
+          # nVisibility=displayNode.GetVisibility()  
 
-          if nVisibility==1:
-            self.setRadioButton(i,true) 
-          else:
-            self.setRadioButton(i,false)          
+          # if nVisibility==1:
+            # self.setRadioButton(i,true) 
+          # else:
+            # self.setRadioButton(i,false)          
 
-  def AddModel(self,i,polyData):
-    modelNode = slicer.vtkMRMLModelNode()
-    displayNode = slicer.vtkMRMLModelDisplayNode()
-    storageNode = slicer.vtkMRMLModelStorageNode()
+  # def AddModel(self,i,polyData):
+    # modelNode = slicer.vtkMRMLModelNode()
+    # displayNode = slicer.vtkMRMLModelDisplayNode()
+    # storageNode = slicer.vtkMRMLModelStorageNode()
 
-    fileName =  "Model_"+ str(i) + ".vtk" 
+    # fileName =  "Model_"+ str(i) + ".vtk" 
 
-    mrmlScene = slicer.mrmlScene
-    modelNode.SetName(fileName)  
-    modelNode.SetAndObservePolyData(polyData)
-    mrmlScene.SaveStateForUndo()
-    modelNode.SetScene(mrmlScene)
-    storageNode.SetScene(mrmlScene)
-    storageNode.SetFileName(fileName)  
-    displayNode.SetScene(mrmlScene)
-    mrmlScene.AddNode(storageNode)
-    mrmlScene.AddNode(displayNode)
-    modelNode.SetAndObserveStorageNodeID(storageNode.GetID())
-    modelNode.SetAndObserveDisplayNodeID(displayNode.GetID())
+    # mrmlScene = slicer.mrmlScene
+    # modelNode.SetName(fileName)  
+    # modelNode.SetAndObservePolyData(polyData)
+    # mrmlScene.SaveStateForUndo()
+    # modelNode.SetScene(mrmlScene)
+    # storageNode.SetScene(mrmlScene)
+    # storageNode.SetFileName(fileName)  
+    # displayNode.SetScene(mrmlScene)
+    # mrmlScene.AddNode(storageNode)
+    # mrmlScene.AddNode(displayNode)
+    # modelNode.SetAndObserveStorageNodeID(storageNode.GetID())
+    # modelNode.SetAndObserveDisplayNodeID(displayNode.GetID())
 
-    transformNode = slicer.mrmlScene.GetNodeByID("vtkMRMLLinearTransformNode4")
-    modelNode.SetAndObserveTransformNodeID(transformNode.GetID())
-    displayNode.SetPolyData(modelNode.GetPolyData())
-    displayNode.SetColor(0,1,0)
-    displayNode.SetSliceIntersectionVisibility(0)
-    displayNode.SetVisibility(0)
+    # transformNode = slicer.mrmlScene.GetNodeByID("vtkMRMLLinearTransformNode4")
+    # modelNode.SetAndObserveTransformNodeID(transformNode.GetID())
+    # displayNode.SetPolyData(modelNode.GetPolyData())
+    # displayNode.SetColor(0,1,0)
+    # displayNode.SetSliceIntersectionVisibility(0)
+    # displayNode.SetVisibility(0)
 
-    mrmlScene.AddNode(modelNode)           
+    # mrmlScene.AddNode(modelNode)           
 
 

@@ -30,13 +30,31 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.glyphBalls = vtk.vtkSphereSource()
     self.glyphPoints3D = vtk.vtkGlyph3D()
     self.pointId = 0
+    self.iteration = 0
+    self.position = [0, 0, 0]
+    self.paintCoordinates = []
+    self.x0, self.y0, self.z0 = 0,0,0
+    self.tx0, self.ty0,self.tz0 = 0,0,0   
+    self.m = vtk.vtkMatrix4x4()
+    self.r = vtk.vtkTransform()
+    self.transformNode,self.model = None, None
+    self.before = 0
+    self.plan = 'plan'  
+    self.actionState = "idle"
+    self.interactorObserverTags = []    
+    self.styleObserverTags = []
+    self.sliceWidgetsPerStyle = {}
+    self.tac=0
+    self.WMAX = 0
+    self.L=[]
+    self.divider = 1
+    self.step = 1
     # self.transformNode = vtk.vtkMRMLLinearTransformNode()
        
     # initialize VR stuff
-
-
     self.__roiSegmentationNode = None
     self.__roiVolume = None
+    self.transform = slicer.mrmlScene.GetNodeByID("vtkMRMLLinearTransformNode4")
     
 
   def createUserInterface( self ):
@@ -90,6 +108,11 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.__secondReg.connect('clicked()', self.ICPRegistration)
     self.__secondReg.setEnabled(0)
     self.__layout.addRow(self.__secondReg)
+    
+    self.fiducialButton = qt.QPushButton('Manual Registration')
+    self.fiducialButton.checkable = True
+    self.__layout.addRow(self.fiducialButton)
+    self.fiducialButton.connect('toggled(bool)', self.onRunButtonToggled)
 
   def setPointData(self,fHoleOriginX,fHoleOriginY):
     fTipPoint,fTipPointTrans=[0,0,0,0],[0,0,0,0]
@@ -310,8 +333,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.onThresholdChanged()
     pNode.SetParameter('currentStep', self.stepid)
     
-
-
   def updateWidgetFromParameters(self, pNode):
   
     baselineROIVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
@@ -340,3 +361,176 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     else:
       Helper.Error('Unexpected parameter values! Error CT-S03-SNA. Please report')
     self.__roiSegmentationNode = Helper.getNodeByID(segmentationID)
+
+ 
+  def start(self):    
+    self.removeObservers()
+    # get new slice nodes
+    layoutManager = slicer.app.layoutManager()
+    sliceNodeCount = slicer.mrmlScene.GetNumberOfNodesByClass('vtkMRMLSliceNode')
+    for nodeIndex in xrange(sliceNodeCount):
+      # find the widget for each node in scene
+      sliceNode = slicer.mrmlScene.GetNthNodeByClass(nodeIndex, 'vtkMRMLSliceNode')
+      sliceWidget = layoutManager.sliceWidget(sliceNode.GetLayoutName())      
+      if sliceWidget:     
+        # add obserservers and keep track of tags
+        style = sliceWidget.sliceView().interactorStyle()
+        self.sliceWidgetsPerStyle[style] = sliceWidget
+        events = ("LeftButtonPressEvent","LeftButtonReleaseEvent","MouseMoveEvent", "KeyPressEvent","KeyReleaseEvent","EnterEvent", "LeaveEvent")
+        for event in events:
+          tag = style.AddObserver(event, self.processEvent)   
+          self.styleObserverTags.append([style,tag])
+		  
+  def stop(self):
+    print("here")
+    self.removeObservers() 
+	
+  def removeObservers(self):
+    # remove observers and reset
+    for observee,tag in self.styleObserverTags:
+      observee.RemoveObserver(tag)
+    self.styleObserverTags = []
+    self.sliceWidgetsPerStyle = {}
+	
+  def processEvent(self,observee,event=None):
+
+    ######################################  transformation  ##########################
+    scene = slicer.mrmlScene
+    pNode= self.parameterNode()
+    transformNodeID = pNode.GetParameter('followupTransformID')
+    self.transform = Helper.getNodeByID(transformNodeID)
+    if self.sliceWidgetsPerStyle.has_key(observee):
+      sliceWidget = self.sliceWidgetsPerStyle[observee]
+      style = sliceWidget.sliceView().interactorStyle()
+
+      if event == "KeyPressEvent":
+        # self.before == 0:
+        key = style.GetInteractor().GetKeySym()
+        if key == 'a' and self.actionState != "translation":
+          self.actionState = "translation"          
+        elif key == 's' and self.actionState != "rotation":
+          self.actionState = "rotation"
+        elif key == 's' and self.actionState == "rotation":
+          self.actionState = "idle"
+          self.before = 0
+        elif key == 'a' and self.actionState == "translation":
+          self.actionState = "idle"
+          self.before = 0
+
+      print(self.actionState)
+
+      global fi, theta, psi
+      
+      if (self.actionState == "rotation" or self.actionState == "translation"):
+
+        ############################  rotation ########################################
+        if self.actionState == "rotation" and event == "MouseMoveEvent":
+          xy = style.GetInteractor().GetEventPosition()
+          xyz = sliceWidget.convertDeviceToXYZ(xy)
+          ras = sliceWidget.convertXYZToRAS(xyz)
+          tx = 0
+          ty = 0
+          tz = 0
+          fi=0
+          theta = 0
+          psi = 0
+          x = ras[0]
+          y = ras[1]
+          z = ras[2]
+          self.r = vtk.vtkTransform()
+          if self.before == 0:
+            self.x0 = ras[0]
+            self.y0 = ras[1]
+            self.z0 = ras[2]
+            self.tx0 = self.m.GetElement(0,3)
+            self.ty0 = self.m.GetElement(1,3)
+            self.tz0 = self.m.GetElement(2,3)      
+            if y == 0:
+              self.plan = 'yplan'      
+            elif z == 0:
+              self.plan = 'zplan'
+            elif x == 0:
+              self.plan = 'xplan'
+          tx = x - self.x0
+          ty = y - self.y0
+          tz = z - self.z0
+
+          self.m =  self.transform.GetMatrixTransformToParent()
+          global center, new_rot_point, mouv_mouse
+          center = [0,0,0]
+          #################### rotation with fiducial point as center: translation  rotation (-translation) ####################
+          # if slicer.util.getNode('vtkMRMLAnnotationFiducialNode1'):
+            # fiducialNode = slicer.util.getNode('vtkMRMLAnnotationFiducialNode1')
+            # fiducialNode.GetFiducialCoordinates(center)
+            # new_rot_point = [center[0]-self.tx0,center[1]-self.ty0,center[2]-self.tz0]
+            # translate_back = [k * -1 for k in new_rot_point]    
+            # mouv_mouse=[tx,ty,tz]
+            # self.r.Translate(new_rot_point)
+            # if self.plan == 'yplan':
+              # self.r.RotateWXYZ(tx,0,1,0)         
+            # elif self.plan == 'zplan':
+              # self.r.RotateZ(tx)
+              # self.r.RotateWXYZ(tx,0,0,1)  
+            # elif self.plan == 'xplan':
+              # self.r.RotateX(ty)
+              # self.r.RotateWXYZ(ty,1,0,0)
+            # self.r.Translate(translate_back)  
+            # self.transform.ApplyTransformMatrix(self.r.GetMatrix())       
+            # self.x0 = x
+            # self.y0 = y
+            # self.z0 = z
+          #################### rotation without fiducial point as center #########################################################
+          # else:
+          new_rot_point = [self.tx0,self.ty0,self.tz0]
+          translate_back = [k * -1 for k in new_rot_point]    
+          mouv_mouse=[tx,ty,tz]
+          self.r.Translate(new_rot_point)
+          if self.plan == 'yplan':
+            self.r.RotateWXYZ(tx,0,1,0)         
+          elif self.plan == 'zplan':           
+            self.r.RotateWXYZ(tx,0,0,1)  
+          elif self.plan == 'xplan':
+            self.r.RotateWXYZ(ty,1,0,0)
+          self.r.Translate(translate_back)  
+          self.transform.ApplyTransformMatrix(self.r.GetMatrix())       
+          self.x0 = x
+          self.y0 = y
+          self.z0 = z
+          self.before += 1
+
+        ######################################### translation ###########################################
+        elif self.actionState == "translation" and event == "MouseMoveEvent":
+          xy = style.GetInteractor().GetEventPosition()
+          xyz = sliceWidget.convertDeviceToXYZ(xy);
+          ras = sliceWidget.convertXYZToRAS(xyz)
+          x = ras[0]
+          y = ras[1]
+          z = ras[2]
+          self.m = self.transform.GetMatrixTransformToParent()
+          if self.before == 0:
+            self.x0 = ras[0]
+            self.y0 = ras[1]
+            self.z0 = ras[2]
+            self.tx0 = self.m.GetElement(0,3)
+            self.ty0 = self.m.GetElement(1,3)
+            self.tz0 = self.m.GetElement(2,3)  
+          tx = x - self.x0 
+          ty = y - self.y0 
+          tz = z - self.z0
+          self.translate(self.tx0+tx,self.ty0+ty,self.tz0+tz)          
+          self.before += 1
+
+   
+  def onRunButtonToggled(self, checked):
+    if checked:
+      self.start()
+      self.fiducialButton.text = "Stop"  
+    else:
+      self.stop()
+      self.fiducialButton.text = "Choose Fiducial Points"
+
+  def translate(self,x,y,z):
+    self.m.SetElement(0,3,x)
+    self.m.SetElement(1,3,y)
+    self.m.SetElement(2,3,z)
+    
