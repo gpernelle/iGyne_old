@@ -135,7 +135,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     transformNodeID = pNode.GetParameter('followupTransformID')
     transformNode = Helper.getNodeByID(transformNodeID)
     self.vtkMatInitial = transformNode.GetMatrixTransformToParent()
-    print(self.vtkMatInitial)
+    # print(self.vtkMatInitial)
     
     self.setPointData(50,28.019)
     self.setPointData(40.209,24.456)
@@ -168,7 +168,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.glyphPoints3D.SetInput(self.glyphInputData)
     self.glyphPoints3D.SetSource(self.glyphBalls.GetOutput())
     self.glyphPoints3D.Update()  
-    print(self.glyphPoints3D)
+    # print(self.glyphPoints3D)
     inputSurface = scene.GetNodeByID("vtkMRMLModelNode4")
     # targetSurface = scene.GetNodeByID("vtkMRMLModelNode6")
     
@@ -187,8 +187,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     icpTransform.SetTarget(targetSurface.GetPolyData())
     icpTransform.SetCheckMeanDistance(0)
     icpTransform.SetMaximumMeanDistance(0.01)
-    icpTransform.SetMaximumNumberOfIterations(300)
-    icpTransform.SetMaximumNumberOfLandmarks(1000)
+    icpTransform.SetMaximumNumberOfIterations(50)
+    icpTransform.SetMaximumNumberOfLandmarks(300)
     icpTransform.SetMeanDistanceModeToRMS()
     icpTransform.GetLandmarkTransform().SetModeToRigidBody()
     icpTransform.Update()

@@ -312,7 +312,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     self.updateWidgetFromParameterNode(pNode)
     bounds = [0,0,0,0,0,0]
     self.__followupVolume.GetRASBounds(bounds)
-    print(bounds)
+    #print(bounds)
     if self.__roi != None:
       self.__roi.VisibleOn()
     self.__roi.SetRadiusXYZ(abs(bounds[0]-bounds[1])/float(2),abs(bounds[2]-bounds[3])/float(2),abs(bounds[4]-bounds[5])/float(2))
