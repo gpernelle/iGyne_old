@@ -12,9 +12,10 @@ class iGyneLoadModelStep( iGyneStep ) :
     self.setDescription( 'Load the template. From this template, auto-crop and registration functions will be processed.' )
     self.__parent = super( iGyneLoadModelStep, self )
     self.loadTemplateButton = None
+    self.skip = 1
 
   def createUserInterface( self ):
- 
+    self.skip = 0
     self.__layout = self.__parent.createUserInterface()
    
     baselineScanLabel = qt.QLabel( 'CT or MR scan:' )
@@ -72,30 +73,33 @@ class iGyneLoadModelStep( iGyneStep ) :
   def validate( self, desiredBranchId ):
     '''
     '''
-    self.__parent.validate( desiredBranchId )
+    if self.skip == 0:
+      self.__parent.validate( desiredBranchId )
+      # check here that the selectors are not empty
+      baseline = self.__baselineVolumeSelector.currentNode()
+      followup = slicer.mrmlScene.GetNodeByID("vtkMRMLModelNode4")
+      obturator = slicer.mrmlScene.GetNodeByID("vtkMRMLModelNode5")
 
-    # check here that the selectors are not empty
-    baseline = self.__baselineVolumeSelector.currentNode()
-    followup = slicer.mrmlScene.GetNodeByID("vtkMRMLModelNode4")
-    obturator = slicer.mrmlScene.GetNodeByID("vtkMRMLModelNode5")
-
-    if baseline != None and followup != None:
-      baselineID = baseline.GetID()
-      followupID = followup.GetID()
-      obturatorID = obturator.GetID()
-      if baselineID != '' and followupID != '' and baselineID != followupID:
-    
-        pNode = self.parameterNode()
-        pNode.SetParameter('baselineVolumeID', baselineID)
-        pNode.SetParameter('followupVolumeID', followupID)
-        pNode.SetParameter('obturatorID', obturatorID)
-        
-        self.__parent.validationSucceeded(desiredBranchId)
+      if baseline != None and followup != None:
+        baselineID = baseline.GetID()
+        followupID = followup.GetID()
+        obturatorID = obturator.GetID()
+        if baselineID != '' and followupID != '' and baselineID != followupID:
+      
+          pNode = self.parameterNode()
+          pNode.SetParameter('baselineVolumeID', baselineID)
+          pNode.SetParameter('followupVolumeID', followupID)
+          pNode.SetParameter('obturatorID', obturatorID)
+          
+          self.__parent.validationSucceeded(desiredBranchId)
+        else:
+          self.__parent.validationFailed(desiredBranchId, 'Error','Please select distinctive baseline and followup volumes!')
       else:
-        self.__parent.validationFailed(desiredBranchId, 'Error','Please select distinctive baseline and followup volumes!')
+        self.__parent.validationFailed(desiredBranchId, 'Error','Please select both Template and scan/DICOM Volume!')
+    
     else:
-      self.__parent.validationFailed(desiredBranchId, 'Error','Please select both Template and scan/DICOM Volume!')
-        
+      self.__parent.validate( desiredBranchId )
+      self.__parent.validationSucceeded(desiredBranchId)
   def onEntry(self,comingFrom,transitionType):
   
     super(iGyneLoadModelStep, self).onEntry(comingFrom, transitionType)
@@ -105,10 +109,12 @@ class iGyneLoadModelStep( iGyneStep ) :
     applicator  = pNode.GetParameter('Template')
     if applicator == "Template+Obturator":
       self.loadTemplate()    
-    self.updateWidgetFromParameters(self.parameterNode())
+    if self.skip == 0:
+      self.updateWidgetFromParameters(self.parameterNode())
    
   def onExit(self, goingTo, transitionType):
-    self.doStepProcessing()
+    if self.skip == 0:
+      self.doStepProcessing()
     #error checking
     if goingTo.id() != 'SelectApplicator' and goingTo.id() != 'FirstRegistration':
       return

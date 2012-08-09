@@ -28,9 +28,11 @@ class iGyneSelectProcedureStep( iGyneStep ) :
     # self.__layout.addRow(radioButton4)
     # self.__layout.addRow(radioButton5)
     self.templateButton = qt.QRadioButton("Template")
-    self.noTemplateButton = qt.QRadioButton("No Template")
+    self.noTemplateButton = qt.QRadioButton("No Template")  
     self.__layout.addRow(self.templateButton)
     self.__layout.addRow(self.noTemplateButton)
+
+    
 
       
   def onEntry(self, comingFrom, transitionType):

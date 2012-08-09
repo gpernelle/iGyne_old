@@ -15,6 +15,7 @@ TODO:
 class iGyneSecondRegistrationStep( iGyneStep ) :
 
   def __init__( self, stepid ):
+    self.skip = 1
     self.initialize( stepid )
     self.setName( '5. Second Registration' )
     self.setDescription( 'Register the template based on the volume segmentation' )
@@ -60,7 +61,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
   def createUserInterface( self ):
     '''
     '''
-
+    self.skip = 0
     self.__layout = self.__parent.createUserInterface()
 
     self.__basicFrame = ctk.ctkCollapsibleButton()
@@ -300,11 +301,12 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.__parent.validationSucceeded(desiredBranchId)
 
   def onExit(self, goingTo, transitionType):
-    if goingTo.id() != 'FirstRegistration' and goingTo.id() != 'NeedlePlanning':
-      return
+    if self.skip == 0:
+      if goingTo.id() != 'FirstRegistration' and goingTo.id() != 'NeedlePlanning':
+        return
 
-    pNode = self.parameterNode()
-    pNode.SetParameter('thresholdRange', str(self.__threshRange.minimumValue)+','+str(self.__threshRange.maximumValue))
+      pNode = self.parameterNode()
+      pNode.SetParameter('thresholdRange', str(self.__threshRange.minimumValue)+','+str(self.__threshRange.maximumValue))
 
     super(iGyneSecondRegistrationStep, self).onExit(goingTo, transitionType)
 
@@ -313,25 +315,26 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     Update GUI and visualization
     '''
     super(iGyneSecondRegistrationStep, self).onEntry(comingFrom, transitionType)
-    pNode = self.parameterNode()
-    self.updateWidgetFromParameters(pNode)
-    self.onThresholdsCheckChanged()
-    Helper.SetBgFgVolumes(pNode.GetParameter('croppedBaselineVolumeID'),'')
+    if self.skip == 0:
+      pNode = self.parameterNode()
+      self.updateWidgetFromParameters(pNode)
+      self.onThresholdsCheckChanged()
+      Helper.SetBgFgVolumes(pNode.GetParameter('croppedBaselineVolumeID'),'')
 
-    roiVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
-    self.__roiVolume = roiVolume
-    self.__roiSegmentationNode = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeSegmentationID'))
-    
-    # setup color transfer function once
-    
-    baselineROIVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
-    baselineROIRange = baselineROIVolume.GetImageData().GetScalarRange()
-    threshRange = [self.__threshRange.minimumValue, self.__threshRange.maximumValue]
-    labelsColorNode = slicer.modules.colors.logic().GetColorTableNodeID(10)
-    self.__roiSegmentationNode.GetDisplayNode().SetAndObserveColorNodeID(labelsColorNode)
-    Helper.SetLabelVolume(self.__roiSegmentationNode.GetID())
-    self.onThresholdChanged()
-    pNode.SetParameter('currentStep', self.stepid)
+      roiVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
+      self.__roiVolume = roiVolume
+      self.__roiSegmentationNode = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeSegmentationID'))
+      
+      # setup color transfer function once
+      
+      baselineROIVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
+      baselineROIRange = baselineROIVolume.GetImageData().GetScalarRange()
+      threshRange = [self.__threshRange.minimumValue, self.__threshRange.maximumValue]
+      labelsColorNode = slicer.modules.colors.logic().GetColorTableNodeID(10)
+      self.__roiSegmentationNode.GetDisplayNode().SetAndObserveColorNodeID(labelsColorNode)
+      Helper.SetLabelVolume(self.__roiSegmentationNode.GetID())
+      self.onThresholdChanged()
+      pNode.SetParameter('currentStep', self.stepid)
     
   def updateWidgetFromParameters(self, pNode):
   

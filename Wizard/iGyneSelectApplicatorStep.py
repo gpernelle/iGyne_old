@@ -11,6 +11,7 @@ class iGyneSelectApplicatorStep( iGyneStep ) :
     self.setName( '2. Choose Applicator' )
     self.setDescription( 'Choose the applicator you are using. It will load the right template.' )
     self.__parent = super( iGyneSelectApplicatorStep, self )
+    self.checkBox1 = qt.QCheckBox("Neblett Template and Obturator")
     # qt.QTimer.singleShot(0, self.killButton)
 
   def createUserInterface( self ):

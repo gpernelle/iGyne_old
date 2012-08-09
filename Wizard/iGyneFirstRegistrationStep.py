@@ -8,6 +8,7 @@ import string
 class iGyneFirstRegistrationStep( iGyneStep ) :
 
   def __init__( self, stepid ):
+    self.skip = 1
     self.initialize( stepid )
     self.setName( '4. Register the template' )
     self.setDescription( 'Register the template based on 3 fiducial points. Choose the points counterclockwise, starting from the one in the middle.' )
@@ -35,10 +36,12 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     self.register = 0
     
     
+    
 
   def createUserInterface( self ):
     '''
     '''
+    self.skip = 0
     self.__layout = self.__parent.createUserInterface()
      
     self.fiducialButton = qt.QPushButton('Choose Fiducial Points')
@@ -283,54 +286,52 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     '''
     self.__parent.validate( desiredBranchId )    
     self.__parent.validationSucceeded(desiredBranchId)
-    if self.registered == 1:
-      self.__parent.validationSucceeded(desiredBranchId)
-    else:
-      self.__parent.validationFailed(desiredBranchId, 'Error',"Haven't you forgotten to register the template?")    
 
   def onEntry(self,comingFrom,transitionType):
     super(iGyneFirstRegistrationStep, self).onEntry(comingFrom, transitionType)
-
-    # setup the interface
-    lm = slicer.app.layoutManager()
-    lm.setLayout(3)
-    pNode = self.parameterNode()
-
-    # use this transform node to align ROI with the axes of the baseline
-    # volume
-    roiTfmNodeID = pNode.GetParameter('roiTransformID')
     
-    if roiTfmNodeID != '':
-      self.__roiTransformNode = Helper.getNodeByID(roiTfmNodeID)
-    else:
-      Helper.Error('Internal error! Error code CT-S2-NRT, please report!')
-    baselineVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
-    self.__followupVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('followupVolumeID'))
-    self.__baselineVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
-    # get the roiNode from parameters node, if it exists, and initialize the
-    # GUI
-    self.updateWidgetFromParameterNode(pNode)
-    bounds = [0,0,0,0,0,0]
-    self.__followupVolume.GetRASBounds(bounds)
-    #print(bounds)
-    if self.__roi != None:
-      self.__roi.VisibleOn()
-    self.__roi.SetRadiusXYZ(abs(bounds[0]-bounds[1])/float(2),abs(bounds[2]-bounds[3])/float(2),abs(bounds[4]-bounds[5])/float(2))
-    pNode.SetParameter('currentStep', self.stepid)
+    if self.skip == 0:
+      # setup the interface
+      lm = slicer.app.layoutManager()
+      lm.setLayout(3)
+      pNode = self.parameterNode()
+
+      # use this transform node to align ROI with the axes of the baseline
+      # volume
+      roiTfmNodeID = pNode.GetParameter('roiTransformID')
+      
+      if roiTfmNodeID != '':
+        self.__roiTransformNode = Helper.getNodeByID(roiTfmNodeID)
+      else:
+        Helper.Error('Internal error! Error code CT-S2-NRT, please report!')
+      baselineVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
+      self.__followupVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('followupVolumeID'))
+      self.__baselineVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
+      # get the roiNode from parameters node, if it exists, and initialize the
+      # GUI
+      self.updateWidgetFromParameterNode(pNode)
+      bounds = [0,0,0,0,0,0]
+      self.__followupVolume.GetRASBounds(bounds)
+      #print(bounds)
+      if self.__roi != None:
+        self.__roi.VisibleOn()
+      self.__roi.SetRadiusXYZ(abs(bounds[0]-bounds[1])/float(2),abs(bounds[2]-bounds[3])/float(2),abs(bounds[4]-bounds[5])/float(2))
+      pNode.SetParameter('currentStep', self.stepid)
 
   def onExit(self, goingTo, transitionType):
-    if goingTo.id() != 'LoadModel' and goingTo.id() != 'SecondRegistration':
-      return
+    if self.skip == 0:
+      if goingTo.id() != 'LoadModel' and goingTo.id() != 'SecondRegistration':
+        return
+        
+      if self.__roi != None:
+        self.__roi.RemoveObserver(self.__roiObserverTag)
+        self.__roi.VisibleOff()
       
-    if self.__roi != None:
-      self.__roi.RemoveObserver(self.__roiObserverTag)
-      self.__roi.VisibleOff()
-    
-    pNode = self.parameterNode()
-    pNode.SetParameter('roiNodeID', self.__roiSelector.currentNode().GetID())
+      pNode = self.parameterNode()
+      pNode.SetParameter('roiNodeID', self.__roiSelector.currentNode().GetID())
 
-    if goingTo.id() == 'SecondRegistration':
-      self.doStepProcessing()
+      if goingTo.id() == 'SecondRegistration':
+        self.doStepProcessing()
 
     super(iGyneFirstRegistrationStep, self).onExit(goingTo, transitionType)
 

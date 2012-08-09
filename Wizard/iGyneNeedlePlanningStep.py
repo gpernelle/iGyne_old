@@ -15,6 +15,7 @@ TODO:
 class iGyneNeedlePlanningStep( iGyneStep ) :
 
   def __init__( self, stepid ):
+    self.skip = 1
     self.initialize( stepid )
     self.setName( '5. Needle position Planning' )
     self.setDescription( 'Position, color, resize needles as you like' )
@@ -24,7 +25,7 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
   def createUserInterface( self ):
     '''
     '''
-
+    self.skip = 0
     self.__layout = self.__parent.createUserInterface()
     TemplateSheetWidget = qt.QWidget()
     TemplateSheetWidget.resize(552, 682)
@@ -2031,18 +2032,19 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     Update GUI and visualization
     '''
     super(iGyneNeedlePlanningStep, self).onEntry(comingFrom, transitionType)
-    pNode = self.parameterNode()
-    self.updateWidgetFromParameters(pNode)
-    Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
-    
-    # setup color transfer function once
+    if self.skip == 0:
+      pNode = self.parameterNode()
+      self.updateWidgetFromParameters(pNode)
+      Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
       
-    # labelsColorNode = slicer.modules.colors.logic().GetColorTableNodeID(10)
-   
-    # Helper.SetLabelVolume(self.__roiSegmentationNode.GetID())
-    # self.onThresholdChanged()
-    pNode.SetParameter('currentStep', self.stepid)
-    self.loadNeedles()
+      # setup color transfer function once
+        
+      # labelsColorNode = slicer.modules.colors.logic().GetColorTableNodeID(10)
+     
+      # Helper.SetLabelVolume(self.__roiSegmentationNode.GetID())
+      # self.onThresholdChanged()
+      pNode.SetParameter('currentStep', self.stepid)
+      self.loadNeedles()
     
 
 
