@@ -78,9 +78,9 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     
     # Set the parameters for the CLI module    
     parameters = {} 
-    parameters['InputImageName'] = inputVolumeID
-    parameters['InputLabelImageName'] = inputLabelID
-    parameters['outputVtkName'] = outputID
+    parameters['inputVolume'] = inputVolumeID
+    parameters['inputLabel'] = inputLabelID
+    parameters['outputVtk'] = outputID
     module = slicer.modules.mainlabelneedletrackingcli 
     self.__cliNode = None
     self.__cliNode = slicer.cli.run(module, None, parameters, wait_for_completion=True)
