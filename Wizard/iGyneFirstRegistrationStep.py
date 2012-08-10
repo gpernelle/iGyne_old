@@ -293,7 +293,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     if self.skip == 0:
       # setup the interface
       lm = slicer.app.layoutManager()
-      lm.setLayout(3)
+      lm.setLayout(slicer.vtkMRMLLayoutNode.SlicerLayoutOneUpRedSliceView)
       pNode = self.parameterNode()
 
       # use this transform node to align ROI with the axes of the baseline

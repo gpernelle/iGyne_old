@@ -189,7 +189,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     icpTransform.SetCheckMeanDistance(0)
     icpTransform.SetMaximumMeanDistance(0.01)
     icpTransform.SetMaximumNumberOfIterations(50)
-    icpTransform.SetMaximumNumberOfLandmarks(300)
+    icpTransform.SetMaximumNumberOfLandmarks(1000)
     icpTransform.SetMeanDistanceModeToRMS()
     icpTransform.GetLandmarkTransform().SetModeToRigidBody()
     icpTransform.Update()
@@ -228,7 +228,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
 
     # self.__modelNode = slicer.mrmlScene.CreateNodeByClass('vtkMRMLModelNode')
     self.__roiSegmentationNode.SetAndObserveImageData(thresh.GetOutput())
-    Helper.SetBgFgVolumes(pNode.GetParameter('croppedBaselineVolumeID'),'')
+    Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
     self.__secondReg.setEnabled(1)
 
     # set up the model maker node 
@@ -289,7 +289,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     thresh.Update()
     
     self.__roiSegmentationNode.SetAndObserveImageData(thresh.GetOutput())
-    Helper.SetBgFgVolumes(pNode.GetParameter('croppedBaselineVolumeID'),'')
+    Helper.SetBgFgVolumes(pNode.GetParameter('BaselineVolumeID'),'')
 
   def processSegmentationCompletion(self, node, event):
 
@@ -316,10 +316,13 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     '''
     super(iGyneSecondRegistrationStep, self).onEntry(comingFrom, transitionType)
     if self.skip == 0:
+    # setup the interface
+      lm = slicer.app.layoutManager()
+      lm.setLayout(3)
       pNode = self.parameterNode()
       self.updateWidgetFromParameters(pNode)
       self.onThresholdsCheckChanged()
-      Helper.SetBgFgVolumes(pNode.GetParameter('croppedBaselineVolumeID'),'')
+      Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
 
       roiVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
       self.__roiVolume = roiVolume
@@ -428,79 +431,57 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
 
         ############################  rotation ########################################
         if self.actionState == "rotation" and event == "MouseMoveEvent":
-          xy = style.GetInteractor().GetEventPosition()
-          xyz = sliceWidget.convertDeviceToXYZ(xy)
-          ras = sliceWidget.convertXYZToRAS(xyz)
-          tx = 0
-          ty = 0
-          tz = 0
-          fi=0
-          theta = 0
-          psi = 0
-          x = ras[0]
-          y = ras[1]
-          z = ras[2]
-          self.r = vtk.vtkTransform()
-          if self.before == 0:
-            self.x0 = ras[0]
-            self.y0 = ras[1]
-            self.z0 = ras[2]
-            self.tx0 = self.m.GetElement(0,3)
-            self.ty0 = self.m.GetElement(1,3)
-            self.tz0 = self.m.GetElement(2,3)      
-            if y == 0:
-              self.plan = 'yplan'      
-            elif z == 0:
-              self.plan = 'zplan'
-            elif x == 0:
-              self.plan = 'xplan'
-          tx = x - self.x0
-          ty = y - self.y0
-          tz = z - self.z0
+          # xy = style.GetInteractor().GetEventPosition()
+          # xyz = sliceWidget.convertDeviceToXYZ(xy)
+          # ras = sliceWidget.convertXYZToRAS(xyz)
+          # tx = 0
+          # ty = 0
+          # tz = 0
+          # fi=0
+          # theta = 0
+          # psi = 0
+          # x = ras[0]
+          # y = ras[1]
+          # z = ras[2]
+          # if self.before == 0:
+            # self.x0 = ras[0]
+            # self.y0 = ras[1]
+            # self.z0 = ras[2]
+            # self.tx0 = self.m.GetElement(0,3)
+            # self.ty0 = self.m.GetElement(1,3)
+            # self.tz0 = self.m.GetElement(2,3)      
+            # if y == 0:
+              # self.plan = 'yplan'      
+            # elif z == 0:
+              # self.plan = 'zplan'
+            # elif x == 0:
+              # self.plan = 'xplan'
+          # tx = x - self.x0
+          # ty = y - self.y0
+          # tz = z - self.z0
 
-          self.m =  self.transform.GetMatrixTransformToParent()
-          global center, new_rot_point, mouv_mouse
-          center = [0,0,0]
-          #################### rotation with fiducial point as center: translation  rotation (-translation) ####################
-          # if slicer.util.getNode('vtkMRMLAnnotationFiducialNode1'):
-            # fiducialNode = slicer.util.getNode('vtkMRMLAnnotationFiducialNode1')
-            # fiducialNode.GetFiducialCoordinates(center)
-            # new_rot_point = [center[0]-self.tx0,center[1]-self.ty0,center[2]-self.tz0]
-            # translate_back = [k * -1 for k in new_rot_point]    
-            # mouv_mouse=[tx,ty,tz]
-            # self.r.Translate(new_rot_point)
-            # if self.plan == 'yplan':
-              # self.r.RotateWXYZ(tx,0,1,0)         
-            # elif self.plan == 'zplan':
-              # self.r.RotateZ(tx)
-              # self.r.RotateWXYZ(tx,0,0,1)  
-            # elif self.plan == 'xplan':
-              # self.r.RotateX(ty)
-              # self.r.RotateWXYZ(ty,1,0,0)
-            # self.r.Translate(translate_back)  
-            # self.transform.ApplyTransformMatrix(self.r.GetMatrix())       
-            # self.x0 = x
-            # self.y0 = y
-            # self.z0 = z
-          #################### rotation without fiducial point as center #########################################################
-          # else:
-          new_rot_point = [self.tx0,self.ty0,self.tz0]
-          translate_back = [k * -1 for k in new_rot_point]    
-          mouv_mouse=[tx,ty,tz]
-          self.r.Translate(new_rot_point)
-          if self.plan == 'yplan':
-            self.r.RotateWXYZ(tx,0,1,0)         
-          elif self.plan == 'zplan':           
-            self.r.RotateWXYZ(tx,0,0,1)  
-          elif self.plan == 'xplan':
-            self.r.RotateWXYZ(ty,1,0,0)
-          self.r.Translate(translate_back)  
-          self.transform.ApplyTransformMatrix(self.r.GetMatrix())       
-          self.x0 = x
-          self.y0 = y
-          self.z0 = z
-          self.before += 1
+          # self.m =  self.transform.GetMatrixTransformToParent()
 
+          # new_rot_point = [0,0,0]
+          # new_rot_point = [self.tx0,self.ty0,self.tz0]
+          # translate_back = [k * -1 for k in new_rot_point]    
+
+          # #self.r.Translate(new_rot_point)
+          # if self.plan == 'yplan':
+            # self.r.RotateWXYZ(tx/float(30),0,1,0)         
+          # elif self.plan == 'zplan':
+            # self.r.RotateWXYZ(tx/float(30),0,0,1)  
+          # elif self.plan == 'xplan':
+            # self.r.RotateWXYZ(ty/float(30),1,0,0)
+          # #self.r.Translate(translate_back)  
+          # self.transform.ApplyTransformMatrix(self.r.GetMatrix())       
+          # self.x0 = x
+          # self.y0 = y
+          # self.z0 = z
+          
+    
+          # self.before += 1
+          print("rotation is not supported yet - please use the transform Module")
         ######################################### translation ###########################################
         elif self.actionState == "translation" and event == "MouseMoveEvent":
           xy = style.GetInteractor().GetEventPosition()

@@ -3545,26 +3545,154 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
   ##-----------------------------------------------------------------------------
   def showOneNeedle(self,i,RadioButton):
     
-    filename= "vtkMRMLModelNode"+str(i+6)
-    mrmlScene=slicer.mrmlScene
-    NeedleNode = mrmlScene.GetNodeByID(filename)
+    name = {0:'Ba.vtk',
+         1:'Bb.vtk',
+         2:'Bc.vtk',
+         3:'Bd.vtk',
+         4:'Be.vtk',
+         5:'Bf.vtk',
+         6:'Bg.vtk',
+         7:'Bh.vtk',
+         8:'Bi.vtk',
+         9:'Bj.vtk',
+         10:'Bk.vtk',
+         11:'Bl.vtk',
+         12:'Ca.vtk',
+         13:'Cb.vtk',
+         14:'Cc.vtk',
+         15:'Cd.vtk',
+         16:'Ce.vtk',
+         17:'Cf.vtk',
+         18:'Cg.vtk',
+         19:'Ch.vtk',
+         20:'Ci.vtk',
+         21:'Cj.vtk',
+         22:'Ck.vtk',
+         23:'Cl.vtk',
+         24:'Cm.vtk',
+         25:'Cn.vtk',
+         26:'Co.vtk',
+         27:'Cp.vtk',
+         28:'Cq.vtk',
+         29:'Cr.vtk',
+         30:'Da.vtk',
+         31:'Db.vtk',
+         32:'Dc.vtk',
+         33:'Dd.vtk',
+         34:'De.vtk',
+         35:'Df.vtk',
+         36:'Dg.vtk',
+         37:'Dh.vtk',
+         38:'Di.vtk',
+         39:'Dj.vtk',
+         40:'Ea.vtk',
+         41:'Eb.vtk',
+         42:'Ec.vtk',
+         43:'Ed.vtk',
+         44:'Ee.vtk',
+         45:'Ef.vtk',
+         46:'Eg.vtk',
+         47:'Eh.vtk',
+         48:'Aa.vtk',
+         49:'Ab.vtk',
+         50:'Ac.vtk',
+         51:'Ad.vtk',
+         52:'Ae.vtk',
+         53:'Af.vtk',
+         54:'Iu.vtk', 
+         55:'Fa.vtk',
+         56:'Fb.vtk',
+         57:'Fc.vtk',
+         58:'Fd.vtk',
+         59:'Fe.vtk',
+         60:'Ff.vtk',
+         61:'Fg.vtk',
+         62:'Fh.vtk'}
+    
+    option = {0:'Ba',
+         1:'Bb',
+         2:'Bc',
+         3:'Bd',
+         4:'Be',
+         5:'Bf',
+         6:'Bg',
+         7:'Bh',
+         8:'Bi',
+         9:'Bj',
+         10:'Bk',
+         11:'Bl',
+         12:'Ca',
+         13:'Cb',
+         14:'Cc',
+         15:'Cd',
+         16:'Ce',
+         17:'Cf',
+         18:'Cg',
+         19:'Ch',
+         20:'Ci',
+         21:'Cj',
+         22:'Ck',
+         23:'Cl',
+         24:'Cm',
+         25:'Cn',
+         26:'Co',
+         27:'Cp',
+         28:'Cq',
+         29:'Cr',
+         30:'Da',
+         31:'Db',
+         32:'Dc',
+         33:'Dd',
+         34:'De',
+         35:'Df',
+         36:'Dg',
+         37:'Dh',
+         38:'Di',
+         39:'Dj',
+         40:'Ea',
+         41:'Eb',
+         42:'Ec',
+         43:'Ed',
+         44:'Ee',
+         45:'Ef',
+         46:'Eg',
+         47:'Eh',
+         48:'Aa',
+         49:'Ab',
+         50:'Ac',
+         51:'Ad',
+         52:'Ae',
+         53:'Af',
+         54:'Iu', 
+         55:'Fa',
+         56:'Fb',
+         57:'Fc',
+         58:'Fd',
+         59:'Fe',
+         60:'Ff',
+         61:'Fg',
+         62:'Fh'}
+    
+    pNode = self.parameterNode()
+    needleID = pNode.GetParameter(name[i])    
+    NeedleNode = slicer.mrmlScene.GetNodeByID(needleID)
     if NeedleNode !=None:
       displayNode =NeedleNode.GetModelDisplayNode()
 
-    nVisibility=displayNode.GetVisibility()  
-    print nVisibility
-    
-    if nVisibility ==1:
-      print("hide needle")
-      displayNode.SetVisibility(0)
-      displayNode.SetSliceIntersectionVisibility(0)
-      # RadioButton.setChecked(False)
-    else:
-      print("show needle")
-      displayNode.SetVisibility(1)
-      displayNode.SetSliceIntersectionVisibility(1)
-      # RadioButton.setChecked(True)
+      nVisibility=displayNode.GetVisibility()  
+      print nVisibility
       
+      if nVisibility ==1:
+        print("hide needle")
+        displayNode.SetVisibility(0)
+        displayNode.SetSliceIntersectionVisibility(0)
+        # RadioButton.setChecked(False)
+      else:
+        print("show needle")
+        displayNode.SetVisibility(1)
+        displayNode.SetSliceIntersectionVisibility(1)
+        # RadioButton.setChecked(True)
+        
 
 
   ##-----------------------------------------------------------------------------
@@ -3620,9 +3748,75 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
 
     if color.isValid():
 
-      filename= "vtkMRMLModelNode"+str(i+6)
-      mrmlScene=slicer.mrmlScene
-      NeedleNode = mrmlScene.GetNodeByID(filename)
+      
+      name = {0:'Ba.vtk',
+         1:'Bb.vtk',
+         2:'Bc.vtk',
+         3:'Bd.vtk',
+         4:'Be.vtk',
+         5:'Bf.vtk',
+         6:'Bg.vtk',
+         7:'Bh.vtk',
+         8:'Bi.vtk',
+         9:'Bj.vtk',
+         10:'Bk.vtk',
+         11:'Bl.vtk',
+         12:'Ca.vtk',
+         13:'Cb.vtk',
+         14:'Cc.vtk',
+         15:'Cd.vtk',
+         16:'Ce.vtk',
+         17:'Cf.vtk',
+         18:'Cg.vtk',
+         19:'Ch.vtk',
+         20:'Ci.vtk',
+         21:'Cj.vtk',
+         22:'Ck.vtk',
+         23:'Cl.vtk',
+         24:'Cm.vtk',
+         25:'Cn.vtk',
+         26:'Co.vtk',
+         27:'Cp.vtk',
+         28:'Cq.vtk',
+         29:'Cr.vtk',
+         30:'Da.vtk',
+         31:'Db.vtk',
+         32:'Dc.vtk',
+         33:'Dd.vtk',
+         34:'De.vtk',
+         35:'Df.vtk',
+         36:'Dg.vtk',
+         37:'Dh.vtk',
+         38:'Di.vtk',
+         39:'Dj.vtk',
+         40:'Ea.vtk',
+         41:'Eb.vtk',
+         42:'Ec.vtk',
+         43:'Ed.vtk',
+         44:'Ee.vtk',
+         45:'Ef.vtk',
+         46:'Eg.vtk',
+         47:'Eh.vtk',
+         48:'Aa.vtk',
+         49:'Ab.vtk',
+         50:'Ac.vtk',
+         51:'Ad.vtk',
+         52:'Ae.vtk',
+         53:'Af.vtk',
+         54:'Iu.vtk', 
+         55:'Fa.vtk',
+         56:'Fb.vtk',
+         57:'Fc.vtk',
+         58:'Fd.vtk',
+         59:'Fe.vtk',
+         60:'Ff.vtk',
+         61:'Fg.vtk',
+         62:'Fh.vtk'}
+    
+      
+      pNode = self.parameterNode()
+      needleID = pNode.GetParameter(name[i])    
+      NeedleNode = slicer.mrmlScene.GetNodeByID(needleID)
       if NeedleNode!=None:
         displayNode =NeedleNode.GetModelDisplayNode()
 
@@ -3954,9 +4148,72 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     modelNode = slicer.vtkMRMLModelNode()
     displayNode = slicer.vtkMRMLModelDisplayNode()
     storageNode = slicer.vtkMRMLModelStorageNode()
+    fiducialNode = slicer.vtkMRMLAnnotationFiducialNode()
 
-    fileName =  "Model_"+ str(i) + ".vtk" 
-
+    name = {0:'Ba.vtk',
+         1:'Bb.vtk',
+         2:'Bc.vtk',
+         3:'Bd.vtk',
+         4:'Be.vtk',
+         5:'Bf.vtk',
+         6:'Bg.vtk',
+         7:'Bh.vtk',
+         8:'Bi.vtk',
+         9:'Bj.vtk',
+         10:'Bk.vtk',
+         11:'Bl.vtk',
+         12:'Ca.vtk',
+         13:'Cb.vtk',
+         14:'Cc.vtk',
+         15:'Cd.vtk',
+         16:'Ce.vtk',
+         17:'Cf.vtk',
+         18:'Cg.vtk',
+         19:'Ch.vtk',
+         20:'Ci.vtk',
+         21:'Cj.vtk',
+         22:'Ck.vtk',
+         23:'Cl.vtk',
+         24:'Cm.vtk',
+         25:'Cn.vtk',
+         26:'Co.vtk',
+         27:'Cp.vtk',
+         28:'Cq.vtk',
+         29:'Cr.vtk',
+         30:'Da.vtk',
+         31:'Db.vtk',
+         32:'Dc.vtk',
+         33:'Dd.vtk',
+         34:'De.vtk',
+         35:'Df.vtk',
+         36:'Dg.vtk',
+         37:'Dh.vtk',
+         38:'Di.vtk',
+         39:'Dj.vtk',
+         40:'Ea.vtk',
+         41:'Eb.vtk',
+         42:'Ec.vtk',
+         43:'Ed.vtk',
+         44:'Ee.vtk',
+         45:'Ef.vtk',
+         46:'Eg.vtk',
+         47:'Eh.vtk',
+         48:'Aa.vtk',
+         49:'Ab.vtk',
+         50:'Ac.vtk',
+         51:'Ad.vtk',
+         52:'Ae.vtk',
+         53:'Af.vtk',
+         54:'Iu.vtk', 
+         55:'Fa.vtk',
+         56:'Fb.vtk',
+         57:'Fc.vtk',
+         58:'Fd.vtk',
+         59:'Fe.vtk',
+         60:'Ff.vtk',
+         61:'Fg.vtk',
+         62:'Fh.vtk'}
+    fileName = name[i]
     mrmlScene = slicer.mrmlScene
     modelNode.SetName(fileName)  
     modelNode.SetAndObservePolyData(polyData)
@@ -3967,6 +4224,7 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     displayNode.SetScene(mrmlScene)
     mrmlScene.AddNode(storageNode)
     mrmlScene.AddNode(displayNode)
+    mrmlScene.AddNode(modelNode)
     modelNode.SetAndObserveStorageNodeID(storageNode.GetID())
     modelNode.SetAndObserveDisplayNodeID(displayNode.GetID())
 
@@ -3976,6 +4234,37 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     displayNode.SetColor(0,1,0)
     displayNode.SetSliceIntersectionVisibility(0)
     displayNode.SetVisibility(0)
+    pNode= self.parameterNode()
+    pNode.SetParameter(fileName,modelNode.GetID())
+    
+    # polyData = modelNode.GetPolyData()
+    # nb = int(polyData.GetNumberOfPoints()-1)
+    # coord = [0,0,0]
+    # polyData.GetPoint(nb,coord)
+   
+    #fiducialNode.SetName(option[i])
+    #fiducialNode.SetFiducialCoordinates(coord) 
+    #fiducialNode.SetAndObserveTransformNodeID(transformNode.GetID())
+    #fiducialNode.SetDisplayVisibility(0)
+    #fidDN = fiducialNode.GetDisplayNode()
+    #fidDN.SetColor(modelNode.GetDisplayNode().GetColor())
+    #fidTN = fiducialNode.GetAnnotationTextDisplayNode()
+    #fidTN.SetScale(2)
+    #fidTN.SetColor(modelNode.GetDisplayNode().GetColor())
+    #fidSN = slicer.vtkMRMLModelStorageNode()
+    
+    
+    mrmlScene.AddNode(modelNode)  
+    
+    #mrmlScene.AddNode(fidDN)
+    #mrmlScene.AddNode(fidTN) 
+    #mrmlScene.AddNode(fidSN)   
 
-    mrmlScene.AddNode(modelNode)           
+    #fiducialNode.SetAndObserveStorageNodeID(fidSN.GetID())
+    #fiducialNode.SetAndObserveDisplayNodeID(fidDN.GetID())
+    #slicer.mrmlScene.AddNode(fiducialNode)
+    #fiducialNode.SetDisplayVisibility(0)
+    
+
+    
 

@@ -61,7 +61,10 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
   def needleSegmentation(self):
     scene = slicer.mrmlScene
     pNode = self.parameterNode()
-    inputVolumeID = self.__volumeSelector.currentNode().GetID()
+    if Helper.getNodeByID(pNode.GetParameter("baselineVolumeID")) == None:
+      inputVolumeID = self.__volumeSelector.currentNode().GetID()
+    else:
+      inputVolumeID = Helper.getNodeByID(pNode.GetParameter("baselineVolumeID")).GetID()
     inputLabelID = self.__needleLabelSelector.currentNode().GetID()
     
     self.outputVolumeNode = slicer.mrmlScene.CreateNodeByClass('vtkMRMLModelNode')
@@ -85,75 +88,16 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.__cliNode = None
     self.__cliNode = slicer.cli.run(module, None, parameters, wait_for_completion=True)
     
+    d = slicer.mrmlScene.GetNodeByID(outputID).GetDisplayNode()
+    # l = slicer.vtkMRMLColorLogic()
+    # d.SetAndObserveColorNodeID(l.GetDefaultEditorColorNodeID())
+    dd = slicer.mrmlScene.GetNodeByID(inputLabelID).GetDisplayNode()
+    color = dd.GetColorNodeID()
     
-    # # input Image
-    # # if  Helper.getNodeByID(pNode.GetParameter("baselineVolumeID")) !=None:
-      # # inputImage = Helper.getNodeByID(pNode.GetParameter("baselineVolumeID"))
-      # # inputImageName = inputImage.GetStorageNode().GetFileName()
-    # # else:
-    # inputImage = self.__volumeSelector.currentNode()
-    # inputImageName = inputImage.GetStorageNode().GetFileName()
     
-    # # input Label
-    # # needleLabelID = pNode.GetParameter('needleLabelID')
-    # # needleLabelNode = None
-    # # if needleLabelID != '':
-      # # needleLabelNode = Helper.getNodeByID(needleLabelID)
-    # # else:
-    
-    # sliceNodeCount = slicer.mrmlScene.GetNumberOfNodesByClass('vtkMRMLScalarVolumeNode')
-    # for nodeIndex in xrange(sliceNodeCount):
-      # # find the widget for each node in scene
-      # sliceNode = slicer.mrmlScene.GetNthNodeByClass(nodeIndex, 'vtkMRMLScalarVolumeNode')
-      # labelName = inputImage.GetName() + '-label'
-      # if sliceNode.GetName() == labelName:
-        # needleLabelNode = sliceNode
-            
-    # # pNode.SetParameter('needleLabelID', needleLabelNode.GetID())
-    
-    # needleLabelName = inputImageName.replace(".nrrd","-label.nrrd")
-    # # needleLabelStorageNodeID = pNode.GetParameter('needleLabelStorageNodeID')
-    # # if needleLabelStorageNodeID =='' :
-    # needleLabelStorageNode = slicer.mrmlScene.CreateNodeByClass('vtkMRMLNRRDStorageNode')
-    # needleLabelStorageNode.SetFileName(needleLabelName)
-    # slicer.mrmlScene.AddNode(needleLabelStorageNode)
-    
-    # # pNode.SetParameter('needleLabelStorageNodeID', needleLabelStorageNode.GetID())
-    
-    # needleLabelNode.AddAndObserveStorageNodeID(needleLabelStorageNode.GetID())
-    # needleLabelStorageNode.WriteData(needleLabelNode)
-
-    # # output Volume    
-    # # outputVolumeID = pNode.GetParameter('outputVolumeID')
-    # # self.outputVolumeNode = None
-    # # if outputVolumeID != '':
-      # # self.outputVolumeNode = Helper.getNodeByID(outputVolumeID)
-    # # else:
-    # self.outputVolumeNode = slicer.mrmlScene.CreateNodeByClass('vtkMRMLModelNode')
-    # self.outputVolumeNode.SetName("Output Needle Model")
-    # outputVolumeStorageNode = slicer.mrmlScene.CreateNodeByClass('vtkMRMLModelStorageNode')
-    # outputVolumeName = inputImageName.replace(".nrrd","-OutputNeedleModel.vtk")
-    # outputVolumeStorageNode.SetFileName(outputVolumeName)
-    # slicer.mrmlScene.AddNode(self.outputVolumeNode)
-    # slicer.mrmlScene.AddNode(outputVolumeStorageNode)
-    # self.outputVolumeNode.AddAndObserveStorageNodeID(outputVolumeStorageNode.GetID())
-    # outputVolumeStorageNode.WriteData(self.outputVolumeNode)
-    
-    # slicer.mrmlScene.AddNode(self.outputVolumeNode)
-    # pNode.SetParameter('outputVolumeID', self.outputVolumeNode.GetID())
-      
-    # # Set the parameters for the CLI module    
-    # parameters = {} 
-    # parameters['InputImageName'] = inputImageName
-    # parameters['InputLabelImageName'] = needleLabelName
-    # parameters['outputVtkName'] = outputVolumeName
-    # module = slicer.modules.mainlabelneedletrackingcli 
-    # self.__cliNode = None
-    # self.__cliNode = slicer.cli.run(module, self.__cliNode, parameters)
-    # # print inputImage
-    # # print needleLabelNode
-    # # print self.outputVolumeNode
-    # # print parameters
+    d.SetScalarVisibility(1)
+    d.SetActiveScalarName('NeedleLabel')
+    d.SetAndObserveColorNodeID(color)
     
   def validate( self, desiredBranchId ):
     '''
