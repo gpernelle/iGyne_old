@@ -24,6 +24,8 @@ class iGyneLoadModelStep( iGyneStep ) :
     self.__baselineVolumeSelector.nodeTypes = ['vtkMRMLScalarVolumeNode']
     self.__baselineVolumeSelector.setMRMLScene(slicer.mrmlScene)
     self.__baselineVolumeSelector.addEnabled = 0
+    self.__layout.connect('mrmlSceneChanged(vtkMRMLScene*)',
+                        self.__baselineVolumeSelector, 'setMRMLScene(vtkMRMLScene*)')
 
 
     # followupScanLabel = qt.QLabel( 'Followup scan:' )
@@ -79,6 +81,10 @@ class iGyneLoadModelStep( iGyneStep ) :
       baseline = self.__baselineVolumeSelector.currentNode()
       followup = slicer.mrmlScene.GetNodeByID("vtkMRMLModelNode4")
       obturator = slicer.mrmlScene.GetNodeByID("vtkMRMLModelNode5")
+      df = followup.GetDisplayNode()
+      do = obturator.GetDisplayNode()
+      df.SetSliceIntersectionVisibility(0)
+      do.SetSliceIntersectionVisibility(0)
 
       if baseline != None and followup != None:
         baselineID = baseline.GetID()

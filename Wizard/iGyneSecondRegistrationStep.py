@@ -106,6 +106,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.__useThresholdsCheck.connect('stateChanged(int)', self.onThresholdsCheckChanged)
     
     self.__secondReg = qt.QPushButton('3/ ICP Registration')
+    self.__registrationStatus = qt.QLabel('Register Template and Model')
+    self.__layout.addRow(self.__registrationStatus, self.__secondReg)
     self.__secondReg.connect('clicked()', self.ICPRegistration)
     self.__secondReg.setEnabled(0)
     self.__layout.addRow(self.__secondReg)
@@ -131,6 +133,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
         # print(self.pointId,self.vtkMatInitial )
   
   def ICPRegistration(self):
+    self.__registrationStatus.setText('Wait ...')
+    self.__secondReg.setEnabled(0)
     scene = slicer.mrmlScene
     pNode= self.parameterNode()
     transformNodeID = pNode.GetParameter('followupTransformID')
@@ -169,9 +173,9 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.glyphPoints3D.SetInput(self.glyphInputData)
     self.glyphPoints3D.SetSource(self.glyphBalls.GetOutput())
     self.glyphPoints3D.Update()  
-    # print(self.glyphPoints3D)
+
     inputSurface = scene.GetNodeByID("vtkMRMLModelNode4")
-    # targetSurface = scene.GetNodeByID("vtkMRMLModelNode6")
+
     
     numNodes = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLModelNode" ) 
     segmentationModel = None 
@@ -181,26 +185,43 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
         segmentationModel = node 
         break 
     targetSurface = segmentationModel
-    # outputSurface = scene.GetNodeByID("vtkMRMLModelNode4")
-    # outputSurface2 = scene.GetNodeByID("vtkMRMLModelNode5")     
+    
     icpTransform = vtk.vtkIterativeClosestPointTransform()
     icpTransform.SetSource(self.glyphInputData)
     icpTransform.SetTarget(targetSurface.GetPolyData())
     icpTransform.SetCheckMeanDistance(0)
     icpTransform.SetMaximumMeanDistance(0.01)
-    icpTransform.SetMaximumNumberOfIterations(50)
-    icpTransform.SetMaximumNumberOfLandmarks(1000)
+    icpTransform.SetMaximumNumberOfIterations(1000)
+    icpTransform.SetMaximumNumberOfLandmarks(100)
     icpTransform.SetMeanDistanceModeToRMS()
     icpTransform.GetLandmarkTransform().SetModeToRigidBody()
     icpTransform.Update()
     nIterations = icpTransform.GetNumberOfIterations()
     FinalMatrix = vtk.vtkMatrix4x4()
-    # print(icpTransform.GetMatrix())
+
     FinalMatrix.Multiply4x4(icpTransform.GetMatrix(),self.vtkMatInitial,FinalMatrix)
     transformNode.SetAndObserveMatrixTransformToParent(FinalMatrix)
-    # transformNode2.SetAndObserveMatrixTransformToParent(FinalMatrix)
-    # print(FinalMatrix)
+    self.processRegistrationCompletion()
+
+  def processRegistrationCompletion(self):
     
+    self.__registrationStatus.setText('Done')
+
+    self.__secondReg.setEnabled(1)
+    # pNode = self.parameterNode()
+    # cropVolumeNodeID = pNode.GetParameter("cropVolumeNodeID")
+    # cropVolumeNode = slicer.mrmlScene.GetNodeByID(cropVolumeNodeID)
+    # cropVolumeNode.SetInputVolumeNodeID(pNode.GetParameter('baselineVolumeID'))
+    # cropVolumeNode.SetROINodeID(pNode.GetParameter('roiNodeID'))
+    # cropVolumeLogic = slicer.modules.cropvolume.logic()
+    # cropVolumeLogic.Apply(cropVolumeNode)
+    # outputVolume = slicer.mrmlScene.GetNodeByID(cropVolumeNode.GetOutputVolumeNodeID())
+    # outputVolume.SetName("baselineROI")
+    # pNode.SetParameter('croppedBaselineVolumeID',cropVolumeNode.GetOutputVolumeNodeID())
+    # roiSegmentationID = pNode.GetParameter('croppedBaselineVolumeSegmentationID') 
+
+
+     
   def onThresholdsCheckChanged(self):
     if self.__useThresholdsCheck.isChecked():
       self.__roiLabelSelector.setEnabled(0)
@@ -307,7 +328,9 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
 
       pNode = self.parameterNode()
       pNode.SetParameter('thresholdRange', str(self.__threshRange.minimumValue)+','+str(self.__threshRange.maximumValue))
-
+      if self.segmentationModel:
+        self.segmentationModel.RemoveAllChildrenNodes()
+        slicer.mrmlScene.RemoveNode(self.segmentationModel)
     super(iGyneSecondRegistrationStep, self).onExit(goingTo, transitionType)
 
   def onEntry(self,comingFrom,transitionType):
@@ -388,7 +411,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
           self.styleObserverTags.append([style,tag])
 		  
   def stop(self):
-    print("here")
     self.removeObservers() 
 	
   def removeObservers(self):
@@ -511,7 +533,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       self.fiducialButton.text = "Stop"  
     else:
       self.stop()
-      self.fiducialButton.text = "Choose Fiducial Points"
+      self.fiducialButton.text = "ICP Registration"
 
   def translate(self,x,y,z):
     self.m.SetElement(0,3,x)

@@ -21,6 +21,7 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     self.setDescription( 'Position, color, resize needles as you like' )
     self.__parent = super( iGyneNeedlePlanningStep, self )
     
+    
 
   def createUserInterface( self ):
     '''
@@ -3545,6 +3546,7 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
   ##-----------------------------------------------------------------------------
   def showOneNeedle(self,i,RadioButton):
     
+
     name = {0:'Ba.vtk',
          1:'Bb.vtk',
          2:'Bc.vtk',
@@ -3673,27 +3675,82 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
          61:'Fg',
          62:'Fh'}
     
+    fidname = "fid"+option[i]
     pNode = self.parameterNode()
-    needleID = pNode.GetParameter(name[i])    
+    needleID = pNode.GetParameter(name[i])
+    fidID = pNode.GetParameter(fidname)    
     NeedleNode = slicer.mrmlScene.GetNodeByID(needleID)
+    print(pNode)
+    print("fidID",fidID)
+    fiducialNode = slicer.mrmlScene.GetNodeByID(fidID)    
+    
     if NeedleNode !=None:
       displayNode =NeedleNode.GetModelDisplayNode()
-
       nVisibility=displayNode.GetVisibility()  
       print nVisibility
+      
+      if fiducialNode == None:
+    
+        fiducialNode = slicer.vtkMRMLAnnotationFiducialNode()
+        NeedleNode.SetDisplayVisibility(1)
+        polyData = NeedleNode.GetPolyData()
+        nb = int(polyData.GetNumberOfPoints()-1)
+        coord = [0,0,0]
+        if nb>100:
+          polyData.GetPoint(nb,coord)
+         
+          fiducialNode.SetName(option[i])
+          fiducialNode.SetFiducialCoordinates(coord)         
+          fiducialNode.SetAndObserveTransformNodeID(self.transformNode.GetID())
+          fiducialNode.Initialize(slicer.mrmlScene)
+          fiducialNode.SetLocked(1)
+          fiducialNode.SetSelectable(0)
+          fidDN = fiducialNode.GetDisplayNode()
+          fidDN.SetColor(NeedleNode.GetDisplayNode().GetColor())
+          fidDN.SetGlyphScale(1)
+          fidTN = fiducialNode.GetAnnotationTextDisplayNode()
+          fidTN.SetTextScale(3)
+          fidTN.SetColor(NeedleNode.GetDisplayNode().GetColor())
+          fiducialNode.SetVisible(0)
+          pNode.SetParameter(fidname,fiducialNode.GetID())
+          self.showOneNeedle(i,RadioButton)
+        else:
+          print('nb:',nb)
+      
       
       if nVisibility ==1:
         print("hide needle")
         displayNode.SetVisibility(0)
         displayNode.SetSliceIntersectionVisibility(0)
+        fiducialNode.SetVisible(0)
         # RadioButton.setChecked(False)
       else:
         print("show needle")
         displayNode.SetVisibility(1)
         displayNode.SetSliceIntersectionVisibility(1)
+        fiducialNode.SetVisible(1)
         # RadioButton.setChecked(True)
-        
+    else:
+      vtkmat = vtk.vtkMatrix4x4()
+      vtkmat.DeepCopy(self.m_vtkmat)
+      vtkmat.SetElement(0,3,self.m_vtkmat.GetElement(0,3)+self.p[0][i])
+      vtkmat.SetElement(1,3,self.m_vtkmat.GetElement(1,3)+self.p[1][i])
+      vtkmat.SetElement(2,3,self.m_vtkmat.GetElement(2,3)+(30.0-150.0)/2.0)
 
+      TransformPolyDataFilter=vtk.vtkTransformPolyDataFilter()
+      Transform=vtk.vtkTransform()        
+      TransformPolyDataFilter.SetInput(self.m_polyCylinder)
+      Transform.SetMatrix(vtkmat)
+      TransformPolyDataFilter.SetTransform(Transform)
+      TransformPolyDataFilter.Update()
+
+      triangles=vtk.vtkTriangleFilter()
+      triangles.SetInput(TransformPolyDataFilter.GetOutput())  
+      # print(Transform) 
+      self.AddModel(i,triangles.GetOutput())
+      self.showOneNeedle(i,RadioButton)
+          
+  
 
   ##-----------------------------------------------------------------------------
   # def showOneNeedle(self,i,bShowNeedels):
@@ -3812,10 +3869,76 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
          60:'Ff.vtk',
          61:'Fg.vtk',
          62:'Fh.vtk'}
+      option = {0:'Ba',
+         1:'Bb',
+         2:'Bc',
+         3:'Bd',
+         4:'Be',
+         5:'Bf',
+         6:'Bg',
+         7:'Bh',
+         8:'Bi',
+         9:'Bj',
+         10:'Bk',
+         11:'Bl',
+         12:'Ca',
+         13:'Cb',
+         14:'Cc',
+         15:'Cd',
+         16:'Ce',
+         17:'Cf',
+         18:'Cg',
+         19:'Ch',
+         20:'Ci',
+         21:'Cj',
+         22:'Ck',
+         23:'Cl',
+         24:'Cm',
+         25:'Cn',
+         26:'Co',
+         27:'Cp',
+         28:'Cq',
+         29:'Cr',
+         30:'Da',
+         31:'Db',
+         32:'Dc',
+         33:'Dd',
+         34:'De',
+         35:'Df',
+         36:'Dg',
+         37:'Dh',
+         38:'Di',
+         39:'Dj',
+         40:'Ea',
+         41:'Eb',
+         42:'Ec',
+         43:'Ed',
+         44:'Ee',
+         45:'Ef',
+         46:'Eg',
+         47:'Eh',
+         48:'Aa',
+         49:'Ab',
+         50:'Ac',
+         51:'Ad',
+         52:'Ae',
+         53:'Af',
+         54:'Iu', 
+         55:'Fa',
+         56:'Fb',
+         57:'Fc',
+         58:'Fd',
+         59:'Fe',
+         60:'Ff',
+         61:'Fg',
+         62:'Fh'}
     
-      
+      fidname = "fid"+option[i]
       pNode = self.parameterNode()
-      needleID = pNode.GetParameter(name[i])    
+      needleID = pNode.GetParameter(name[i])  
+      fidID = pNode.GetParameter(fidname) 
+      
+      fiducialNode = slicer.mrmlScene.GetNodeByID(fidID)      
       NeedleNode = slicer.mrmlScene.GetNodeByID(needleID)
       if NeedleNode!=None:
         displayNode =NeedleNode.GetModelDisplayNode()
@@ -3824,7 +3947,13 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
         sColor = "background-color: rgb(" + str(color.red())+ "," + str(color.green()) + "," + str(color.blue()) + ')'
         print sColor
         ColorPushButton.setStyleSheet(sColor)
-      
+        
+        if fiducialNode!=None:
+          fidDN = fiducialNode.GetDisplayNode()
+          fidDN.SetColor(displayNode.GetColor())
+          fidTN = fiducialNode.GetAnnotationTextDisplayNode()
+          fidTN.SetColor(displayNode.GetColor())
+       
 
   ##-----------------------------------------------------------------------------
   # def showNeedles(self):
@@ -4119,36 +4248,11 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
       self.m_poly = vtk.vtkPolyData()  
       self.m_poly.DeepCopy(ObutratorNode.GetPolyData())
       
-    if alreadyloaded != "1":
-          
-      vtkmat = vtk.vtkMatrix4x4()
-      vtkmat.DeepCopy(self.m_vtkmat)
-   
-      for i in xrange(63):
-      
-        vtkmat.SetElement(0,3,self.m_vtkmat.GetElement(0,3)+self.p[0][i])
-        vtkmat.SetElement(1,3,self.m_vtkmat.GetElement(1,3)+self.p[1][i])
-        vtkmat.SetElement(2,3,self.m_vtkmat.GetElement(2,3)+(30.0-150.0)/2.0)
-
-        TransformPolyDataFilter=vtk.vtkTransformPolyDataFilter()
-        Transform=vtk.vtkTransform()        
-        TransformPolyDataFilter.SetInput(self.m_polyCylinder)
-        Transform.SetMatrix(vtkmat)
-        TransformPolyDataFilter.SetTransform(Transform)
-        TransformPolyDataFilter.Update()
-
-        triangles=vtk.vtkTriangleFilter()
-        triangles.SetInput(TransformPolyDataFilter.GetOutput())  
-        # print(Transform) 
-        self.AddModel(i,triangles.GetOutput())
-         
-      pNode.SetParameter("Needles-loaded","1")
       
   def AddModel(self,i,polyData):
     modelNode = slicer.vtkMRMLModelNode()
     displayNode = slicer.vtkMRMLModelDisplayNode()
     storageNode = slicer.vtkMRMLModelStorageNode()
-    fiducialNode = slicer.vtkMRMLAnnotationFiducialNode()
 
     name = {0:'Ba.vtk',
          1:'Bb.vtk',
@@ -4227,9 +4331,8 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     mrmlScene.AddNode(modelNode)
     modelNode.SetAndObserveStorageNodeID(storageNode.GetID())
     modelNode.SetAndObserveDisplayNodeID(displayNode.GetID())
-
-    transformNode = slicer.mrmlScene.GetNodeByID("vtkMRMLLinearTransformNode4")
-    modelNode.SetAndObserveTransformNodeID(transformNode.GetID())
+    self.transformNode = slicer.mrmlScene.GetNodeByID("vtkMRMLLinearTransformNode4")
+    modelNode.SetAndObserveTransformNodeID(self.transformNode.GetID())
     displayNode.SetPolyData(modelNode.GetPolyData())
     displayNode.SetColor(0,1,0)
     displayNode.SetSliceIntersectionVisibility(0)
@@ -4237,21 +4340,7 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     pNode= self.parameterNode()
     pNode.SetParameter(fileName,modelNode.GetID())
     
-    # polyData = modelNode.GetPolyData()
-    # nb = int(polyData.GetNumberOfPoints()-1)
-    # coord = [0,0,0]
-    # polyData.GetPoint(nb,coord)
-   
-    #fiducialNode.SetName(option[i])
-    #fiducialNode.SetFiducialCoordinates(coord) 
-    #fiducialNode.SetAndObserveTransformNodeID(transformNode.GetID())
-    #fiducialNode.SetDisplayVisibility(0)
-    #fidDN = fiducialNode.GetDisplayNode()
-    #fidDN.SetColor(modelNode.GetDisplayNode().GetColor())
-    #fidTN = fiducialNode.GetAnnotationTextDisplayNode()
-    #fidTN.SetScale(2)
-    #fidTN.SetColor(modelNode.GetDisplayNode().GetColor())
-    #fidSN = slicer.vtkMRMLModelStorageNode()
+
     
     
     mrmlScene.AddNode(modelNode)  

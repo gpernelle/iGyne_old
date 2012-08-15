@@ -6,6 +6,7 @@ from Helper import *
 class iGyneSelectProcedureStep( iGyneStep ) :
 
   def __init__( self, stepid ):
+    self.skip = 1
     self.initialize( stepid )
     self.setName( '1. Select the Procedure' )
     self.setDescription( 'Select the procedure used in this iGyne case.' )
@@ -28,6 +29,7 @@ class iGyneSelectProcedureStep( iGyneStep ) :
     # self.__layout.addRow(radioButton4)
     # self.__layout.addRow(radioButton5)
     self.templateButton = qt.QRadioButton("Template")
+    self.templateButton.setChecked(1)
     self.noTemplateButton = qt.QRadioButton("No Template")  
     self.__layout.addRow(self.templateButton)
     self.__layout.addRow(self.noTemplateButton)
@@ -44,11 +46,10 @@ class iGyneSelectProcedureStep( iGyneStep ) :
 
   def onExit(self, goingTo, transitionType):
     
-    # if self.templateButton.isChecked():
-      # goingTo.id() = 'SelectApplicator'
-    # else:
-      # goingTo.id() = 'NeedleSegmentation'
-    print(goingTo)
+    if self.templateButton.isChecked():
+      self.skip = 0
+    else:
+      self.skip = 1
     if goingTo.id() != 'SelectApplicator' and goingTo.id() != 'NeedleSegmentation':
       return
     super(iGyneSelectProcedureStep, self).onExit(goingTo, transitionType) 

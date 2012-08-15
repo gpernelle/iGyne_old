@@ -208,6 +208,12 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       pNode = self.parameterNode()
       followupNode = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('followupVolumeID'))
       obturatorNode = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('obturatorID'))
+      
+      df = followupNode.GetDisplayNode()
+      df.SetSliceIntersectionVisibility(1)
+      do = obturatorNode.GetDisplayNode()
+      do.SetSliceIntersectionVisibility(1)
+      
       roiNode = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('roiTransformID'))
       followupNode.SetAndObserveTransformNodeID(self.__followupTransform.GetID())
       obturatorNode.SetAndObserveTransformNodeID(self.__followupTransform.GetID())
@@ -373,6 +379,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     outputVolume = slicer.mrmlScene.GetNodeByID(cropVolumeNode.GetOutputVolumeNodeID())
     outputVolume.SetName("baselineROI")
     pNode.SetParameter('croppedBaselineVolumeID',cropVolumeNode.GetOutputVolumeNodeID())
+    pNode.SetParameter('cropVolumeNodeID',cropVolumeNode.GetID())
 
     roiSegmentationID = pNode.GetParameter('croppedBaselineVolumeSegmentationID') 
     if roiSegmentationID == '':

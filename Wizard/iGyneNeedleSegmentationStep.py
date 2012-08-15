@@ -38,6 +38,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.__needleLabelSelector = slicer.qMRMLNodeComboBox()
     self.__needleLabelSelector.toolTip = "Choose the needle-label image"
     self.__needleLabelSelector.nodeTypes = ['vtkMRMLScalarVolumeNode']
+    self.__needleLabelSelector.addAttribute("vtkMRMLScalarVolumeNode", "LabelMap", "1")
     self.__needleLabelSelector.setMRMLScene(slicer.mrmlScene)
     self.__needleLabelSelector.addEnabled = 1
     self.__layout.addRow( needleLabel, self.__needleLabelSelector )
