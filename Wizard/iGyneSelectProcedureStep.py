@@ -1,5 +1,5 @@
 from __main__ import qt, ctk
-
+import os.path, time
 from iGyneStep import *
 from Helper import *
 
@@ -9,7 +9,12 @@ class iGyneSelectProcedureStep( iGyneStep ) :
     self.skip = 1
     self.initialize( stepid )
     self.setName( '1. Select the Procedure' )
-    self.setDescription( 'Select the procedure used in this iGyne case.' )
+    file = slicer.modules.igynepy.path
+    builddate = time.gmtime(os.path.getmtime(file))
+    versionnumber = int((builddate.tm_year - 2000)*365.25+builddate.tm_yday)
+    self.version = str(versionnumber)
+    self.setDescription( 'iGyne v1.0.' + self.version + '  Last Modified:' + time.ctime(os.path.getmtime(file)) )
+    
     self.__parent = super( iGyneSelectProcedureStep, self )
 
   def createUserInterface( self ):
@@ -33,6 +38,7 @@ class iGyneSelectProcedureStep( iGyneStep ) :
     self.noTemplateButton = qt.QRadioButton("No Template")  
     self.__layout.addRow(self.templateButton)
     self.__layout.addRow(self.noTemplateButton)
+    
 
     
 
