@@ -2,6 +2,7 @@ from __main__ import qt, ctk, slicer
 
 from iGyneStep import *
 from Helper import *
+import DICOMLib
 import PythonQt
 
 class iGyneLoadModelStep( iGyneStep ) :
@@ -23,9 +24,8 @@ class iGyneLoadModelStep( iGyneStep ) :
     self.__baselineVolumeSelector.toolTip = "Choose the baseline scan"
     self.__baselineVolumeSelector.nodeTypes = ['vtkMRMLScalarVolumeNode']
     self.__baselineVolumeSelector.setMRMLScene(slicer.mrmlScene)
-    self.__baselineVolumeSelector.addEnabled = 0
-    self.__layout.connect('mrmlSceneChanged(vtkMRMLScene*)',
-                        self.__baselineVolumeSelector, 'setMRMLScene(vtkMRMLScene*)')
+    self.__baselineVolumeSelector.addEnabled = 1
+    self.__layout.connect('nodeAdded(vtkMRMLNode*)',self.__baselineVolumeSelector,'setCurrentNode(vtkMRMLNode*)')
 
 
     # followupScanLabel = qt.QLabel( 'Followup scan:' )
@@ -64,10 +64,26 @@ class iGyneLoadModelStep( iGyneStep ) :
     voiGroupBox.setTitle( 'DICOM' )
     dicomFrame.addRow( voiGroupBox )
     voiGroupBoxLayout = qt.QFormLayout( voiGroupBox )
-    self.__roiWidget = ctk.ctkDICOMAppWidget()
-    voiGroupBoxLayout.addRow( self.__roiWidget )
+    self.dicomApp = ctk.ctkDICOMAppWidget()
+    voiGroupBoxLayout.addRow( self.dicomApp )
+    self.detailsPopup = DICOMLib.DICOMDetailsPopup(self.dicomApp,True)
+    
+    self.showBrowser = qt.QPushButton('Show DICOM Browser')
+    voiGroupBoxLayout.addRow(self.showBrowser)
+    self.showBrowser.connect('clicked()', self.detailsPopup.open)
+    
+    
+    # dicom = DICOMLib.DICOMWidgets.DICOMDetailsPopup(self.__roiWidget)
+    # voiGroupBoxLayout.addRow(dicom.create())
+    
+    
+    
+    # self.loadButton = qt.QPushButton('Load Selection to Slicer')
+    # self.loadButton.enabled = False 
+    # voiGroupBoxLayout.addWidget(self.loadButton)
     
     self.updateWidgetFromParameters(self.parameterNode())
+  
 
   def loadData(self):
     slicer.util.openAddDataDialog()

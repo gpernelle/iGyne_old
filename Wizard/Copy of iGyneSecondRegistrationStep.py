@@ -4,6 +4,7 @@ from iGyneStep import *
 from Helper import *
 from EditorLib import *
 import math
+import PythonQt
 
 import string
 
@@ -45,19 +46,24 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.interactorObserverTags = []    
     self.styleObserverTags = []
     self.sliceWidgetsPerStyle = {}
+    self.__roiTransformNode = None
+    self.__baselineVolume = None
+    self.__roi = None
+    self.__roiObserverTag = None
+    self.__roiSegmentationNode = None
+    self.__roiVolume = None
     self.tac=0
     self.WMAX = 0
     self.L=[]
     self.divider = 1
     self.step = 1
-    self.nIterations = 0
-    self.timer = None
     # self.transformNode = vtk.vtkMRMLLinearTransformNode()
        
     # initialize VR stuff
     self.__roiSegmentationNode = None
     self.__roiVolume = None
     self.transform = slicer.mrmlScene.GetNodeByID("vtkMRMLLinearTransformNode4")
+    self.__roiWidget = PythonQt.qSlicerAnnotationsModuleWidgets.qMRMLAnnotationROIWidget()
     
 
   def createUserInterface( self ):
@@ -108,12 +114,10 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.__useThresholdsCheck.connect('stateChanged(int)', self.onThresholdsCheckChanged)
     
     self.__secondReg = qt.QPushButton('3/ ICP Registration')
-    string = 'Register Template and Model.'
-    self.__registrationStatus = qt.QLabel(string)
+    self.__registrationStatus = qt.QLabel('Register Template and Model')
     self.__layout.addRow(self.__registrationStatus, self.__secondReg)
-    self.__secondReg.connect('toggled(bool)', self.onICPButtonToggled)
+    self.__secondReg.connect('clicked()', self.ICPRegistration)
     self.__secondReg.setEnabled(0)
-    self.__secondReg.checkable = True
     self.__layout.addRow(self.__secondReg)
     
     self.fiducialButton = qt.QPushButton('Manual Registration')
@@ -193,14 +197,14 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     icpTransform = vtk.vtkIterativeClosestPointTransform()
     icpTransform.SetSource(self.glyphInputData)
     icpTransform.SetTarget(targetSurface.GetPolyData())
-    icpTransform.SetCheckMeanDistance(1)
-    icpTransform.SetMaximumMeanDistance(0.1)
-    icpTransform.SetMaximumNumberOfIterations(3)
-    icpTransform.SetMaximumNumberOfLandmarks(1000)
+    icpTransform.SetCheckMeanDistance(0)
+    icpTransform.SetMaximumMeanDistance(0.01)
+    icpTransform.SetMaximumNumberOfIterations(1000)
+    icpTransform.SetMaximumNumberOfLandmarks(100)
     icpTransform.SetMeanDistanceModeToRMS()
     icpTransform.GetLandmarkTransform().SetModeToRigidBody()
     icpTransform.Update()
-    self.nIterations = icpTransform.GetNumberOfIterations()
+    nIterations = icpTransform.GetNumberOfIterations()
     FinalMatrix = vtk.vtkMatrix4x4()
 
     FinalMatrix.Multiply4x4(icpTransform.GetMatrix(),self.vtkMatInitial,FinalMatrix)
@@ -210,39 +214,26 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
   def processRegistrationCompletion(self):
     
     self.__registrationStatus.setText('Done')
+
     self.__secondReg.setEnabled(1)
-  
-  def onRunButtonToggled(self, checked):
-    if checked:
-      self.start()
-      self.fiducialButton.text = "Stop"  
-    else:
-      self.stop()
-      self.fiducialButton.text = "ICP Registration"
-      
-  def onICPButtonToggled(self,checked):
-    if checked:  
-      self.startICP()
-      self.__secondReg.text = "Processing"
-    else:
-      self.stopICP()
-      self.__secondReg.text = "ICP Registration"
-      
-  def startICP(self):          
-    if self.timer:
-      self.stop()
-    self.timer = qt.QTimer()
-    self.timer.setInterval(2)
-    self.timer.connect('timeout()', self.ICPRegistration)
-    self.timer.start()
     
-  def stopICP(self):
-    if self.timer:
-      self.timer.stop()
-      self.timer = None
+    pNode = self.parameterNode()
+    followupNode = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('followupVolumeID'))
+    obturatorNode = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('obturatorID'))
     
-  def stop(self):
-    self.removeObservers()
+    df = followupNode.GetDisplayNode()
+    df.SetSliceIntersectionVisibility(1)
+    do = obturatorNode.GetDisplayNode()
+    do.SetSliceIntersectionVisibility(1)
+    
+    roiNode = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('roiTransformID'))
+    roiNode.SetAndObserveTransformNodeID(self.__followupTransform.GetID())
+
+    Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),pNode.GetParameter('followupVolumeID'))
+
+    pNode.SetParameter('followupTransformID', self.__followupTransform.GetID())
+    self.onROIChanged()
+
 
 
      
@@ -336,9 +327,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.__roiSegmentationNode.SetAndObserveImageData(thresh.GetOutput())
     Helper.SetBgFgVolumes(pNode.GetParameter('BaselineVolumeID'),'')
 
-  def processSegmentationCompletion(self, node, event):
-
-    print("event")
   def validate( self, desiredBranchId ):
     '''
     '''
@@ -355,6 +343,14 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       if self.segmentationModel:
         self.segmentationModel.RemoveAllChildrenNodes()
         slicer.mrmlScene.RemoveNode(self.segmentationModel)
+        
+      if self.__roi != None:
+        self.__roi.RemoveObserver(self.__roiObserverTag)
+        self.__roi.VisibleOff()
+      
+      pNode = self.parameterNode()
+      pNode.SetParameter('roiNodeID', self.__roiSelector.currentNode().GetID())
+      
     super(iGyneSecondRegistrationStep, self).onExit(goingTo, transitionType)
 
   def onEntry(self,comingFrom,transitionType):
@@ -367,29 +363,49 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       lm = slicer.app.layoutManager()
       lm.setLayout(3)
       pNode = self.parameterNode()
+
+      
+      self.__roiTransformNode = slicer.mrmlScene.GetNodeByID( pNode.GetParameter('roiTransformID'))
+      self.__followupVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('followupVolumeID'))
+      self.__baselineVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
+      self.__followupTransform = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('followupTransformID'))
+      
+      print pNode
       self.updateWidgetFromParameters(pNode)
       self.onThresholdsCheckChanged()
-      Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
+      #Helper.SetBgFgVolumes(self.__baselineVolume,'')
 
-      roiVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
-      self.__roiVolume = roiVolume
-      self.__roiSegmentationNode = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeSegmentationID'))
+      self.__roiVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
+      self.__roiSegmentationNode = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('croppedBaselineVolumeSegmentationID'))
       
       # setup color transfer function once
       
-      baselineROIVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
-      baselineROIRange = baselineROIVolume.GetImageData().GetScalarRange()
+
+      baselineROIRange = self.__roiVolume.GetImageData().GetScalarRange()
       threshRange = [self.__threshRange.minimumValue, self.__threshRange.maximumValue]
       labelsColorNode = slicer.modules.colors.logic().GetColorTableNodeID(10)
       self.__roiSegmentationNode.GetDisplayNode().SetAndObserveColorNodeID(labelsColorNode)
       Helper.SetLabelVolume(self.__roiSegmentationNode.GetID())
       self.onThresholdChanged()
+      
+      # use this transform node to align ROI with the axes of the baseline
+      # volume
+      
+      # get the roiNode from parameters node, if it exists, and initialize the
+      # GUI
+      self.updateWidgetFromParameters(pNode)
+      bounds = [0,0,0,0,0,0]
+      self.__followupVolume.GetRASBounds(bounds)
+      #print(bounds)
+      if self.__roi != None:
+        self.__roi.VisibleOn()
+      self.__roi.SetRadiusXYZ(abs(bounds[0]-bounds[1])/float(2),abs(bounds[2]-bounds[3])/float(2),abs(bounds[4]-bounds[5])/float(2))
       pNode.SetParameter('currentStep', self.stepid)
     
   def updateWidgetFromParameters(self, pNode):
   
-    baselineROIVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
-    baselineROIRange = baselineROIVolume.GetImageData().GetScalarRange()
+    self.__roiVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
+    baselineROIRange = self.__roiVolume.GetImageData().GetScalarRange()
     self.__threshRange.minimum = baselineROIRange[0]
     self.__threshRange.maximum = baselineROIRange[1]
 
@@ -414,8 +430,88 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     else:
       Helper.Error('Unexpected parameter values! Error CT-S03-SNA. Please report')
     self.__roiSegmentationNode = Helper.getNodeByID(segmentationID)
+    
+    roiNodeID = pNode.GetParameter('roiNodeID')
+    if roiNodeID != '':
+      self.__roi = slicer.mrmlScene.GetNodeByID(roiNodeID) 
+    else:
+      Helper.Error('RoiNodeID is missing')
+    self.onROIChanged()
+    self.doStepProcessing()
 
- 
+  def onROIChanged(self):
+    pNode = self.parameterNode()
+    roiID = pNode.GetParameter('roiNodeID')
+    roi = slicer.mrmlScene.GetNodeByID(roiID)
+
+    if roi != None:
+    
+      pNode = self.parameterNode()
+      roi.SetAndObserveTransformNodeID(self.__roiTransformNode.GetID())
+
+      if self.__roiObserverTag != None:
+        self.__roi.RemoveObserver(self.__roiObserverTag)
+
+      self.__roi = slicer.mrmlScene.GetNodeByID(roi.GetID())
+      self.__roiObserverTag = self.__roi.AddObserver('ModifiedEvent', self.processROIEvents)
+
+      roi.SetInteractiveMode(0)
+
+      self.__roiWidget.setMRMLAnnotationROINode(roi)
+      self.__roi.VisibleOff()
+     
+  def processROIEvents(self,node,event):
+    # get the range of intensities inside the ROI
+
+    # get the IJK bounding box of the voxels inside ROI
+    roiCenter = [0,0,0]
+    roiRadius = [0,0,0]
+    self.__roi.GetXYZ(roiCenter)
+    self.__roi.GetRadiusXYZ(roiRadius)
+
+    roiCorner1 = [roiCenter[0]+roiRadius[0],roiCenter[1]+roiRadius[1],roiCenter[2]+roiRadius[2],1]
+    roiCorner2 = [roiCenter[0]+roiRadius[0],roiCenter[1]+roiRadius[1],roiCenter[2]-roiRadius[2],1]
+    roiCorner3 = [roiCenter[0]+roiRadius[0],roiCenter[1]-roiRadius[1],roiCenter[2]+roiRadius[2],1]
+    roiCorner4 = [roiCenter[0]+roiRadius[0],roiCenter[1]-roiRadius[1],roiCenter[2]-roiRadius[2],1]
+    roiCorner5 = [roiCenter[0]-roiRadius[0],roiCenter[1]+roiRadius[1],roiCenter[2]+roiRadius[2],1]
+    roiCorner6 = [roiCenter[0]-roiRadius[0],roiCenter[1]+roiRadius[1],roiCenter[2]-roiRadius[2],1]
+    roiCorner7 = [roiCenter[0]-roiRadius[0],roiCenter[1]-roiRadius[1],roiCenter[2]+roiRadius[2],1]
+    roiCorner8 = [roiCenter[0]-roiRadius[0],roiCenter[1]-roiRadius[1],roiCenter[2]-roiRadius[2],1]
+
+    ras2ijk = vtk.vtkMatrix4x4()
+    self.__baselineVolume.GetRASToIJKMatrix(ras2ijk)
+
+    roiCorner1ijk = ras2ijk.MultiplyPoint(roiCorner1)
+    roiCorner2ijk = ras2ijk.MultiplyPoint(roiCorner2)
+    roiCorner3ijk = ras2ijk.MultiplyPoint(roiCorner3)
+    roiCorner4ijk = ras2ijk.MultiplyPoint(roiCorner4)
+    roiCorner5ijk = ras2ijk.MultiplyPoint(roiCorner5)
+    roiCorner6ijk = ras2ijk.MultiplyPoint(roiCorner6)
+    roiCorner7ijk = ras2ijk.MultiplyPoint(roiCorner7)
+    roiCorner8ijk = ras2ijk.MultiplyPoint(roiCorner8)
+
+    lowerIJK = [0, 0, 0]
+    upperIJK = [0, 0, 0]
+
+    lowerIJK[0] = min(roiCorner1ijk[0],roiCorner2ijk[0],roiCorner3ijk[0],roiCorner4ijk[0],roiCorner5ijk[0],roiCorner6ijk[0],roiCorner7ijk[0],roiCorner8ijk[0])
+    lowerIJK[1] = min(roiCorner1ijk[1],roiCorner2ijk[1],roiCorner3ijk[1],roiCorner4ijk[1],roiCorner5ijk[1],roiCorner6ijk[1],roiCorner7ijk[1],roiCorner8ijk[1])
+    lowerIJK[2] = min(roiCorner1ijk[2],roiCorner2ijk[2],roiCorner3ijk[2],roiCorner4ijk[2],roiCorner5ijk[2],roiCorner6ijk[2],roiCorner7ijk[2],roiCorner8ijk[2])
+
+    upperIJK[0] = max(roiCorner1ijk[0],roiCorner2ijk[0],roiCorner3ijk[0],roiCorner4ijk[0],roiCorner5ijk[0],roiCorner6ijk[0],roiCorner7ijk[0],roiCorner8ijk[0])
+    upperIJK[1] = max(roiCorner1ijk[1],roiCorner2ijk[1],roiCorner3ijk[1],roiCorner4ijk[1],roiCorner5ijk[1],roiCorner6ijk[1],roiCorner7ijk[1],roiCorner8ijk[1])
+    upperIJK[2] = max(roiCorner1ijk[2],roiCorner2ijk[2],roiCorner3ijk[2],roiCorner4ijk[2],roiCorner5ijk[2],roiCorner6ijk[2],roiCorner7ijk[2],roiCorner8ijk[2])
+
+    image = self.__baselineVolume.GetImageData()
+    clipper = vtk.vtkImageClip()
+    clipper.ClipDataOn()
+    clipper.SetOutputWholeExtent(int(lowerIJK[0]),int(upperIJK[0]),int(lowerIJK[1]),int(upperIJK[1]),int(lowerIJK[2]),int(upperIJK[2]))
+    clipper.SetInput(image)
+    clipper.Update()
+
+    roiImageRegion = clipper.GetOutput()
+    intRange = roiImageRegion.GetScalarRange()
+    lThresh = 0.4*(intRange[0]+intRange[1])
+    uThresh = intRange[1]
   def start(self):    
     self.removeObservers()
     # get new slice nodes
@@ -551,15 +647,43 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
           self.before += 1
 
   
-  def removeObservers(self):
-    # remove observers and reset
-    for observee,tag in self.styleObserverTags:
-      observee.RemoveObserver(tag)
-    self.styleObserverTags = []
-    self.sliceWidgetsPerStyle = {}
+  def onRunButtonToggled(self, checked):
+    if checked:
+      self.start()
+      self.fiducialButton.text = "Stop"  
+    else:
+      self.stop()
+      self.fiducialButton.text = "ICP Registration"
 
   def translate(self,x,y,z):
     self.m.SetElement(0,3,x)
     self.m.SetElement(1,3,y)
     self.m.SetElement(2,3,z)
+    
+  def doStepProcessing(self):
+    '''
+    prepare roi image for the next step
+    '''
+    pNode = self.parameterNode()
+    cropVolumeNode = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('cropVolumeNodeID'))
+    # cropVolumeNode.SetAndObserveOutputVolumeNodeID(outputVolume.GetID())
+
+    cropVolumeLogic = slicer.modules.cropvolume.logic()
+    cropVolumeLogic.Apply(cropVolumeNode)
+
+    # TODO: cropvolume error checking
+    outputVolume = slicer.mrmlScene.GetNodeByID(cropVolumeNode.GetOutputVolumeNodeID())
+    outputVolume.SetName("baselineROI")
+    pNode.SetParameter('croppedBaselineVolumeID',cropVolumeNode.GetOutputVolumeNodeID())
+
+
+    roiSegmentationID = pNode.GetParameter('croppedBaselineVolumeSegmentationID') 
+    if roiSegmentationID == '':
+      roiRange = outputVolume.GetImageData().GetScalarRange()
+
+      # default threshold is half-way of the range
+      thresholdParameter = str(0.25*(roiRange[0]+roiRange[1]))+','+str(roiRange[1])
+      pNode.SetParameter('thresholdRange', thresholdParameter)
+      pNode.SetParameter('useSegmentationThresholds', 'True')
+
     

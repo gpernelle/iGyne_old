@@ -28,8 +28,6 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     self.__vrDisplayNode = None
     self.__threshold = [ -1, -1 ]  
     # initialize VR stuff
-    self.__vrLogic = slicer.modules.volumerendering.logic()
-    self.__vrOpacityMap = None
     self.__roiSegmentationNode = None
     self.__roiVolume = None
     self.click = 0
@@ -73,9 +71,6 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     voiGroupBoxLayout = qt.QFormLayout( voiGroupBox )
     self.__roiWidget = PythonQt.qSlicerAnnotationsModuleWidgets.qMRMLAnnotationROIWidget()
     voiGroupBoxLayout.addRow( self.__roiWidget )
-    
-    # initialize VR stuff
-    self.__vrLogic = slicer.modules.volumerendering.logic()
 
   def onROIChanged(self):
     roi = self.__roiSelector.currentNode()
@@ -310,7 +305,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
         self.__roiTransformNode = Helper.getNodeByID(roiTfmNodeID)
       else:
         Helper.Error('Internal error! Error code CT-S2-NRT, please report!')
-      baselineVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
+   
       self.__followupVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('followupVolumeID'))
       self.__baselineVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
       # get the roiNode from parameters node, if it exists, and initialize the
