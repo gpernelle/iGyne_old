@@ -1,7 +1,6 @@
 SET(iGWizard_PYTHON_SCRIPTS
   __init__.py
   Helper.py
-  iGyneUI.py
   iGyneStep.py
   iGyneSelectProcedureStep.py
   iGyneSelectApplicatorStep.py

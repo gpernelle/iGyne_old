@@ -20,12 +20,77 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     self.setName( '5. Needle position Planning' )
     self.setDescription( 'Position, color, resize needles as you like' )
     self.__parent = super( iGyneNeedlePlanningStep, self )
+
+    self.option = {0:'Ba',
+       1:'Bb',
+       2:'Bc',
+       3:'Bd',
+       4:'Be',
+       5:'Bf',
+       6:'Bg',
+       7:'Bh',
+       8:'Bi',
+       9:'Bj',
+       10:'Bk',
+       11:'Bl',
+       12:'Ca',
+       13:'Cb',
+       14:'Cc',
+       15:'Cd',
+       16:'Ce',
+       17:'Cf',
+       18:'Cg',
+       19:'Ch',
+       20:'Ci',
+       21:'Cj',
+       22:'Ck',
+       23:'Cl',
+       24:'Cm',
+       25:'Cn',
+       26:'Co',
+       27:'Cp',
+       28:'Cq',
+       29:'Cr',
+       30:'Da',
+       31:'Db',
+       32:'Dc',
+       33:'Dd',
+       34:'De',
+       35:'Df',
+       36:'Dg',
+       37:'Dh',
+       38:'Di',
+       39:'Dj',
+       40:'Ea',
+       41:'Eb',
+       42:'Ec',
+       43:'Ed',
+       44:'Ee',
+       45:'Ef',
+       46:'Eg',
+       47:'Eh',
+       48:'Aa',
+       49:'Ab',
+       50:'Ac',
+       51:'Ad',
+       52:'Ae',
+       53:'Af',
+       54:'Iu', 
+       55:'Fa',
+       56:'Fb',
+       57:'Fc',
+       58:'Fd',
+       59:'Fe',
+       60:'Ff',
+       61:'Fg',
+       62:'Fh'}
     
     
 
   def createUserInterface( self ):
     '''
     '''
+    pNode = self.parameterNode()
     self.skip = 0
     self.__layout = self.__parent.createUserInterface()
     TemplateSheetWidget = qt.QWidget()
@@ -1982,7 +2047,8 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
 
       #------------------------------------------
       mrmlScene = slicer.mrmlScene
-      self.ObturatorNode = mrmlScene.GetNodeByID("vtkMRMLModelNode5")
+      obturatorID = pNode.GetParameter('obturatorID')
+      self.ObturatorNode = mrmlScene.GetNodeByID(obturatorID)
       if self.ObturatorNode :
       
         self.setNeedleCoordinates()
@@ -2065,7 +2131,7 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     sizePolicy1.setHorizontalStretch(0)
     sizePolicy1.setVerticalStretch(0)
     sizePolicy1.setHeightForWidth(popupSpinbox.sizePolicy.hasHeightForWidth())
-    popupSpinbox.setStyleSheet("background-color: rgb(255, 255, 255)")
+    popupSpinbox.setStyleSheet("background-color: rgb(255, 255, 255);")
     popupSpinbox.setSizePolicy(sizePolicy1)
     popupSpinbox.setMaximum(300)
     popupSpinbox.setValue(170)  
@@ -2697,7 +2763,7 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
   def pushBaNeedle(self):
 
     nDepth = self.popupSpinboxBa.value
-
+    print('pushba ',nDepth)
     self.pushOneNeedle(0, nDepth)   
 
 
@@ -3526,7 +3592,8 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
 
     nDepth = self.popupSpinboxOb.value
     mrmlScene=slicer.mrmlScene  
-    self.ObturatorNode = mrmlScene.GetNodeByID("vtkMRMLModelNode5")
+    obturatorID = pNode.GetParameter('obturatorID')
+    self.ObturatorNode = mrmlScene.GetNodeByID(obturatorID)
 
     vtkmat = vtk.vtkMatrix4x4()
     vtkmat.Identity()
@@ -3545,161 +3612,29 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
 
   ##-----------------------------------------------------------------------------
   def showOneNeedle(self,i,RadioButton):
-    
-
-    name = {0:'Ba.vtk',
-         1:'Bb.vtk',
-         2:'Bc.vtk',
-         3:'Bd.vtk',
-         4:'Be.vtk',
-         5:'Bf.vtk',
-         6:'Bg.vtk',
-         7:'Bh.vtk',
-         8:'Bi.vtk',
-         9:'Bj.vtk',
-         10:'Bk.vtk',
-         11:'Bl.vtk',
-         12:'Ca.vtk',
-         13:'Cb.vtk',
-         14:'Cc.vtk',
-         15:'Cd.vtk',
-         16:'Ce.vtk',
-         17:'Cf.vtk',
-         18:'Cg.vtk',
-         19:'Ch.vtk',
-         20:'Ci.vtk',
-         21:'Cj.vtk',
-         22:'Ck.vtk',
-         23:'Cl.vtk',
-         24:'Cm.vtk',
-         25:'Cn.vtk',
-         26:'Co.vtk',
-         27:'Cp.vtk',
-         28:'Cq.vtk',
-         29:'Cr.vtk',
-         30:'Da.vtk',
-         31:'Db.vtk',
-         32:'Dc.vtk',
-         33:'Dd.vtk',
-         34:'De.vtk',
-         35:'Df.vtk',
-         36:'Dg.vtk',
-         37:'Dh.vtk',
-         38:'Di.vtk',
-         39:'Dj.vtk',
-         40:'Ea.vtk',
-         41:'Eb.vtk',
-         42:'Ec.vtk',
-         43:'Ed.vtk',
-         44:'Ee.vtk',
-         45:'Ef.vtk',
-         46:'Eg.vtk',
-         47:'Eh.vtk',
-         48:'Aa.vtk',
-         49:'Ab.vtk',
-         50:'Ac.vtk',
-         51:'Ad.vtk',
-         52:'Ae.vtk',
-         53:'Af.vtk',
-         54:'Iu.vtk', 
-         55:'Fa.vtk',
-         56:'Fb.vtk',
-         57:'Fc.vtk',
-         58:'Fd.vtk',
-         59:'Fe.vtk',
-         60:'Ff.vtk',
-         61:'Fg.vtk',
-         62:'Fh.vtk'}
-    
-    option = {0:'Ba',
-         1:'Bb',
-         2:'Bc',
-         3:'Bd',
-         4:'Be',
-         5:'Bf',
-         6:'Bg',
-         7:'Bh',
-         8:'Bi',
-         9:'Bj',
-         10:'Bk',
-         11:'Bl',
-         12:'Ca',
-         13:'Cb',
-         14:'Cc',
-         15:'Cd',
-         16:'Ce',
-         17:'Cf',
-         18:'Cg',
-         19:'Ch',
-         20:'Ci',
-         21:'Cj',
-         22:'Ck',
-         23:'Cl',
-         24:'Cm',
-         25:'Cn',
-         26:'Co',
-         27:'Cp',
-         28:'Cq',
-         29:'Cr',
-         30:'Da',
-         31:'Db',
-         32:'Dc',
-         33:'Dd',
-         34:'De',
-         35:'Df',
-         36:'Dg',
-         37:'Dh',
-         38:'Di',
-         39:'Dj',
-         40:'Ea',
-         41:'Eb',
-         42:'Ec',
-         43:'Ed',
-         44:'Ee',
-         45:'Ef',
-         46:'Eg',
-         47:'Eh',
-         48:'Aa',
-         49:'Ab',
-         50:'Ac',
-         51:'Ad',
-         52:'Ae',
-         53:'Af',
-         54:'Iu', 
-         55:'Fa',
-         56:'Fb',
-         57:'Fc',
-         58:'Fd',
-         59:'Fe',
-         60:'Ff',
-         61:'Fg',
-         62:'Fh'}
-    
-    fidname = "fid"+option[i]
+    fidname = "fid"+self.option[i]
     pNode = self.parameterNode()
-    needleID = pNode.GetParameter(name[i])
+    needleID = pNode.GetParameter(self.option[i]+'.vtk')
     fidID = pNode.GetParameter(fidname)    
     NeedleNode = slicer.mrmlScene.GetNodeByID(needleID)
-    print(pNode)
-    print("fidID",fidID)
     fiducialNode = slicer.mrmlScene.GetNodeByID(fidID)    
     
     if NeedleNode !=None:
       displayNode =NeedleNode.GetModelDisplayNode()
+      d =NeedleNode.GetModelDisplayNode()
       nVisibility=displayNode.GetVisibility()  
-      print nVisibility
-      
+
       if fiducialNode == None:
-    
-        fiducialNode = slicer.vtkMRMLAnnotationFiducialNode()
-        NeedleNode.SetDisplayVisibility(1)
-        polyData = NeedleNode.GetPolyData()
+        displayNode.SetVisibility(1)    
+        displayNode.SetOpacity(0.9)
+        polyData = displayNode.GetPolyData()
+        polyData.Update()
         nb = int(polyData.GetNumberOfPoints()-1)
         coord = [0,0,0]
         if nb>100:
-          polyData.GetPoint(nb,coord)
-         
-          fiducialNode.SetName(option[i])
+          fiducialNode = slicer.vtkMRMLAnnotationFiducialNode()
+          polyData.GetPoint(nb,coord)    
+          fiducialNode.SetName(self.option[i])
           fiducialNode.SetFiducialCoordinates(coord)         
           fiducialNode.SetAndObserveTransformNodeID(self.transformNode.GetID())
           fiducialNode.Initialize(slicer.mrmlScene)
@@ -3707,29 +3642,31 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
           fiducialNode.SetSelectable(0)
           fidDN = fiducialNode.GetDisplayNode()
           fidDN.SetColor(NeedleNode.GetDisplayNode().GetColor())
-          fidDN.SetGlyphScale(1)
+          fidDN.SetGlyphScale(0)
           fidTN = fiducialNode.GetAnnotationTextDisplayNode()
           fidTN.SetTextScale(3)
           fidTN.SetColor(NeedleNode.GetDisplayNode().GetColor())
           fiducialNode.SetVisible(0)
           pNode.SetParameter(fidname,fiducialNode.GetID())
-          self.showOneNeedle(i,RadioButton)
-        else:
-          print('nb:',nb)
-      
-      
+          sColor = "background-color: rgb(" + str(self.color255[i][0]) +","+ str(self.color255[i][1]) +"," + str(self.color255[i][2]) + ");"
+          colorButtonName = "self." + self.option[i] + "ColorPushButton"
+          eval(colorButtonName).setStyleSheet(sColor)
+          fiducialNode.SetVisible(1)
+
       if nVisibility ==1:
-        print("hide needle")
+
         displayNode.SetVisibility(0)
         displayNode.SetSliceIntersectionVisibility(0)
-        fiducialNode.SetVisible(0)
-        # RadioButton.setChecked(False)
+        if fiducialNode!=None:
+          fiducialNode.SetVisible(0)
+
       else:
-        print("show needle")
+
         displayNode.SetVisibility(1)
         displayNode.SetSliceIntersectionVisibility(1)
-        fiducialNode.SetVisible(1)
-        # RadioButton.setChecked(True)
+        if fiducialNode!=None:
+          fiducialNode.SetVisible(1)
+
     else:
       vtkmat = vtk.vtkMatrix4x4()
       vtkmat.DeepCopy(self.m_vtkmat)
@@ -3746,13 +3683,15 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
 
       triangles=vtk.vtkTriangleFilter()
       triangles.SetInput(TransformPolyDataFilter.GetOutput())  
-      # print(Transform) 
       self.AddModel(i,triangles.GetOutput())
+      
       self.showOneNeedle(i,RadioButton)
-          
+      self.showOneNeedle(i,RadioButton)
+    
+
   
 
-  ##-----------------------------------------------------------------------------
+  # ##-----------------------------------------------------------------------------
   # def showOneNeedle(self,i,bShowNeedels):
 
     # filename= "vtkMRMLModelNode"+str(i+6)
@@ -3773,9 +3712,11 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
   ##-----------------------------------------------------------------------------
   def pushOneNeedle(self,i,nDepth):
 
-    filename= "vtkMRMLModelNode"+str(i+6)
-    mrmlScene=slicer.mrmlScene
-    NeedleNode = mrmlScene.GetNodeByID(filename)
+    pNode = self.parameterNode()
+    needleID = pNode.GetParameter(self.option[i]+'.vtk')  
+    NeedleNode = slicer.mrmlScene.GetNodeByID(needleID)
+    print NeedleNode.GetID()
+    
 
     vtkmat = vtk.vtkMatrix4x4()
     vtkmat.DeepCopy(self.m_vtkmat) 
@@ -3795,147 +3736,20 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     triangles.SetInput(TransformPolyDataFilter.GetOutput())
     if NeedleNode !=None:
       NeedleNode.SetAndObservePolyData(triangles.GetOutput())
+      print("push",nDepth)
     
   ##-----------------------------------------------------------------------------
   def setOneNeedleColor(self,i,ColorPushButton):
 
     color = qt.QColorDialog.getColor(qt.QColor('green'), self)
     sColor = ""
-    sColor = "background-color: rgb(" + str(color.red())+ "," + str(color.green()) + "," + str(color.blue())
+    sColor = "background-color: rgb(" + str(color.red())+ "," + str(color.green()) + "," + str(color.blue()) + ");"
 
     if color.isValid():
 
-      
-      name = {0:'Ba.vtk',
-         1:'Bb.vtk',
-         2:'Bc.vtk',
-         3:'Bd.vtk',
-         4:'Be.vtk',
-         5:'Bf.vtk',
-         6:'Bg.vtk',
-         7:'Bh.vtk',
-         8:'Bi.vtk',
-         9:'Bj.vtk',
-         10:'Bk.vtk',
-         11:'Bl.vtk',
-         12:'Ca.vtk',
-         13:'Cb.vtk',
-         14:'Cc.vtk',
-         15:'Cd.vtk',
-         16:'Ce.vtk',
-         17:'Cf.vtk',
-         18:'Cg.vtk',
-         19:'Ch.vtk',
-         20:'Ci.vtk',
-         21:'Cj.vtk',
-         22:'Ck.vtk',
-         23:'Cl.vtk',
-         24:'Cm.vtk',
-         25:'Cn.vtk',
-         26:'Co.vtk',
-         27:'Cp.vtk',
-         28:'Cq.vtk',
-         29:'Cr.vtk',
-         30:'Da.vtk',
-         31:'Db.vtk',
-         32:'Dc.vtk',
-         33:'Dd.vtk',
-         34:'De.vtk',
-         35:'Df.vtk',
-         36:'Dg.vtk',
-         37:'Dh.vtk',
-         38:'Di.vtk',
-         39:'Dj.vtk',
-         40:'Ea.vtk',
-         41:'Eb.vtk',
-         42:'Ec.vtk',
-         43:'Ed.vtk',
-         44:'Ee.vtk',
-         45:'Ef.vtk',
-         46:'Eg.vtk',
-         47:'Eh.vtk',
-         48:'Aa.vtk',
-         49:'Ab.vtk',
-         50:'Ac.vtk',
-         51:'Ad.vtk',
-         52:'Ae.vtk',
-         53:'Af.vtk',
-         54:'Iu.vtk', 
-         55:'Fa.vtk',
-         56:'Fb.vtk',
-         57:'Fc.vtk',
-         58:'Fd.vtk',
-         59:'Fe.vtk',
-         60:'Ff.vtk',
-         61:'Fg.vtk',
-         62:'Fh.vtk'}
-      option = {0:'Ba',
-         1:'Bb',
-         2:'Bc',
-         3:'Bd',
-         4:'Be',
-         5:'Bf',
-         6:'Bg',
-         7:'Bh',
-         8:'Bi',
-         9:'Bj',
-         10:'Bk',
-         11:'Bl',
-         12:'Ca',
-         13:'Cb',
-         14:'Cc',
-         15:'Cd',
-         16:'Ce',
-         17:'Cf',
-         18:'Cg',
-         19:'Ch',
-         20:'Ci',
-         21:'Cj',
-         22:'Ck',
-         23:'Cl',
-         24:'Cm',
-         25:'Cn',
-         26:'Co',
-         27:'Cp',
-         28:'Cq',
-         29:'Cr',
-         30:'Da',
-         31:'Db',
-         32:'Dc',
-         33:'Dd',
-         34:'De',
-         35:'Df',
-         36:'Dg',
-         37:'Dh',
-         38:'Di',
-         39:'Dj',
-         40:'Ea',
-         41:'Eb',
-         42:'Ec',
-         43:'Ed',
-         44:'Ee',
-         45:'Ef',
-         46:'Eg',
-         47:'Eh',
-         48:'Aa',
-         49:'Ab',
-         50:'Ac',
-         51:'Ad',
-         52:'Ae',
-         53:'Af',
-         54:'Iu', 
-         55:'Fa',
-         56:'Fb',
-         57:'Fc',
-         58:'Fd',
-         59:'Fe',
-         60:'Ff',
-         61:'Fg',
-         62:'Fh'}
-    
-      fidname = "fid"+option[i]
+      fidname = "fid"+self.option[i]
       pNode = self.parameterNode()
-      needleID = pNode.GetParameter(name[i])  
+      needleID = pNode.GetParameter(self.option[i]+'.vtk')  
       fidID = pNode.GetParameter(fidname) 
       
       fiducialNode = slicer.mrmlScene.GetNodeByID(fidID)      
@@ -3944,7 +3758,7 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
         displayNode =NeedleNode.GetModelDisplayNode()
 
         displayNode.SetColor(color.red()/float(255.0),color.green()/float(255.0),color.blue()/float(255.0))
-        sColor = "background-color: rgb(" + str(color.red())+ "," + str(color.green()) + "," + str(color.blue()) + ')'
+        sColor = "background-color: rgb(" + str(color.red())+ "," + str(color.green()) + "," + str(color.blue()) + ');'
         print sColor
         ColorPushButton.setStyleSheet(sColor)
         
@@ -3955,7 +3769,7 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
           fidTN.SetColor(displayNode.GetColor())
        
 
-  ##-----------------------------------------------------------------------------
+  #-----------------------------------------------------------------------------
   # def showNeedles(self):
 
     # if self.ShowNeedlesPushButton.isChecked():
@@ -4237,8 +4051,8 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
   def loadNeedles(self):
     pNode = self.parameterNode()
     alreadyloaded = pNode.GetParameter("Needles-loaded")
-        
-    ObutratorNode = slicer.mrmlScene.GetNodeByID("vtkMRMLModelNode5")
+    obturatorID = pNode.GetParameter('obturatorID')    
+    ObutratorNode = slicer.mrmlScene.GetNodeByID(obturatorID)
 
     if ObutratorNode!=None:
       print("obturator loaded")
@@ -4253,79 +4067,20 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     modelNode = slicer.vtkMRMLModelNode()
     displayNode = slicer.vtkMRMLModelDisplayNode()
     storageNode = slicer.vtkMRMLModelStorageNode()
+ 
+    fileName = self.option[i]+'.vtk'
+    print("filename:",fileName)
 
-    name = {0:'Ba.vtk',
-         1:'Bb.vtk',
-         2:'Bc.vtk',
-         3:'Bd.vtk',
-         4:'Be.vtk',
-         5:'Bf.vtk',
-         6:'Bg.vtk',
-         7:'Bh.vtk',
-         8:'Bi.vtk',
-         9:'Bj.vtk',
-         10:'Bk.vtk',
-         11:'Bl.vtk',
-         12:'Ca.vtk',
-         13:'Cb.vtk',
-         14:'Cc.vtk',
-         15:'Cd.vtk',
-         16:'Ce.vtk',
-         17:'Cf.vtk',
-         18:'Cg.vtk',
-         19:'Ch.vtk',
-         20:'Ci.vtk',
-         21:'Cj.vtk',
-         22:'Ck.vtk',
-         23:'Cl.vtk',
-         24:'Cm.vtk',
-         25:'Cn.vtk',
-         26:'Co.vtk',
-         27:'Cp.vtk',
-         28:'Cq.vtk',
-         29:'Cr.vtk',
-         30:'Da.vtk',
-         31:'Db.vtk',
-         32:'Dc.vtk',
-         33:'Dd.vtk',
-         34:'De.vtk',
-         35:'Df.vtk',
-         36:'Dg.vtk',
-         37:'Dh.vtk',
-         38:'Di.vtk',
-         39:'Dj.vtk',
-         40:'Ea.vtk',
-         41:'Eb.vtk',
-         42:'Ec.vtk',
-         43:'Ed.vtk',
-         44:'Ee.vtk',
-         45:'Ef.vtk',
-         46:'Eg.vtk',
-         47:'Eh.vtk',
-         48:'Aa.vtk',
-         49:'Ab.vtk',
-         50:'Ac.vtk',
-         51:'Ad.vtk',
-         52:'Ae.vtk',
-         53:'Af.vtk',
-         54:'Iu.vtk', 
-         55:'Fa.vtk',
-         56:'Fb.vtk',
-         57:'Fc.vtk',
-         58:'Fd.vtk',
-         59:'Fe.vtk',
-         60:'Ff.vtk',
-         61:'Fg.vtk',
-         62:'Fh.vtk'}
-    fileName = name[i]
     mrmlScene = slicer.mrmlScene
     modelNode.SetName(fileName)  
     modelNode.SetAndObservePolyData(polyData)
+    
     mrmlScene.SaveStateForUndo()
     modelNode.SetScene(mrmlScene)
     storageNode.SetScene(mrmlScene)
     storageNode.SetFileName(fileName)  
     displayNode.SetScene(mrmlScene)
+    displayNode.SetVisibility(1)
     mrmlScene.AddNode(storageNode)
     mrmlScene.AddNode(displayNode)
     mrmlScene.AddNode(modelNode)
@@ -4334,26 +4089,229 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     self.transformNode = slicer.mrmlScene.GetNodeByID("vtkMRMLLinearTransformNode4")
     modelNode.SetAndObserveTransformNodeID(self.transformNode.GetID())
     displayNode.SetPolyData(modelNode.GetPolyData())
-    displayNode.SetColor(0,1,0)
+    self.colorLabel()
+    displayNode.SetColor(self.color[i])
     displayNode.SetSliceIntersectionVisibility(0)
-    displayNode.SetVisibility(0)
     pNode= self.parameterNode()
     pNode.SetParameter(fileName,modelNode.GetID())
+    mrmlScene.AddNode(modelNode)
+    displayNode.SetVisibility(1)
     
 
-    
-    
-    mrmlScene.AddNode(modelNode)  
-    
-    #mrmlScene.AddNode(fidDN)
-    #mrmlScene.AddNode(fidTN) 
-    #mrmlScene.AddNode(fidSN)   
 
-    #fiducialNode.SetAndObserveStorageNodeID(fidSN.GetID())
-    #fiducialNode.SetAndObserveDisplayNodeID(fidDN.GetID())
-    #slicer.mrmlScene.AddNode(fiducialNode)
-    #fiducialNode.SetDisplayVisibility(0)
-    
 
+  def colorLabel(self):
+    self.color= [[0,0,0] for i in range(310)]
+    self.color255= [[0,0,0] for i in range(310)]    
+    self.color[0]=[221,108,158]
+    self.color[1]=[128,174,128]
+    self.color[2]=[241,214,145]
+    self.color[3]=[177,122,101]
+    self.color[4]=[111,184,210]
+    self.color[5]=[216,101,79]
+    self.color[6]=[221,130,101]
+    self.color[7]=[144,238,144]
+    self.color[8]=[192,104,88]
+    self.color[9]=[220,245,20]
+    self.color[10]=[78,63,0]
+    self.color[11]=[255,250,220]
+    self.color[12]=[230,220,70]
+    self.color[13]=[200,200,235]
+    self.color[14]=[250,250,210]
+    self.color[15]=[244,214,49]
+    self.color[16]=[0,151,206]
+    self.color[17]=[183,156,220]
+    self.color[18]=[183,214,211]
+    self.color[19]=[152,189,207]
+    self.color[20]=[178,212,242]
+    self.color[21]=[68,172,100]
+    self.color[22]=[111,197,131]
+    self.color[23]=[85,188,255]
+    self.color[24]=[0,145,30]
+    self.color[25]=[214,230,130]
+    self.color[26]=[218,255,255]
+    self.color[27]=[170,250,250]
+    self.color[28]=[140,224,228]
+    self.color[29]=[188,65,28]
+    self.color[30]=[216,191,216]
+    self.color[31]=[145,60,66]
+    self.color[32]=[150,98,83]
+    self.color[33]=[250,250,225]
+    self.color[34]=[200,200,215]
+    self.color[35]=[68,131,98]
+    self.color[36]=[83,146,164]
+    self.color[37]=[162,115,105]
+    self.color[38]=[141,93,137]
+    self.color[39]=[182,166,110]
+    self.color[40]=[188,135,166]
+    self.color[41]=[154,150,201]
+    self.color[42]=[177,140,190]
+    self.color[43]=[30,111,85]
+    self.color[44]=[210,157,166]
+    self.color[45]=[48,129,126]
+    self.color[46]=[98,153,112]
+    self.color[47]=[69,110,53]
+    self.color[48]=[166,113,137]
+    self.color[49]=[122,101,38]
+    self.color[50]=[253,135,192]
+    self.color[51]=[145,92,109]
+    self.color[52]=[46,101,131]
+    self.color[53]=[0,108,112]
+    self.color[54]=[127,150,88]
+    self.color[55]=[159,116,163]
+    self.color[56]=[125,102,154]
+    self.color[57]=[106,174,155]
+    self.color[58]=[154,146,83]
+    self.color[59]=[126,126,55]
+    self.color[60]=[201,160,133]
+    self.color[61]=[78,152,141]
+    self.color[62]=[174,140,103]
+    self.color[63]=[139,126,177]
+    self.color[64]=[148,120,72]
+    self.color[65]=[186,135,135]
+    self.color[66]=[99,106,24]
+    self.color[67]=[156,171,108]
+    self.color[68]=[64,123,147]
+    self.color[69]=[138,95,74]
+    self.color[70]=[97,113,158]
+    self.color[71]=[126,161,197]
+    self.color[72]=[194,195,164]
+    self.color[73]=[88,106,215]
+    self.color[74]=[82,174,128]
+    self.color[75]=[57,157,110]
+    self.color[76]=[60,143,83]
+    self.color[77]=[92,162,109]
+    self.color[78]=[255,244,209]
+    self.color[79]=[201,121,77]
+    self.color[80]=[70,163,117]
+    self.color[81]=[188,91,95]
+    self.color[82]=[166,84,94]
+    self.color[83]=[182,105,107]
+    self.color[84]=[229,147,118]
+    self.color[85]=[174,122,90]
+    self.color[86]=[201,112,73]
+    self.color[87]=[194,142,0]
+    self.color[88]=[241,213,144]
+    self.color[89]=[203,179,77]
+    self.color[90]=[229,204,109]
+    self.color[91]=[255,243,152]
+    self.color[92]=[209,185,85]
+    self.color[93]=[248,223,131]
+    self.color[94]=[255,230,138]
+    self.color[95]=[196,172,68]
+    self.color[96]=[255,255,167]
+    self.color[97]=[255,250,160]
+    self.color[98]=[255,237,145]
+    self.color[99]=[242,217,123]
+    self.color[100]=[222,198,101]
+    self.color[101]=[213,124,109]
+    self.color[102]=[184,105,108]
+    self.color[103]=[150,208,243]
+    self.color[104]=[62,162,114]
+    self.color[105]=[242,206,142]
+    self.color[106]=[250,210,139]
+    self.color[107]=[255,255,207]
+    self.color[108]=[182,228,255]
+    self.color[109]=[175,216,244]
+    self.color[110]=[197,165,145]
+    self.color[111]=[172,138,115]
+    self.color[112]=[202,164,140]
+    self.color[113]=[224,186,162]
+    self.color[114]=[255,245,217]
+    self.color[115]=[206,110,84]
+    self.color[116]=[210,115,89]
+    self.color[117]=[203,108,81]
+    self.color[118]=[233,138,112]
+    self.color[119]=[195,100,73]
+    self.color[120]=[181,85,57]
+    self.color[121]=[152,55,13]
+    self.color[122]=[159,63,27]
+    self.color[123]=[166,70,38]
+    self.color[124]=[218,123,97]
+    self.color[125]=[225,130,104]
+    self.color[126]=[224,97,76]
+    self.color[127]=[184,122,154]
+    self.color[128]=[211,171,143]
+    self.color[129]=[47,150,103]
+    self.color[130]=[173,121,88]
+    self.color[131]=[188,95,76]
+    self.color[132]=[255,239,172]
+    self.color[133]=[226,202,134]
+    self.color[134]=[253,232,158]
+    self.color[135]=[244,217,154]
+    self.color[136]=[205,179,108]
+    self.color[137]=[186,124,161]
+    self.color[138]=[255,255,220]
+    self.color[139]=[234,234,194]
+    self.color[140]=[204,142,178]
+    self.color[141]=[180,119,153]
+    self.color[142]=[216,132,105]
+    self.color[143]=[255,253,229]
+    self.color[144]=[205,167,142]
+    self.color[145]=[204,168,143]
+    self.color[146]=[255,224,199]
+    self.color[147]=[139,150,98]
+    self.color[148]=[249,180,111]
+    self.color[149]=[157,108,162]
+    self.color[150]=[203,136,116]
+    self.color[151]=[185,102,83]
+    self.color[152]=[247,182,164]
+    self.color[153]=[222,154,132]
+    self.color[154]=[124,186,223]
+    self.color[155]=[249,186,150]
+    self.color[156]=[244,170,147]
+    self.color[157]=[255,181,158]
+    self.color[158]=[255,190,165]
+    self.color[159]=[227,153,130]
+    self.color[160]=[213,141,113]
+    self.color[161]=[193,123,103]
+    self.color[162]=[216,146,127]
+    self.color[163]=[230,158,140]
+    self.color[164]=[245,172,147]
+    self.color[165]=[241,172,151]
+    self.color[166]=[177,124,92]
+    self.color[167]=[171,85,68]
+    self.color[168]=[217,198,131]
+    self.color[169]=[212,188,102]
+    self.color[170]=[185,135,134]
+    self.color[171]=[198,175,125]
+    self.color[172]=[194,98,79]
+    self.color[173]=[255,238,170]
+    self.color[174]=[206,111,93]
+    self.color[175]=[216,186,0]
+    self.color[176]=[255,226,77]
+    self.color[177]=[255,243,106]
+    self.color[178]=[255,234,92]
+    self.color[179]=[240,210,35]
+    self.color[180]=[224,194,0]
+    self.color[181]=[213,99,79]
+    self.color[182]=[217,102,81]
+    self.color[183]=[0,147,202]
+    self.color[184]=[0,122,171]
+    self.color[185]=[186,77,64]
+    self.color[186]=[240,255,30]
+    self.color[187]=[185,232,61]
+    self.color[188]=[0,226,255]
+    self.color[189]=[251,159,255]
+    self.color[190]=[230,169,29]
+    self.color[191]=[0,194,113]
+    self.color[192]=[104,160,249]
+    self.color[193]=[221,108,158]
+    self.color[194]=[137,142,0]
+    self.color[195]=[230,70,0]
+    self.color[196]=[0,147,0]
+    self.color[197]=[0,147,248]
+    self.color[198]=[231,0,206]
+    self.color[199]=[129,78,0]
+    self.color[200]=[0,116,0]
+    self.color[201]=[0,0,255]
+    self.color[202]=[157,0,0]
+    self.color[203]=[100,100,130]
+    self.color[204]=[205,205,100]
+    for i in range(310):
+      for j in range(3):
+        self.color255[i][j] = self.color[i][j]
+        self.color[i][j] = self.color[i][j]/float(255)
+    
     
 

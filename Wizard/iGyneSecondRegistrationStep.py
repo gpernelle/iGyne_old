@@ -52,6 +52,10 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.step = 1
     self.nIterations = 0
     self.timer = None
+    self.pos0 = 0
+    self.trianglesOutput = vtk.vtkPolyData()
+    self.TransformPolyDataFilter=vtk.vtkTransformPolyDataFilter()
+    self.Transform=vtk.vtkTransform()
     # self.transformNode = vtk.vtkMRMLLinearTransformNode()
        
     # initialize VR stuff
@@ -107,6 +111,11 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.__threshRange.connect('valuesChanged(double,double)', self.onThresholdChanged)
     self.__useThresholdsCheck.connect('stateChanged(int)', self.onThresholdsCheckChanged)
     
+    groupbox = qt.QGroupBox()
+    groupboxLayout  = qt.QFormLayout(groupbox)
+    groupboxLayout.addRow(slicer.modules.editor.widgetRepresentation())
+    self.__layout.addRow(groupbox)
+    
     self.__secondReg = qt.QPushButton('3/ ICP Registration')
     string = 'Register Template and Model.'
     self.__registrationStatus = qt.QLabel(string)
@@ -116,11 +125,49 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.__secondReg.checkable = True
     self.__layout.addRow(self.__secondReg)
     
-    self.fiducialButton = qt.QPushButton('Manual Registration')
-    self.fiducialButton.checkable = True
-    self.__layout.addRow(self.fiducialButton)
-    self.fiducialButton.connect('toggled(bool)', self.onRunButtonToggled)
+    # self.fiducialButton = qt.QPushButton('Manual Registration')
+    # self.fiducialButton.checkable = True
+    # self.__layout.addRow(self.fiducialButton)
+    # self.fiducialButton.connect('toggled(bool)', self.onRunButtonToggled)
+    self.iter=0
+    self.obturatorSlider = ctk.ctkSliderWidget()
+    self.obturatorSlider.minimum = -10
+    self.obturatorSlider.maximum = 300
+    self.obturatorSlider.singleStep = 1
+    self.obturatorSlider.value = 0
+    self.obturatorSlider.connect('valueChanged(double)', self.pushObturator)
+    self.__layout.addRow(self.obturatorSlider)
+    
+  def pushObturator(self):
+    
+    nDepth = self.obturatorSlider.value-self.pos0
+    pNode=self.parameterNode()
+    mrmlScene=slicer.mrmlScene  
+    obturatorID = pNode.GetParameter('obturatorID')
+    self.ObturatorNode = mrmlScene.GetNodeByID(obturatorID)
+    if self.ObturatorNode!=None :   
+      self.m_poly = vtk.vtkPolyData()  
+      self.m_poly.DeepCopy(self.ObturatorNode.GetPolyData())
+    
+    vtkmat = vtk.vtkMatrix4x4()
+    print nDepth
+    vtkmat.SetElement(2,3,nDepth)
 
+    
+    self.TransformPolyDataFilter.SetInput(self.m_poly)
+    self.Transform.SetMatrix(vtkmat)
+    
+    self.TransformPolyDataFilter.SetTransform(self.Transform)
+    self.TransformPolyDataFilter.Update()
+
+    triangles=vtk.vtkTriangleFilter()
+    triangles.SetInput(self.TransformPolyDataFilter.GetOutput())
+    self.ObturatorNode.SetAndObservePolyData(triangles.GetOutput())
+    self.pos0 = self.obturatorSlider.value
+
+    self.iter +=1
+    print self.iter    
+ 
   def setPointData(self,fHoleOriginX,fHoleOriginY):
     fTipPoint,fTipPointTrans=[0,0,0,0],[0,0,0,0]
     for k in xrange(10):
@@ -137,7 +184,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
         # print(self.pointId,self.vtkMatInitial )
   
   def ICPRegistration(self):
-    self.__registrationStatus.setText('Wait ...')
+    self.__registrationStatus.setText('Please Wait ...')
     self.__secondReg.setEnabled(0)
     scene = slicer.mrmlScene
     pNode= self.parameterNode()
@@ -179,23 +226,52 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.glyphPoints3D.Update()  
 
     inputSurface = scene.GetNodeByID("vtkMRMLModelNode4")
-
     
+
     numNodes = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLModelNode" ) 
     segmentationModel = None 
     for n in xrange(numNodes): 
       node = slicer.mrmlScene.GetNthNodeByClass( n, "vtkMRMLModelNode" ) 
       if node.GetName() == "baselineROI_segmentation_10_Post-Gyrus": 
         segmentationModel = node 
-        break 
+      if node.GetName() == "obturator": 
+        modelFromImageNode = node 
+        break
+    
+
     targetSurface = segmentationModel
+    self.templateDisplayModel = segmentationModel.GetDisplayNode()
+    self.obturatorDisplayModel = modelFromImageNode.GetDisplayNode()
+    
+    addTarget = vtk.vtkAppendPolyData()
+    addTarget.AddInput(targetSurface.GetPolyData())
+    addTarget.AddInput(modelFromImageNode.GetPolyData())
+    addTarget.Update()
+    
+    obturatorID = pNode.GetParameter('obturatorID')    
+    ObutratorNode = slicer.mrmlScene.GetNodeByID(obturatorID)
+    if ObutratorNode!=None:   
+      self.m_poly = vtk.vtkPolyData()  
+      self.m_poly.DeepCopy(ObutratorNode.GetPolyData())
+    TransformPolyDataFilter = vtk.vtkTransformPolyDataFilter()
+    Transform = vtk.vtkTransform()
+    TransformPolyDataFilter.SetInput(self.m_poly)
+    Transform.SetMatrix(self.vtkMatInitial)
+    TransformPolyDataFilter.SetTransform(Transform)
+    TransformPolyDataFilter.Update()
+    
+    addSource = vtk.vtkAppendPolyData()
+    addSource.AddInput( self.glyphInputData)
+    addSource.AddInput(TransformPolyDataFilter.GetOutput())
+    addSource.Update()
+    
     
     icpTransform = vtk.vtkIterativeClosestPointTransform()
-    icpTransform.SetSource(self.glyphInputData)
-    icpTransform.SetTarget(targetSurface.GetPolyData())
-    icpTransform.SetCheckMeanDistance(1)
+    icpTransform.SetSource(addSource.GetOutput())
+    icpTransform.SetTarget(addTarget.GetOutput())
+    icpTransform.SetCheckMeanDistance(0)
     icpTransform.SetMaximumMeanDistance(0.1)
-    icpTransform.SetMaximumNumberOfIterations(3)
+    icpTransform.SetMaximumNumberOfIterations(300)
     icpTransform.SetMaximumNumberOfLandmarks(1000)
     icpTransform.SetMeanDistanceModeToRMS()
     icpTransform.GetLandmarkTransform().SetModeToRigidBody()
@@ -205,12 +281,40 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
 
     FinalMatrix.Multiply4x4(icpTransform.GetMatrix(),self.vtkMatInitial,FinalMatrix)
     transformNode.SetAndObserveMatrixTransformToParent(FinalMatrix)
+
     self.processRegistrationCompletion()
 
   def processRegistrationCompletion(self):
     
     self.__registrationStatus.setText('Done')
     self.__secondReg.setEnabled(1)
+    self.__secondReg.setChecked(0)
+    self.__secondReg.text = "ICP Registration"
+    Helper.SetLabelVolume('None')
+    self.obturatorDisplayModel.SetVisibility(0)
+    self.templateDisplayModel.SetVisibility(0)
+    
+    # self.removeNodes()
+
+  # def removeNodes(self):
+  
+    # numNodes = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLScalarVolumeNode" ) 
+    
+    # # for n in xrange(numNodes): 
+      # # node = slicer.mrmlScene.GetNthNodeByClass( n, "vtkMRMLScalarVolumeNode" )
+      # # print n      
+      # # if node and node.GetAttribute('LabelMap') == "1": 
+        # # slicer.mrmlScene.RemoveNode(node)
+        # # print(node.GetID()," removed")
+        
+    # # numNodes2 = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLModelNode" ) 
+    # # segmentationModel = None 
+    # # for n in xrange(numNodes2): 
+      # # node = slicer.mrmlScene.GetNthNodeByClass( n, "vtkMRMLModelNode" ) 
+      # # if node.GetName() == "baselineROI_segmentation_10_Post-Gyrus": 
+        # # slicer.mrmlScene.RemoveNode(node)
+      # # if node.GetName() == "obturator":
+        # # slicer.mrmlScene.RemoveNode(node)      
   
   def onRunButtonToggled(self, checked):
     if checked:
@@ -224,22 +328,23 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     if checked:  
       self.startICP()
       self.__secondReg.text = "Processing"
-    else:
-      self.stopICP()
-      self.__secondReg.text = "ICP Registration"
+    # else:
+      # self.stopICP()
+      # self.__secondReg.text = "ICP Registration"
       
   def startICP(self):          
-    if self.timer:
-      self.stop()
-    self.timer = qt.QTimer()
-    self.timer.setInterval(2)
-    self.timer.connect('timeout()', self.ICPRegistration)
-    self.timer.start()
+    # if self.timer:
+      # self.stop()
+    # self.timer = qt.QTimer()
+    # self.timer.setInterval(2)
+    # self.timer.connect('timeout()', self.ICPRegistration)
+    # self.timer.start()
+    self.ICPRegistration()
     
-  def stopICP(self):
-    if self.timer:
-      self.timer.stop()
-      self.timer = None
+  # def stopICP(self):
+    # if self.timer:
+      # self.timer.stop()
+      # self.timer = None
     
   def stop(self):
     self.removeObservers()

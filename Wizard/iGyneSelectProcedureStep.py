@@ -9,11 +9,15 @@ class iGyneSelectProcedureStep( iGyneStep ) :
     self.skip = 1
     self.initialize( stepid )
     self.setName( '1. Select the Procedure' )
+    
+    # file = slicer.modules.igynepy.path.replace("lib/Slicer-4.1/qt-scripted-modules/iGynePy.py","Modules/Scripted/iGynePy/Wizard/python_compile_iGyneWizard_complete")
     file = slicer.modules.igynepy.path
     builddate = time.gmtime(os.path.getmtime(file))
-    versionnumber = int((builddate.tm_year - 2000)*365.25+builddate.tm_yday)
+    creationdate = int(12*365.25 + 188)# 07/07/2012
+    todaydate = int((builddate.tm_year - 2000)*365.25+builddate.tm_yday)
+    versionnumber = todaydate - creationdate
     self.version = str(versionnumber)
-    self.setDescription( 'iGyne v1.0.' + self.version + '  Last Modified:' + time.ctime(os.path.getmtime(file)) )
+    self.setDescription( 'iGyne v2.0.' + self.version + '       Last Modified: ' + time.ctime(os.path.getmtime(file)) )
     
     self.__parent = super( iGyneSelectProcedureStep, self )
 

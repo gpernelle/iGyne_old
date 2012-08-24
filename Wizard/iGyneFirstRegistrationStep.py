@@ -164,7 +164,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     # TODO: add progress reporting (BRAINSfit does not report progress though)
     pNode = self.parameterNode()
     baselineVolumeID = pNode.GetParameter('baselineVolumeID')
-    followupVolumeID = pNode.GetParameter('followupVolumeID')
+    templateID = pNode.GetParameter('templateID')
     self.__followupTransform = slicer.mrmlScene.GetNodeByID('vtkMRMLLinearTransformNode4')
     slicer.mrmlScene.AddNode(self.__followupTransform)
     sliceNodeCount = slicer.mrmlScene.GetNumberOfNodesByClass('vtkMRMLAnnotationHierarchyNode')
@@ -201,20 +201,20 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       self.firstRegButton.setEnabled(1)
   
       pNode = self.parameterNode()
-      followupNode = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('followupVolumeID'))
+      templateNode = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('templateID'))
       obturatorNode = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('obturatorID'))
       
-      df = followupNode.GetDisplayNode()
+      df = templateNode.GetDisplayNode()
       df.SetSliceIntersectionVisibility(1)
       do = obturatorNode.GetDisplayNode()
       do.SetSliceIntersectionVisibility(1)
       
       roiNode = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('roiTransformID'))
-      followupNode.SetAndObserveTransformNodeID(self.__followupTransform.GetID())
+      templateNode.SetAndObserveTransformNodeID(self.__followupTransform.GetID())
       obturatorNode.SetAndObserveTransformNodeID(self.__followupTransform.GetID())
       roiNode.SetAndObserveTransformNodeID(self.__followupTransform.GetID())
   
-      Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),pNode.GetParameter('followupVolumeID'))
+      Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
 
       pNode.SetParameter('followupTransformID', self.__followupTransform.GetID())
       self.registered = 1
@@ -306,13 +306,13 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       else:
         Helper.Error('Internal error! Error code CT-S2-NRT, please report!')
    
-      self.__followupVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('followupVolumeID'))
+      self.__template = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('templateID'))
       self.__baselineVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
       # get the roiNode from parameters node, if it exists, and initialize the
       # GUI
       self.updateWidgetFromParameterNode(pNode)
       bounds = [0,0,0,0,0,0]
-      self.__followupVolume.GetRASBounds(bounds)
+      self.__template.GetRASBounds(bounds)
       #print(bounds)
       if self.__roi != None:
         self.__roi.VisibleOn()
@@ -333,6 +333,11 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
 
       if goingTo.id() == 'SecondRegistration':
         self.doStepProcessing()
+      
+      fiducialNodes = slicer.util.getNodes('vtkMRMLAnnotationFiducialNode*')
+      for fiducialNode in fiducialNodes.values():
+        dfid = fiducialNode.GetDisplayNode()
+        dfid.SetVisibility(0)
 
     super(iGyneFirstRegistrationStep, self).onExit(goingTo, transitionType)
 
