@@ -20,6 +20,69 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.setName( '6. Needle Segmentation' )
     self.setDescription( 'Segment the needles' )
     self.__parent = super( iGyneNeedleSegmentationStep, self )
+    self.option = {0:'Ba',
+       1:'Bb',
+       2:'Bc',
+       3:'Bd',
+       4:'Be',
+       5:'Bf',
+       6:'Bg',
+       7:'Bh',
+       8:'Bi',
+       9:'Bj',
+       10:'Bk',
+       11:'Bl',
+       12:'Ca',
+       13:'Cb',
+       14:'Cc',
+       15:'Cd',
+       16:'Ce',
+       17:'Cf',
+       18:'Cg',
+       19:'Ch',
+       20:'Ci',
+       21:'Cj',
+       22:'Ck',
+       23:'Cl',
+       24:'Cm',
+       25:'Cn',
+       26:'Co',
+       27:'Cp',
+       28:'Cq',
+       29:'Cr',
+       30:'Da',
+       31:'Db',
+       32:'Dc',
+       33:'Dd',
+       34:'De',
+       35:'Df',
+       36:'Dg',
+       37:'Dh',
+       38:'Di',
+       39:'Dj',
+       40:'Ea',
+       41:'Eb',
+       42:'Ec',
+       43:'Ed',
+       44:'Ee',
+       45:'Ef',
+       46:'Eg',
+       47:'Eh',
+       48:'Aa',
+       49:'Ab',
+       50:'Ac',
+       51:'Ad',
+       52:'Ae',
+       53:'Af',
+       54:'Iu', 
+       55:'Fa',
+       56:'Fb',
+       57:'Fc',
+       58:'Fd',
+       59:'Fe',
+       60:'Ff',
+       61:'Fg',
+       62:'Fh'}
     
 
   def createUserInterface( self ):
@@ -94,7 +157,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     
     outputID = self.outputVolumeNode.GetID()
     
-    foldername = './NeedleModels/' + datetime
+    foldername = 'C:/NeedleModels/' + datetime
     
     # Set the parameters for the CLI module    
     parameters = {} 
@@ -125,6 +188,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     
     
     ##### match the needles ######
+    # self.computerPolydataAndMatrix()
     self.colorLabel()
     self.setNeedleCoordinates()
     xmin = min(self.p[0])
@@ -133,32 +197,59 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     ymax = max(self.p[1])
     xdelta= xmax - xmin
     ydelta = ymax - ymin
-    
-    for i in xrange(60):
-      
-      base=[0,0,0]
-      pathneedle = os.path.abspath("./") + foldername+'/'+str(i)+'.vtk'
-      needlenode = "needlenode" + str(i)
-      displaynode = "displaynode" + str(i)
-      needlenode = slicer.util.loadModel(pathneedle, True)
-      print pathneedle
-      if needlenode[0] == True:
-        displaynode = needlenode[1].GetDisplayNode()
-        polydata = needlenode[1].GetPolyData()
-        polydata.GetPoint(0,base)
-        print base        
+    base = [[0 for j in range(3)] for j in range(63)]
+    tip = [[0 for j in range(3)] for j in range(63)]
+    needlenode = [[0 for j in range(2)] for j in range(63)]
+    displaynode = [0 for j in range(63)]
 
-        displaynode.SliceIntersectionVisibilityOn()
+    
+    for i in xrange(63):
+      
+      
+      pathneedle = foldername+'/'+str(i)+'.vtk'
+
+      needlenode[i] = slicer.util.loadModel(pathneedle, True)
+      # print pathneedle
+      if needlenode[i][0] == True:
+        displaynode[i] = needlenode[i][1].GetDisplayNode()
+        polydata = needlenode[i][1].GetPolyData()
+        polydata.GetPoint(0,base[i]) 
+                
+      
+        displaynode[i].SliceIntersectionVisibilityOn()
         bestmatch = None
         mindist = None
         for j in xrange(63):
-          delta = ((self.p[0][j]-base[0])**2+(self.p[1][j]-base[1])**2)**(0.5)
+          delta = ((self.p[0][j]-(base[i][0]))**2+(self.p[1][j]-base[i][1])**2)**(0.5)
           if delta < mindist or mindist == None:
             bestmatch = j
             mindist = delta
+
         
+        displaynode[i].SetColor(self.color[bestmatch])
         
-        displaynode.SetColor(self.color[bestmatch])
+    for i in xrange(63):
+      if base[i] != [0,0,0]:
+        for j in xrange(63):
+          if j != i :
+            distance = (base[i][0] - base[j][0])**2 + (base[i][1] - base[j][1])**2
+            # print(i,j,distance)
+            if distance < 25:
+              iPolyData = needlenode[i][1].GetPolyData()
+              iNb = int(iPolyData.GetNumberOfPoints()-1)
+              iPolyData.GetPoint(iNb,tip[i])
+              jPolyData = needlenode[j][1].GetPolyData()
+              jNb = int(iPolyData.GetNumberOfPoints()-1)
+              jPolyData.GetPoint(jNb,tip[j])
+              
+              if tip[i][2]>=tip[j][2]:
+                displaynode[j].SetVisibility(0)
+              else:
+                displaynode[i].SetVisibility(0)
+                displaynode[i].SliceIntersectionVisibilityOff()
+                slicer.mrmlScene.RemoveNode(needlenode[i][1])
+              
+    
     
     
 
@@ -337,6 +428,28 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.p[1][61]=18
     self.p[0][62]=61
     self.p[1][62]=12
+    pNode = self.parameterNode()
+    transformNodeID = pNode.GetParameter('followupTransformID')
+    transformNode = Helper.getNodeByID(transformNodeID)
+    if transformNode != None:
+      transformMatrix = transformNode.GetMatrixTransformToParent()
+      for i in xrange(63):
+        vtkmat = vtk.vtkMatrix4x4()
+        # self.vtkmat.DeepCopy(self.m_vtkmat)
+        vtkmat.SetElement(0,3,self.p[0][i])
+        vtkmat.SetElement(1,3,self.p[1][i])
+        print "avant"
+        print vtkmat
+        vtkmat.Multiply4x4(transformMatrix,vtkmat,vtkmat)
+        print "apres"
+        print vtkmat
+        self.p[0][i] = vtkmat.GetElement(0,3)
+        self.p[1][i] = vtkmat.GetElement(1,3)
+      
+      print self.p[0]
+      print self.p[1]
+        
+        
 
   def colorLabel(self):
     self.color= [[0,0,0] for i in range(310)] 
@@ -548,3 +661,184 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     for i in range(310):
       for j in range(3):
         self.color[i][j] = self.color[i][j]/float(255)
+
+  def computerPolydataAndMatrix(self):
+
+    Cylinder = vtk.vtkCylinderSource()
+
+    Cylinder.SetResolution(1000)
+    Cylinder.SetCapping(1) 
+    Cylinder.SetHeight( float(200.0) )
+    Cylinder.SetRadius( float(1.0) )
+    self.m_polyCylinder=Cylinder.GetOutput()
+
+    self.m_vtkmat = vtk.vtkMatrix4x4()
+    self.m_vtkmat.Identity()
+
+    RestruMatrix=vtk.vtkMatrix4x4()
+    WorldMatrix=vtk.vtkMatrix4x4()
+    Restru2WorldMatrix=vtk.vtkMatrix4x4()
+
+    RestruMatrix.SetElement(0,0,0)
+    RestruMatrix.SetElement(1,0,0)
+    RestruMatrix.SetElement(2,0,0)
+    RestruMatrix.SetElement(3,0,1)
+
+    RestruMatrix.SetElement(0,1,1)
+    RestruMatrix.SetElement(1,1,0)
+    RestruMatrix.SetElement(2,1,0)
+    RestruMatrix.SetElement(3,1,1)
+
+    RestruMatrix.SetElement(0,2,0)
+    RestruMatrix.SetElement(1,2,1)
+    RestruMatrix.SetElement(2,2,0)
+    RestruMatrix.SetElement(3,2,1)
+
+    RestruMatrix.SetElement(0,3,0)
+    RestruMatrix.SetElement(1,3,0)
+    RestruMatrix.SetElement(2,3,1)
+    RestruMatrix.SetElement(3,3,1)
+
+    WorldMatrix.SetElement(0,0,0)
+    WorldMatrix.SetElement(1,0,0)
+    WorldMatrix.SetElement(2,0,0)
+    WorldMatrix.SetElement(3,0,1)
+
+    WorldMatrix.SetElement(0,1,1)
+    WorldMatrix.SetElement(1,1,0)
+    WorldMatrix.SetElement(2,1,0)
+    WorldMatrix.SetElement(3,1,1)
+
+    WorldMatrix.SetElement(0,2,0)
+    WorldMatrix.SetElement(1,2,0)
+    WorldMatrix.SetElement(2,2,-1)
+    WorldMatrix.SetElement(3,2,1)
+
+    WorldMatrix.SetElement(0,3,0)
+    WorldMatrix.SetElement(1,3,1)
+    WorldMatrix.SetElement(2,3,0)
+    WorldMatrix.SetElement(3,3,1)
+
+    WorldMatrix.Invert()
+    Restru2WorldMatrix.Multiply4x4(RestruMatrix,WorldMatrix,self.m_vtkmat)
+    
+  def showOneNeedle(self,i):
+    fidname = "fid"+self.option[i]
+    pNode = self.parameterNode()
+    needleID = pNode.GetParameter(self.option[i]+'.vtk')
+    fidID = pNode.GetParameter(fidname)    
+    NeedleNode = slicer.mrmlScene.GetNodeByID(needleID)
+    fiducialNode = slicer.mrmlScene.GetNodeByID(fidID)    
+    
+    if NeedleNode !=None:
+      displayNode =NeedleNode.GetModelDisplayNode()
+      d =NeedleNode.GetModelDisplayNode()
+      nVisibility=displayNode.GetVisibility()  
+
+      if fiducialNode == None:
+        displayNode.SetVisibility(1)    
+        displayNode.SetOpacity(0.9)
+        polyData = displayNode.GetPolyData()
+        polyData.Update()
+        nb = int(polyData.GetNumberOfPoints()-1)
+        coord = [0,0,0]
+        if nb>100:
+          fiducialNode = slicer.vtkMRMLAnnotationFiducialNode()
+          polyData.GetPoint(nb,coord)    
+          fiducialNode.SetName(self.option[i])
+          fiducialNode.SetFiducialCoordinates(coord)         
+          fiducialNode.SetAndObserveTransformNodeID(self.transformNode.GetID())
+          fiducialNode.Initialize(slicer.mrmlScene)
+          fiducialNode.SetLocked(1)
+          fiducialNode.SetSelectable(0)
+          fidDN = fiducialNode.GetDisplayNode()
+          fidDN.SetColor(NeedleNode.GetDisplayNode().GetColor())
+          fidDN.SetGlyphScale(0)
+          fidTN = fiducialNode.GetAnnotationTextDisplayNode()
+          fidTN.SetTextScale(3)
+          fidTN.SetColor(NeedleNode.GetDisplayNode().GetColor())
+          fiducialNode.SetVisible(0)
+          pNode.SetParameter(fidname,fiducialNode.GetID())
+          fiducialNode.SetVisible(1)
+
+      if nVisibility ==1:
+
+        displayNode.SetVisibility(0)
+        displayNode.SetSliceIntersectionVisibility(0)
+        if fiducialNode!=None:
+          fiducialNode.SetVisible(0)
+
+      else:
+
+        displayNode.SetVisibility(1)
+        displayNode.SetSliceIntersectionVisibility(1)
+        if fiducialNode!=None:
+          fiducialNode.SetVisible(1)
+
+    else:
+      vtkmat = vtk.vtkMatrix4x4()
+      vtkmat.DeepCopy(self.m_vtkmat)
+      vtkmat.SetElement(0,3,self.m_vtkmat.GetElement(0,3)+self.p[0][i])
+      vtkmat.SetElement(1,3,self.m_vtkmat.GetElement(1,3)+self.p[1][i])
+      vtkmat.SetElement(2,3,self.m_vtkmat.GetElement(2,3)+(30.0-150.0)/2.0)
+
+      TransformPolyDataFilter=vtk.vtkTransformPolyDataFilter()
+      Transform=vtk.vtkTransform()        
+      TransformPolyDataFilter.SetInput(self.m_polyCylinder)
+      Transform.SetMatrix(vtkmat)
+      TransformPolyDataFilter.SetTransform(Transform)
+      TransformPolyDataFilter.Update()
+
+      triangles=vtk.vtkTriangleFilter()
+      triangles.SetInput(TransformPolyDataFilter.GetOutput())  
+      self.AddModel(i,triangles.GetOutput())
+      
+  def loadNeedles(self):
+    pNode = self.parameterNode()
+    alreadyloaded = pNode.GetParameter("Needles-loaded")
+    obturatorID = pNode.GetParameter('obturatorID')    
+    ObutratorNode = slicer.mrmlScene.GetNodeByID(obturatorID)
+
+    if ObutratorNode!=None:
+      print("obturator loaded")
+      self.setNeedleCoordinates()
+      self.computerPolydataAndMatrix()    
+      
+      self.m_poly = vtk.vtkPolyData()  
+      self.m_poly.DeepCopy(ObutratorNode.GetPolyData())
+      
+      
+  def AddModel(self,i,polyData):
+    modelNode = slicer.vtkMRMLModelNode()
+    displayNode = slicer.vtkMRMLModelDisplayNode()
+    storageNode = slicer.vtkMRMLModelStorageNode()
+ 
+    fileName = self.option[i]+'.vtk'
+    print("filename:",fileName)
+
+    mrmlScene = slicer.mrmlScene
+    modelNode.SetName(fileName)  
+    modelNode.SetAndObservePolyData(polyData)
+    
+    mrmlScene.SaveStateForUndo()
+    modelNode.SetScene(mrmlScene)
+    storageNode.SetScene(mrmlScene)
+    storageNode.SetFileName(fileName)  
+    displayNode.SetScene(mrmlScene)
+    displayNode.SetVisibility(1)
+    mrmlScene.AddNode(storageNode)
+    mrmlScene.AddNode(displayNode)
+    mrmlScene.AddNode(modelNode)
+    modelNode.SetAndObserveStorageNodeID(storageNode.GetID())
+    modelNode.SetAndObserveDisplayNodeID(displayNode.GetID())
+    self.transformNode = slicer.mrmlScene.GetNodeByID("vtkMRMLLinearTransformNode4")
+    modelNode.SetAndObserveTransformNodeID(self.transformNode.GetID())
+    displayNode.SetPolyData(modelNode.GetPolyData())
+    self.colorLabel()
+    displayNode.SetColor(self.color[i])
+    displayNode.SetSliceIntersectionVisibility(0)
+    pNode= self.parameterNode()
+    pNode.SetParameter(fileName,modelNode.GetID())
+    mrmlScene.AddNode(modelNode)
+    displayNode.SetVisibility(1)
+    

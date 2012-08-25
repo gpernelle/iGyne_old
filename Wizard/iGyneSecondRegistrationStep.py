@@ -184,52 +184,10 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
         # print(self.pointId,self.vtkMatInitial )
   
   def ICPRegistration(self):
-    self.__registrationStatus.setText('Please Wait ...')
-    self.__secondReg.setEnabled(0)
-    scene = slicer.mrmlScene
-    pNode= self.parameterNode()
-    transformNodeID = pNode.GetParameter('followupTransformID')
-    transformNode = Helper.getNodeByID(transformNodeID)
-    self.vtkMatInitial = transformNode.GetMatrixTransformToParent()
-    # print(self.vtkMatInitial)
     
-    self.setPointData(50,28.019)
-    self.setPointData(40.209,24.456)
-    self.setPointData(35,14)
-    self.setPointData(24.647,15.363)
-    self.setPointData(15,19.359)
-    self.setPointData(15,88.641)
-    self.setPointData(24.647,92.637)
-    self.setPointData(35,94)
-    self.setPointData(45.353,92.637)
-    self.setPointData(55,88.641)
-    self.setPointData(55,19.359)
-    self.setPointData(45.353,15.363)
-    self.setPointData(30.642,4.19)
-    self.setPointData(22.059,5.704)
-    self.setPointData(22.059,102.296)
-    self.setPointData(30.642,103.81)
-    self.setPointData(39.358,103.81)
-    self.setPointData(47.941,102.296)
-    self.setPointData(47.941,5.704)
-    self.setPointData(39.358,4.19)
-    # print(self.glyphPoints)
-    self.glyphInputData.SetPoints(self.glyphPoints)
-    self.glyphInputData.Update()
-
-    self.glyphBalls.SetRadius(0.05)
-    self.glyphBalls.SetThetaResolution(6)
-    self.glyphBalls.SetPhiResolution(10)
-
-    self.glyphPoints3D.SetInput(self.glyphInputData)
-    self.glyphPoints3D.SetSource(self.glyphBalls.GetOutput())
-    self.glyphPoints3D.Update()  
-
-    inputSurface = scene.GetNodeByID("vtkMRMLModelNode4")
-    
-
     numNodes = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLModelNode" ) 
     segmentationModel = None 
+    modelFromImageNode = None
     for n in xrange(numNodes): 
       node = slicer.mrmlScene.GetNthNodeByClass( n, "vtkMRMLModelNode" ) 
       if node.GetName() == "baselineROI_segmentation_10_Post-Gyrus": 
@@ -237,53 +195,97 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       if node.GetName() == "obturator": 
         modelFromImageNode = node 
         break
-    
+    if modelFromImageNode != None: 
+      self.__registrationStatus.setText('Please Wait ...')
+      self.__secondReg.setEnabled(0)
+      scene = slicer.mrmlScene
+      pNode= self.parameterNode()
+      transformNodeID = pNode.GetParameter('followupTransformID')
+      transformNode = Helper.getNodeByID(transformNodeID)
+      self.vtkMatInitial = transformNode.GetMatrixTransformToParent()
+      # print(self.vtkMatInitial)
+      
+      self.setPointData(50,28.019)
+      self.setPointData(40.209,24.456)
+      self.setPointData(35,14)
+      self.setPointData(24.647,15.363)
+      self.setPointData(15,19.359)
+      self.setPointData(15,88.641)
+      self.setPointData(24.647,92.637)
+      self.setPointData(35,94)
+      self.setPointData(45.353,92.637)
+      self.setPointData(55,88.641)
+      self.setPointData(55,19.359)
+      self.setPointData(45.353,15.363)
+      self.setPointData(30.642,4.19)
+      self.setPointData(22.059,5.704)
+      self.setPointData(22.059,102.296)
+      self.setPointData(30.642,103.81)
+      self.setPointData(39.358,103.81)
+      self.setPointData(47.941,102.296)
+      self.setPointData(47.941,5.704)
+      self.setPointData(39.358,4.19)
+      # print(self.glyphPoints)
+      self.glyphInputData.SetPoints(self.glyphPoints)
+      self.glyphInputData.Update()
 
-    targetSurface = segmentationModel
-    self.templateDisplayModel = segmentationModel.GetDisplayNode()
-    self.obturatorDisplayModel = modelFromImageNode.GetDisplayNode()
-    
-    addTarget = vtk.vtkAppendPolyData()
-    addTarget.AddInput(targetSurface.GetPolyData())
-    addTarget.AddInput(modelFromImageNode.GetPolyData())
-    addTarget.Update()
-    
-    obturatorID = pNode.GetParameter('obturatorID')    
-    ObutratorNode = slicer.mrmlScene.GetNodeByID(obturatorID)
-    if ObutratorNode!=None:   
-      self.m_poly = vtk.vtkPolyData()  
-      self.m_poly.DeepCopy(ObutratorNode.GetPolyData())
-    TransformPolyDataFilter = vtk.vtkTransformPolyDataFilter()
-    Transform = vtk.vtkTransform()
-    TransformPolyDataFilter.SetInput(self.m_poly)
-    Transform.SetMatrix(self.vtkMatInitial)
-    TransformPolyDataFilter.SetTransform(Transform)
-    TransformPolyDataFilter.Update()
-    
-    addSource = vtk.vtkAppendPolyData()
-    addSource.AddInput( self.glyphInputData)
-    addSource.AddInput(TransformPolyDataFilter.GetOutput())
-    addSource.Update()
-    
-    
-    icpTransform = vtk.vtkIterativeClosestPointTransform()
-    icpTransform.SetSource(addSource.GetOutput())
-    icpTransform.SetTarget(addTarget.GetOutput())
-    icpTransform.SetCheckMeanDistance(0)
-    icpTransform.SetMaximumMeanDistance(0.1)
-    icpTransform.SetMaximumNumberOfIterations(300)
-    icpTransform.SetMaximumNumberOfLandmarks(1000)
-    icpTransform.SetMeanDistanceModeToRMS()
-    icpTransform.GetLandmarkTransform().SetModeToRigidBody()
-    icpTransform.Update()
-    self.nIterations = icpTransform.GetNumberOfIterations()
-    FinalMatrix = vtk.vtkMatrix4x4()
+      self.glyphBalls.SetRadius(0.05)
+      self.glyphBalls.SetThetaResolution(6)
+      self.glyphBalls.SetPhiResolution(10)
 
-    FinalMatrix.Multiply4x4(icpTransform.GetMatrix(),self.vtkMatInitial,FinalMatrix)
-    transformNode.SetAndObserveMatrixTransformToParent(FinalMatrix)
+      self.glyphPoints3D.SetInput(self.glyphInputData)
+      self.glyphPoints3D.SetSource(self.glyphBalls.GetOutput())
+      self.glyphPoints3D.Update()  
 
-    self.processRegistrationCompletion()
+      inputSurface = scene.GetNodeByID("vtkMRMLModelNode4")
 
+      targetSurface = segmentationModel
+      self.templateDisplayModel = segmentationModel.GetDisplayNode()
+      self.obturatorDisplayModel = modelFromImageNode.GetDisplayNode()
+      
+      addTarget = vtk.vtkAppendPolyData()
+      addTarget.AddInput(targetSurface.GetPolyData())
+      addTarget.AddInput(modelFromImageNode.GetPolyData())
+      addTarget.Update()
+      
+      obturatorID = pNode.GetParameter('obturatorID')    
+      ObutratorNode = slicer.mrmlScene.GetNodeByID(obturatorID)
+      if ObutratorNode!=None:   
+        self.m_poly = vtk.vtkPolyData()  
+        self.m_poly.DeepCopy(ObutratorNode.GetPolyData())
+      TransformPolyDataFilter = vtk.vtkTransformPolyDataFilter()
+      Transform = vtk.vtkTransform()
+      TransformPolyDataFilter.SetInput(self.m_poly)
+      Transform.SetMatrix(self.vtkMatInitial)
+      TransformPolyDataFilter.SetTransform(Transform)
+      TransformPolyDataFilter.Update()
+      
+      addSource = vtk.vtkAppendPolyData()
+      addSource.AddInput( self.glyphInputData)
+      addSource.AddInput(TransformPolyDataFilter.GetOutput())
+      addSource.Update()
+      
+      icpTransform = vtk.vtkIterativeClosestPointTransform()
+      icpTransform.SetSource(addSource.GetOutput())
+      icpTransform.SetTarget(addTarget.GetOutput())
+      icpTransform.SetCheckMeanDistance(0)
+      icpTransform.SetMaximumMeanDistance(0.1)
+      icpTransform.SetMaximumNumberOfIterations(300)
+      icpTransform.SetMaximumNumberOfLandmarks(1000)
+      icpTransform.SetMeanDistanceModeToRMS()
+      icpTransform.GetLandmarkTransform().SetModeToRigidBody()
+      icpTransform.Update()
+      self.nIterations = icpTransform.GetNumberOfIterations()
+      FinalMatrix = vtk.vtkMatrix4x4()
+
+      FinalMatrix.Multiply4x4(icpTransform.GetMatrix(),self.vtkMatInitial,FinalMatrix)
+      transformNode.SetAndObserveMatrixTransformToParent(FinalMatrix)
+
+      self.processRegistrationCompletion()
+    else:
+      messageBox = qt.QMessageBox.warning( self, 'Error','Please make a model named "obturator"')
+      self.__secondReg.setChecked(0)
+      self.__secondReg.text = "ICP Registration"
   def processRegistrationCompletion(self):
     
     self.__registrationStatus.setText('Done')
