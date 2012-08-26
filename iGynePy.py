@@ -1,15 +1,22 @@
 from __main__ import vtk, qt, ctk, slicer
-
+import os.path,time
 import iGyneWizard
 
 class iGynePy:
   def __init__( self, parent ):
     parent.title = """iGynePy"""
     parent.categories = ["""Wizards"""]
-    parent.contributors = ["""Andrey Fedorov""", """Xiaojun Chen""", """Guillaume Pernelle""", """Ron Kikinis"""]
-    parent.helpText = """ Igyne help....""";
-    parent.acknowledgementText = """blabla"""
-  
+    parent.contributors = ["""Xiaojun Chen""", """Yi Gao""", """Guillaume Pernelle""", """Tina Kapur""", """Jan Egger""", """Carolina Vale"""]
+    parent.helpText = """ Good Luck!""";
+    
+    file = slicer.app.slicerHome + "/lib/Slicer-4.1/qt-scripted-modules/iGynePy.py"
+    builddate = time.gmtime(os.path.getmtime(file))
+    creationdate = int(12*365.25 + 188)# 07/07/2012
+    todaydate = int((builddate.tm_year - 2000)*365.25+builddate.tm_yday)
+    versionnumber = todaydate - creationdate
+    self.version = str(versionnumber)
+
+    parent.acknowledgementText = """ Version : """ + 'iGyne v2.0.' + self.version + ' ----   Last Modified: ' + time.ctime(os.path.getmtime(file))
     self.parent = parent
 
 class iGynePyWidget:

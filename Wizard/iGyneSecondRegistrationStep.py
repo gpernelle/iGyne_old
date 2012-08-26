@@ -56,12 +56,9 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.trianglesOutput = vtk.vtkPolyData()
     self.TransformPolyDataFilter=vtk.vtkTransformPolyDataFilter()
     self.Transform=vtk.vtkTransform()
-    # self.transformNode = vtk.vtkMRMLLinearTransformNode()
-       
-    # initialize VR stuff
     self.__roiSegmentationNode = None
     self.__roiVolume = None
-    self.transform = slicer.mrmlScene.GetNodeByID("vtkMRMLLinearTransformNode4")
+    self.regIter = 0
     
 
   def createUserInterface( self ):
@@ -129,18 +126,29 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     # self.fiducialButton.checkable = True
     # self.__layout.addRow(self.fiducialButton)
     # self.fiducialButton.connect('toggled(bool)', self.onRunButtonToggled)
-    self.iter=0
-    self.obturatorSlider = ctk.ctkSliderWidget()
-    self.obturatorSlider.minimum = -10
-    self.obturatorSlider.maximum = 300
-    self.obturatorSlider.singleStep = 1
-    self.obturatorSlider.value = 0
-    self.obturatorSlider.connect('valueChanged(double)', self.pushObturator)
-    self.__layout.addRow(self.obturatorSlider)
+    # self.iter=0
+    # self.obturatorSlider = ctk.ctkSliderWidget()
+    # self.obturatorSlider.minimum = -10
+    # self.obturatorSlider.maximum = 300
+    # self.obturatorSlider.singleStep = 1
+    # self.obturatorSlider.value = 0
+    # self.obturatorSlider.connect('valueChanged(double)', self.pushObturator)
+    # self.__layout.addRow(self.obturatorSlider)
     
+    # Obturator SpinBox
+    
+    self.pushObturatorValueButton = qt.QSpinBox()
+    self.pushObturatorValueButton.setMinimum(-500)
+    self.pushObturatorValueButton.setMaximum(500)
+    
+    fLabel = qt.QLabel("Pull Obturator: ")
+    self.__layout.addRow(fLabel,self.pushObturatorValueButton)
+    self.pushObturatorValueButton.connect('valueChanged(int)', self.pushObturator)
+    
+
   def pushObturator(self):
     
-    nDepth = self.obturatorSlider.value-self.pos0
+    nDepth = self.pushObturatorValueButton.value-self.pos0
     pNode=self.parameterNode()
     mrmlScene=slicer.mrmlScene  
     obturatorID = pNode.GetParameter('obturatorID')
@@ -150,9 +158,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       self.m_poly.DeepCopy(self.ObturatorNode.GetPolyData())
     
     vtkmat = vtk.vtkMatrix4x4()
-    print nDepth
     vtkmat.SetElement(2,3,nDepth)
-
     
     self.TransformPolyDataFilter.SetInput(self.m_poly)
     self.Transform.SetMatrix(vtkmat)
@@ -163,10 +169,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     triangles=vtk.vtkTriangleFilter()
     triangles.SetInput(self.TransformPolyDataFilter.GetOutput())
     self.ObturatorNode.SetAndObservePolyData(triangles.GetOutput())
-    self.pos0 = self.obturatorSlider.value
-
-    self.iter +=1
-    print self.iter    
+    self.pos0 = self.pushObturatorValueButton.value   
  
   def setPointData(self,fHoleOriginX,fHoleOriginY):
     fTipPoint,fTipPointTrans=[0,0,0,0],[0,0,0,0]
@@ -185,6 +188,14 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
   
   def ICPRegistration(self):
     
+    if self.regIter==0:
+      nbIteration = 20
+    elif self.regIter==1:
+      nbIteration = 100
+    else:
+      nbIteration = 300
+    
+    
     numNodes = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLModelNode" ) 
     segmentationModel = None 
     modelFromImageNode = None
@@ -200,9 +211,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       self.__secondReg.setEnabled(0)
       scene = slicer.mrmlScene
       pNode= self.parameterNode()
-      transformNodeID = pNode.GetParameter('followupTransformID')
-      transformNode = Helper.getNodeByID(transformNodeID)
-      self.vtkMatInitial = transformNode.GetMatrixTransformToParent()
+
+      self.vtkMatInitial = self.transform.GetMatrixTransformToParent()
       # print(self.vtkMatInitial)
       
       self.setPointData(50,28.019)
@@ -270,7 +280,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       icpTransform.SetTarget(addTarget.GetOutput())
       icpTransform.SetCheckMeanDistance(0)
       icpTransform.SetMaximumMeanDistance(0.1)
-      icpTransform.SetMaximumNumberOfIterations(300)
+      icpTransform.SetMaximumNumberOfIterations(nbIteration)
       icpTransform.SetMaximumNumberOfLandmarks(1000)
       icpTransform.SetMeanDistanceModeToRMS()
       icpTransform.GetLandmarkTransform().SetModeToRigidBody()
@@ -279,19 +289,18 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       FinalMatrix = vtk.vtkMatrix4x4()
 
       FinalMatrix.Multiply4x4(icpTransform.GetMatrix(),self.vtkMatInitial,FinalMatrix)
-      transformNode.SetAndObserveMatrixTransformToParent(FinalMatrix)
+      self.transform.SetAndObserveMatrixTransformToParent(FinalMatrix)
 
       self.processRegistrationCompletion()
     else:
       messageBox = qt.QMessageBox.warning( self, 'Error','Please make a model named "obturator"')
       self.__secondReg.setChecked(0)
-      self.__secondReg.text = "ICP Registration"
+      self.__secondReg.text = "ICP Registration " + str(self.regIter + 1) + "?"
   def processRegistrationCompletion(self):
     
     self.__registrationStatus.setText('Done')
     self.__secondReg.setEnabled(1)
     self.__secondReg.setChecked(0)
-    self.__secondReg.text = "ICP Registration"
     Helper.SetLabelVolume('None')
     self.obturatorDisplayModel.SetVisibility(0)
     self.templateDisplayModel.SetVisibility(0)
@@ -329,7 +338,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
   def onICPButtonToggled(self,checked):
     if checked:  
       self.startICP()
-      self.__secondReg.text = "Processing"
+      self.regIter += 1
     # else:
       # self.stopICP()
       # self.__secondReg.text = "ICP Registration"
@@ -521,6 +530,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     else:
       Helper.Error('Unexpected parameter values! Error CT-S03-SNA. Please report')
     self.__roiSegmentationNode = Helper.getNodeByID(segmentationID)
+    transformNodeID = pNode.GetParameter('followupTransformID')
+    self.transform = Helper.getNodeByID(transformNodeID)
 
  
   def start(self):    
@@ -556,8 +567,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     ######################################  transformation  ##########################
     scene = slicer.mrmlScene
     pNode= self.parameterNode()
-    transformNodeID = pNode.GetParameter('followupTransformID')
-    self.transform = Helper.getNodeByID(transformNodeID)
+
     if self.sliceWidgetsPerStyle.has_key(observee):
       sliceWidget = self.sliceWidgetsPerStyle[observee]
       style = sliceWidget.sliceView().interactorStyle()

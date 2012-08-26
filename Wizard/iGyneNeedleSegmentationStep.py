@@ -20,6 +20,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.setName( '6. Needle Segmentation' )
     self.setDescription( 'Segment the needles' )
     self.__parent = super( iGyneNeedleSegmentationStep, self )
+    self.analysisGroupBox = None
     self.option = {0:'Ba',
        1:'Bb',
        2:'Bc',
@@ -92,10 +93,17 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     pNode = self.parameterNode()
     self.__layout = self.__parent.createUserInterface()
     
+    #  editor widgetRepresentation
+    self.__editorFrame = ctk.ctkCollapsibleButton()
+    self.__editorFrame.text = "Editor"
+    self.__editorFrame.collapsed = 0
+    editorFrame = qt.QFormLayout(self.__editorFrame)
+    self.__layout.addRow(self.__editorFrame)
+    
     groupbox = qt.QGroupBox()
     groupboxLayout  = qt.QFormLayout(groupbox)
     groupboxLayout.addRow(slicer.modules.editor.widgetRepresentation())
-    self.__layout.addRow(groupbox)
+    editorFrame.addRow(groupbox)
     
     needleLabel = qt.QLabel( 'Needle Label:' )
     self.__needleLabelSelector = slicer.qMRMLNodeComboBox()
@@ -124,13 +132,362 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
                         self.__volumeSelector, 'setMRMLScene(vtkMRMLScene*)')
 
 	
-	#Segment Needle Button 
+	  #Segment Needle Button 
     self.needleButton = qt.QPushButton('Segment Needles')
     self.__layout.addRow(self.needleButton)
     self.needleButton.connect('clicked()', self.needleSegmentation)
     
     self.updateWidgetFromParameters(self.parameterNode())
     
+    
+  	#Filter Needles Button
+    self.__filterFrame = ctk.ctkCollapsibleButton()
+    self.__filterFrame.text = "Filter Needles"
+    self.__filterFrame.collapsed = 1
+    filterFrame = qt.QFormLayout(self.__filterFrame)
+    self.__layout.addRow(self.__filterFrame)
+    # Filter spin box
+    self.filterValueButton = qt.QSpinBox()
+    self.filterValueButton.setMaximum(500)
+    fLabel = qt.QLabel("Max Deviation Value: ")
+    
+   
+    self.removeDuplicates = qt.QCheckBox('Remove duplicates by segmenting')
+    self.removeDuplicates.setChecked(1)
+    self.removeDuplicatesButton = qt.QPushButton('Remove duplicates')
+    self.removeDuplicatesButton.connect('clicked()', self.positionFilteringNeedles)
+    
+    filterNeedlesButton = qt.QPushButton('Filter Needles')
+    filterNeedlesButton.connect('clicked()', self.angleFilteringNeedles)
+    
+    
+    
+    filterFrame.addRow(self.removeDuplicates)
+    filterFrame.addRow(self.removeDuplicatesButton)
+    
+    filterFrame.addRow(fLabel,self.filterValueButton)
+    filterFrame.addRow(filterNeedlesButton)
+    
+    self.displayFiducialButton = qt.QPushButton('Display Labels On Needles')
+    self.displayFiducialButton.connect('clicked()',self.displayFiducial)
+    self.analysisReportButton = qt.QPushButton('Print Analysis')
+    self.analysisReportButton.connect('clicked()',self.analyzeSegmentation)
+    
+    
+    self.__layout.addRow(self.displayFiducialButton)
+    self.__layout.addRow(self.analysisReportButton)
+    
+  
+  def analyzeSegmentation(self):
+  
+    if self.analysisGroupBox != None:
+      self.__layout.removeWidget(self.analysisGroupBox)
+      self.analysisGroupBox.deleteLater()
+      self.analysisGroupBox = None
+    self.analysisGroupBox = qt.QGroupBox()
+    self.analysisGroupBox.setTitle( 'Segmentation Report' )
+    self.__layout.addRow( self.analysisGroupBox )
+    self.analysisGroupBoxLayout = qt.QFormLayout( self.analysisGroupBox )
+    if self.transform !=None :
+      # transformation matrix
+      m = self.transform.GetMatrixTransformToParent()
+      m_t = vtk.vtkMatrix4x4()
+      m_t.DeepCopy(m)
+      
+      # data from a the first planned-needle found
+      modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
+      stop = 1
+      for modelNode in modelNodes.values():
+        if modelNode.GetAttribute("planned") == "1" and stop:
+          stop = 0
+          polyData = modelNode.GetPolyData()
+          polyData.Update()
+          nb = polyData.GetNumberOfPoints()
+          base = [0,0,0]
+          tip = [0,0,0]
+          polyData.GetPoint(nb-1,tip)
+          polyData.GetPoint(0,base)
+          # evaluate the angle after the coordinate system transformation - used after as reference
+          vtkmat = vtk.vtkMatrix4x4()              
+          vtkmat.SetElement(0,3,base[0])       
+          vtkmat.SetElement(1,3,base[1])
+          vtkmat.SetElement(2,3,base[2])       
+          m_t.Multiply4x4(m_t,vtkmat,vtkmat)
+          base[0] = vtkmat.GetElement(0,3)      
+          base[1] = vtkmat.GetElement(1,3)
+          base[2] = vtkmat.GetElement(2,3)
+          vtkmat = vtk.vtkMatrix4x4()              
+          vtkmat.SetElement(0,3,tip[0])       
+          vtkmat.SetElement(1,3,tip[1]) 
+          vtkmat.SetElement(2,3,tip[2])      
+          m_t.Multiply4x4(m_t,vtkmat,vtkmat)
+          tip[0] = vtkmat.GetElement(0,3)       
+          tip[1] = vtkmat.GetElement(1,3)
+          tip[2] = vtkmat.GetElement(2,3)
+
+          phi1 = math.degrees(math.acos((tip[0]-base[0])/((tip[0]*-base[0])**2+(tip[1]-base[1])**2)**0.5))
+          theta1 = math.degrees(math.acos((tip[1]-base[1])/((tip[1]-base[1])**2+(tip[2]-base[2])**2)**0.5))
+          psi1 = math.degrees(math.acos((tip[0]-base[0])/((tip[0]*-base[0])**2+(tip[2]-base[2])**2)**0.5))
+           
+
+      m = vtk.vtkMatrix4x4()
+      volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+      volumeNode.GetIJKToRASMatrix(m)
+      m.Invert()
+      imageData = volumeNode.GetImageData()
+      indice=0
+      
+      modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
+      for modelNode in modelNodes.values():
+        displayNode = modelNode.GetDisplayNode()
+        if modelNode.GetAttribute("segmented") == "1" and displayNode.GetVisibility()==1:        
+          polyData = modelNode.GetPolyData()
+          polyData.Update()
+          nb = polyData.GetNumberOfPoints()
+          ijk=[0,0,0]
+          ras=[0,0,0]
+          total=0
+          for i in range(nb):
+            polyData.GetPoint(i,ras)
+            k = vtk.vtkMatrix4x4()
+            o = vtk.vtkMatrix4x4()
+            k.SetElement(0,3,ras[0])
+            k.SetElement(1,3,ras[1])
+            k.SetElement(2,3,ras[2])
+            k.Multiply4x4(m,k,o)
+            ijk[0] = int(round(o.GetElement(0,3)))
+            ijk[1] = int(round(o.GetElement(1,3)))
+            ijk[2] = int(round(o.GetElement(2,3)))
+            pixelValue = imageData.GetScalarComponentAsDouble(ijk[0], ijk[1], ijk[2], 0)
+            total += pixelValue
+          indice = total/float(nb-1)
+
+          polyData = modelNode.GetPolyData()
+          polyData.Update()
+          nb = polyData.GetNumberOfPoints()
+          base = [0,0,0]
+          tip = [0,0,0]
+          polyData.GetPoint(nb-1,tip)
+          polyData.GetPoint(0,base)
+          phi = math.degrees(math.acos((tip[0]-base[0])/((tip[0]*-base[0])**2+(tip[1]*100-base[1]*100)**2)**0.5))
+          theta = math.degrees(math.acos((tip[1]-base[1])/((tip[1]-base[1])**2+(tip[2]-base[2])**2)**0.5))
+          psi = math.degrees(math.acos((tip[0]-base[0])/((tip[0]-base[0])**2+(tip[2]-base[2])**2)**0.5))
+          angleDeviation = (phi1-phi)**2+(theta1-theta)**2+(psi1-psi)**2
+
+          result = "Needle " + self.option[int(modelNode.GetAttribute("nth"))] + ": Angle Deviation from ref: " + str(angleDeviation)+" Intensity average :" + str(indice) 
+          analysisLine = qt.QLabel(result)
+          self.analysisGroupBoxLayout.addRow(analysisLine)
+        
+    else:
+    
+      m = vtk.vtkMatrix4x4()
+      volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+      volumeNode.GetIJKToRASMatrix(m)
+      m.Invert()
+      imageData = volumeNode.GetImageData()
+      
+      modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
+      for modelNode in modelNodes.values():
+        displayNode = modelNode.GetDisplayNode()
+        if modelNode.GetAttribute("segmented") == "1" and displayNode.GetVisibility()==1:        
+          polyData = modelNode.GetPolyData()
+          polyData.Update()
+          nb = polyData.GetNumberOfPoints()
+          ijk=[0,0,0]
+          ras=[0,0,0]
+          total=0
+          for i in range(nb):
+            polyData.GetPoint(i,ras)
+            k = vtk.vtkMatrix4x4()
+            o = vtk.vtkMatrix4x4()
+            k.SetElement(0,3,ras[0])
+            k.SetElement(1,3,ras[1])
+            k.SetElement(2,3,ras[2])
+            k.Multiply4x4(m,k,o)
+            ijk[0] = int(round(o.GetElement(0,3)))
+            ijk[1] = int(round(o.GetElement(1,3)))
+            ijk[2] = int(round(o.GetElement(2,3)))
+            pixelValue = imageData.GetScalarComponentAsDouble(ijk[0], ijk[1], ijk[2], 0)
+            total += pixelValue
+        
+          indice = total/float(nb-1) 
+     
+          
+          result = "Needle " + self.option[int(modelNode.GetAttribute("nth"))]  +" Intensity average :" + str(indice)
+          analysisLine = qt.QLabel(result)
+          self.analysisGroupBoxLayout.addRow(analysisLine)
+      
+  
+  def angleDeviationEvaluation(self, modelNode):
+    if self.transform !=None :
+      # transformation matrix
+      m = self.transform.GetMatrixTransformToParent()
+      m_t = vtk.vtkMatrix4x4()
+      m_t.DeepCopy(m)
+      
+      # data from a the first planned-needle found
+      modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
+      stop = 1
+      for modelNode in modelNodes.values():
+        if modelNode.GetAttribute("planned") == "1" and stop:
+          stop = 0
+          polyData = modelNode.GetPolyData()
+          polyData.Update()
+          nb = polyData.GetNumberOfPoints()
+          base = [0,0,0]
+          tip = [0,0,0]
+          polyData.GetPoint(nb-1,tip)
+          polyData.GetPoint(0,base)
+          # evaluate the angle after the coordinate system transformation - used after as reference
+          vtkmat = vtk.vtkMatrix4x4()              
+          vtkmat.SetElement(0,3,base[0])       
+          vtkmat.SetElement(1,3,base[1])
+          vtkmat.SetElement(2,3,base[2])       
+          m_t.Multiply4x4(m_t,vtkmat,vtkmat)
+          base[0] = vtkmat.GetElement(0,3)      
+          base[1] = vtkmat.GetElement(1,3)
+          base[2] = vtkmat.GetElement(2,3)
+          vtkmat = vtk.vtkMatrix4x4()              
+          vtkmat.SetElement(0,3,tip[0])       
+          vtkmat.SetElement(1,3,tip[1]) 
+          vtkmat.SetElement(2,3,tip[2])      
+          m_t.Multiply4x4(m_t,vtkmat,vtkmat)
+          tip[0] = vtkmat.GetElement(0,3)       
+          tip[1] = vtkmat.GetElement(1,3)
+          tip[2] = vtkmat.GetElement(2,3)
+
+          phi1 = math.degrees(math.acos((tip[0]-base[0])/((tip[0]*-base[0])**2+(tip[1]-base[1])**2)**0.5))
+          theta1 = math.degrees(math.acos((tip[1]-base[1])/((tip[1]-base[1])**2+(tip[2]-base[2])**2)**0.5))
+          psi1 = math.degrees(math.acos((tip[0]-base[0])/((tip[0]*-base[0])**2+(tip[2]-base[2])**2)**0.5))
+
+      modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
+      for modelNode in modelNodes.values():
+        displayNode = modelNode.GetDisplayNode()
+        if modelNode.GetAttribute("segmented") == "1" and displayNode.GetVisibility()==1:
+          polyData = modelNode.GetPolyData()
+          polyData.Update()
+          nb = polyData.GetNumberOfPoints()
+          base = [0,0,0]
+          tip = [0,0,0]
+          polyData.GetPoint(nb-1,tip)
+          polyData.GetPoint(0,base)
+          phi = math.degrees(math.acos((tip[0]-base[0])/((tip[0]*-base[0])**2+(tip[1]*100-base[1]*100)**2)**0.5))
+          theta = math.degrees(math.acos((tip[1]-base[1])/((tip[1]-base[1])**2+(tip[2]-base[2])**2)**0.5))
+          psi = math.degrees(math.acos((tip[0]-base[0])/((tip[0]-base[0])**2+(tip[2]-base[2])**2)**0.5))
+          self.angleDeviation = (phi1-phi)**2+(theta1-theta)**2+(psi1-psi)**2  
+  
+  def positionFilteringNeedles(self):
+    
+    # remove "duplicates"
+    
+    for i in xrange(63):
+      if self.base[i] != [0,0,0]:
+        for j in xrange(63):
+          if j != i :
+            distance = (self.base[i][0] - self.base[j][0])**2 + (self.base[i][1] - self.base[j][1])**2
+            # print(i,j,distance)
+            if distance < 25:
+              iPolyData = self.needlenode[i][1].GetPolyData()
+              iNb = int(iPolyData.GetNumberOfPoints()-1)
+              iPolyData.GetPoint(iNb,self.tip[i])
+              jPolyData = self.needlenode[j][1].GetPolyData()
+              jNb = int(iPolyData.GetNumberOfPoints()-1)
+              jPolyData.GetPoint(jNb,self.tip[j])
+              
+              if self.tip[i][2]>=self.tip[j][2]:
+                self.displaynode[j].SetVisibility(0)
+              else:
+                self.displaynode[i].SetVisibility(0)
+                self.displaynode[i].SliceIntersectionVisibilityOff()
+                slicer.mrmlScene.RemoveNode(self.needlenode[i][1])
+                
+    self.removeDuplicatesButton.setEnabled(0)
+    self.removeDuplicatesButton.setChecked(1)
+
+  
+ 
+  def angleFilteringNeedles(self):
+    
+    # transformation matrix
+    m = self.transform.GetMatrixTransformToParent()
+    m_t = vtk.vtkMatrix4x4()
+    m_t.DeepCopy(m)
+    
+    # data from a the first planned-needle found
+    modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
+    stop = 1
+    for modelNode in modelNodes.values():
+      if modelNode.GetAttribute("planned") == "1" and stop:
+        stop = 0
+        polyData = modelNode.GetPolyData()
+        polyData.Update()
+        nb = polyData.GetNumberOfPoints()
+        base = [0,0,0]
+        tip = [0,0,0]
+        polyData.GetPoint(nb-1,tip)
+        polyData.GetPoint(0,base)
+        # evaluate the angle after the coordinate system transformation - used after as reference
+        vtkmat = vtk.vtkMatrix4x4()              
+        vtkmat.SetElement(0,3,base[0])       
+        vtkmat.SetElement(1,3,base[1])
+        vtkmat.SetElement(2,3,base[2])       
+        m_t.Multiply4x4(m_t,vtkmat,vtkmat)
+        base[0] = vtkmat.GetElement(0,3)      
+        base[1] = vtkmat.GetElement(1,3)
+        base[2] = vtkmat.GetElement(2,3)
+        vtkmat = vtk.vtkMatrix4x4()              
+        vtkmat.SetElement(0,3,tip[0])       
+        vtkmat.SetElement(1,3,tip[1]) 
+        vtkmat.SetElement(2,3,tip[2])      
+        m_t.Multiply4x4(m_t,vtkmat,vtkmat)
+        tip[0] = vtkmat.GetElement(0,3)       
+        tip[1] = vtkmat.GetElement(1,3)
+        tip[2] = vtkmat.GetElement(2,3)
+
+        phi1 = math.degrees(math.acos((tip[0]-base[0])/((tip[0]*-base[0])**2+(tip[1]-base[1])**2)**0.5))
+        theta1 = math.degrees(math.acos((tip[1]-base[1])/((tip[1]-base[1])**2+(tip[2]-base[2])**2)**0.5))
+        psi1 = math.degrees(math.acos((tip[0]-base[0])/((tip[0]*-base[0])**2+(tip[2]-base[2])**2)**0.5))
+    
+    # data from segmented-needles and angle evaluation
+    modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
+    for modelNode in modelNodes.values():
+      displayNode = modelNode.GetDisplayNode()
+      if modelNode.GetAttribute("segmented") == "1":
+        polyData = modelNode.GetPolyData()
+        polyData.Update()
+        nb = polyData.GetNumberOfPoints()
+        base = [0,0,0]
+        tip = [0,0,0]
+        polyData.GetPoint(nb-1,tip)
+        polyData.GetPoint(0,base)
+        phi = math.degrees(math.acos((tip[0]-base[0])/((tip[0]*-base[0])**2+(tip[1]*100-base[1]*100)**2)**0.5))
+        theta = math.degrees(math.acos((tip[1]-base[1])/((tip[1]-base[1])**2+(tip[2]-base[2])**2)**0.5))
+        psi = math.degrees(math.acos((tip[0]-base[0])/((tip[0]-base[0])**2+(tip[2]-base[2])**2)**0.5))
+        angleDeviation = (phi1-phi)**2+(theta1-theta)**2+(psi1-psi)**2
+        print("diff angle:",angleDeviation)
+        
+        
+        displayNode = modelNode.GetDisplayNode()
+        i = modelNode.GetAttribute("nth")
+        if angleDeviation >= self.filterValueButton.value :
+          displayNode.SetVisibility(0)
+          if i !=None and self.fiducialnode[int(i)]!=0:
+            self.fiducialnode[int(i)].SetVisible(0)
+        else:
+          displayNode.SetVisibility(1)
+          if i !=None and self.fiducialnode[int(i)]!=0:
+            self.fiducialnode[int(i)].SetVisible(1)
+      
+      # display/hide label+needle
+      nVisibility = displayNode.GetVisibility()
+      
+      if nVisibility == 1:
+        displayNode.SliceIntersectionVisibilityOn()
+      else:
+        displayNode.SliceIntersectionVisibilityOff()
+        
+        
+  
   def needleSegmentation(self):
     scene = slicer.mrmlScene
     pNode = self.parameterNode()
@@ -157,7 +514,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     
     outputID = self.outputVolumeNode.GetID()
     
-    foldername = 'C:/NeedleModels/' + datetime
+    foldername = '/NeedleModels/' + datetime
     
     # Set the parameters for the CLI module    
     parameters = {} 
@@ -168,95 +525,99 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     module = slicer.modules.mainlabelneedletrackingcli 
     self.__cliNode = None
     self.__cliNode = slicer.cli.run(module, None, parameters, wait_for_completion=True)
-    
-    boundsAll=[0,0,0,0,0,0]
-    
-    d = slicer.mrmlScene.GetNodeByID(outputID).GetDisplayNode()
-    p = slicer.mrmlScene.GetNodeByID(outputID).GetPolyData()
-    p.GetBounds(boundsAll)
-    Xdelta = abs(boundsAll[1]-boundsAll[0])
-    Ydelta = abs(boundsAll[3]-boundsAll[2])
-    Xmin = boundsAll[0]
-    Ymin = boundsAll[2]
-    d.SetVisibility(1)
-    dd = slicer.mrmlScene.GetNodeByID(inputLabelID).GetDisplayNode()
-    color = dd.GetColorNodeID()
-    
-    d.SetScalarVisibility(1)
-    d.SetActiveScalarName('NeedleLabel')
-    d.SetAndObserveColorNodeID(color)
-    
+        
     
     ##### match the needles ######
-    # self.computerPolydataAndMatrix()
+
     self.colorLabel()
     self.setNeedleCoordinates()
+    self.computerPolydataAndMatrix()
     xmin = min(self.p[0])
     xmax = max(self.p[0])
     ymin = min(self.p[1])
     ymax = max(self.p[1])
     xdelta= xmax - xmin
     ydelta = ymax - ymin
-    base = [[0 for j in range(3)] for j in range(63)]
-    tip = [[0 for j in range(3)] for j in range(63)]
-    needlenode = [[0 for j in range(2)] for j in range(63)]
-    displaynode = [0 for j in range(63)]
+    self.base = [[0 for j in range(3)] for j in range(63)]
+    self.tip = [[0 for j in range(3)] for j in range(63)]
+    self.needlenode = [[0 for j in range(2)] for j in range(63)]
+    self.displaynode = [0 for j in range(63)]
+    self.fiducialnode = [0 for j in range(63)]
 
-    
     for i in xrange(63):
       
       
       pathneedle = foldername+'/'+str(i)+'.vtk'
 
-      needlenode[i] = slicer.util.loadModel(pathneedle, True)
+      self.needlenode[i] = slicer.util.loadModel(pathneedle, True)
       # print pathneedle
-      if needlenode[i][0] == True:
-        displaynode[i] = needlenode[i][1].GetDisplayNode()
-        polydata = needlenode[i][1].GetPolyData()
-        polydata.GetPoint(0,base[i]) 
+      if self.needlenode[i][0] == True:
+        self.displaynode[i] = self.needlenode[i][1].GetDisplayNode()
+        polydata = self.needlenode[i][1].GetPolyData()
+        polydata.GetPoint(0,self.base[i]) 
                 
       
-        displaynode[i].SliceIntersectionVisibilityOn()
+        self.displaynode[i].SliceIntersectionVisibilityOn()
         bestmatch = None
         mindist = None
         for j in xrange(63):
-          delta = ((self.p[0][j]-(base[i][0]))**2+(self.p[1][j]-base[i][1])**2)**(0.5)
+          delta = ((self.p[0][j]-(self.base[i][0]))**2+(self.p[1][j]-self.base[i][1])**2)**(0.5)
           if delta < mindist or mindist == None:
             bestmatch = j
             mindist = delta
 
-        
-        displaynode[i].SetColor(self.color[bestmatch])
-        
-    for i in xrange(63):
-      if base[i] != [0,0,0]:
-        for j in xrange(63):
-          if j != i :
-            distance = (base[i][0] - base[j][0])**2 + (base[i][1] - base[j][1])**2
-            # print(i,j,distance)
-            if distance < 25:
-              iPolyData = needlenode[i][1].GetPolyData()
-              iNb = int(iPolyData.GetNumberOfPoints()-1)
-              iPolyData.GetPoint(iNb,tip[i])
-              jPolyData = needlenode[j][1].GetPolyData()
-              jNb = int(iPolyData.GetNumberOfPoints()-1)
-              jPolyData.GetPoint(jNb,tip[j])
-              
-              if tip[i][2]>=tip[j][2]:
-                displaynode[j].SetVisibility(0)
-              else:
-                displaynode[i].SetVisibility(0)
-                displaynode[i].SliceIntersectionVisibilityOff()
-                slicer.mrmlScene.RemoveNode(needlenode[i][1])
-              
+        self.showOneNeedle(i,0)
+        self.displaynode[i].SetColor(self.color[bestmatch])
+        self.needlenode[i][1].SetName(self.option[bestmatch]+"_segmented")
+        self.needlenode[i][1].SetAttribute("segmented","1")
+        self.needlenode[i][1].SetAttribute("nth",str(bestmatch))
     
-    
-    
+    if self.removeDuplicates.isChecked():
+      self.positionFilteringNeedles()
 
-    
+    d = slicer.mrmlScene.GetNodeByID(outputID).GetDisplayNode()
     d.SetVisibility(0)
     
+    self.__editorFrame.collapsed = 1
     
+  def displayFiducial(self):
+    
+    modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
+    for modelNode in modelNodes.values():
+      displayNode = modelNode.GetDisplayNode()
+      if modelNode.GetAttribute("segmented") == "1" and modelNode.GetAttribute("nth")!=None:
+        # if self.transform != None:
+        if 1:
+          i = int(modelNode.GetAttribute("nth"))
+          if self.fiducialnode[i] == 0:    
+            polyData = displayNode.GetPolyData()
+            nb = int(polyData.GetNumberOfPoints()-1)
+            coord = [0,0,0]
+            if nb>10:
+              self.fiducialnode[i] = slicer.vtkMRMLAnnotationFiducialNode()
+              polyData.GetPoint(nb,coord)    
+              self.fiducialnode[i].SetName(self.option[i])
+              self.fiducialnode[i].SetFiducialCoordinates(coord)         
+              self.fiducialnode[i].Initialize(slicer.mrmlScene)
+              self.fiducialnode[i].SetLocked(1)
+              self.fiducialnode[i].SetSelectable(0)
+              fidDN = self.fiducialnode[i].GetDisplayNode()
+              fidDN.SetColor(modelNode.GetDisplayNode().GetColor())
+              fidDN.SetGlyphScale(0)
+              fidTN = self.fiducialnode[i].GetAnnotationTextDisplayNode()
+              fidTN.SetTextScale(3)
+              fidTN.SetColor(modelNode.GetDisplayNode().GetColor())
+              
+              self.fiducialnode[i].SetVisible(modelNode.GetDisplayNode().GetVisibility())
+          else:    
+            if modelNode.GetDisplayNode().GetVisibility():
+               self.fiducialnode[i].SetVisible(abs(self.fiducialnode[i].GetVisible()-1))
+            if self.fiducialnode[i].GetVisible()==1:
+              self.displayFiducialButton.text = "Hide Labels on Needles"
+            else:
+              self.displayFiducialButton.text = "Display Labels on Needles"
+
+              
   def validate( self, desiredBranchId ):
     '''
     '''
@@ -298,7 +659,9 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
 
   def updateWidgetFromParameters(self, pNode):
   
-    baselineVolume = Helper.getNodeByID(pNode.GetParameter('baselineVolumeID'))
+    self.baselineVolume = Helper.getNodeByID(pNode.GetParameter('baselineVolumeID'))
+    transformNodeID = pNode.GetParameter('followupTransformID')
+    self.transform = Helper.getNodeByID(transformNodeID)
     
   def setNeedleCoordinates(self):
     self.p = [[0 for j in range(63)] for j in range(3)]
@@ -438,11 +801,9 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         # self.vtkmat.DeepCopy(self.m_vtkmat)
         vtkmat.SetElement(0,3,self.p[0][i])
         vtkmat.SetElement(1,3,self.p[1][i])
-        print "avant"
-        print vtkmat
+
         vtkmat.Multiply4x4(transformMatrix,vtkmat,vtkmat)
-        print "apres"
-        print vtkmat
+
         self.p[0][i] = vtkmat.GetElement(0,3)
         self.p[1][i] = vtkmat.GetElement(1,3)
       
@@ -722,7 +1083,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     WorldMatrix.Invert()
     Restru2WorldMatrix.Multiply4x4(RestruMatrix,WorldMatrix,self.m_vtkmat)
     
-  def showOneNeedle(self,i):
+  def showOneNeedle(self,i,visibility):
     fidname = "fid"+self.option[i]
     pNode = self.parameterNode()
     needleID = pNode.GetParameter(self.option[i]+'.vtk')
@@ -747,7 +1108,8 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
           polyData.GetPoint(nb,coord)    
           fiducialNode.SetName(self.option[i])
           fiducialNode.SetFiducialCoordinates(coord)         
-          fiducialNode.SetAndObserveTransformNodeID(self.transformNode.GetID())
+          if self.transform != None:
+            fiducialNode.SetAndObserveTransformNodeID(self.transform.GetID())
           fiducialNode.Initialize(slicer.mrmlScene)
           fiducialNode.SetLocked(1)
           fiducialNode.SetSelectable(0)
@@ -761,7 +1123,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
           pNode.SetParameter(fidname,fiducialNode.GetID())
           fiducialNode.SetVisible(1)
 
-      if nVisibility ==1:
+      if visibility ==0:
 
         displayNode.SetVisibility(0)
         displayNode.SetSliceIntersectionVisibility(0)
@@ -792,6 +1154,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       triangles=vtk.vtkTriangleFilter()
       triangles.SetInput(TransformPolyDataFilter.GetOutput())  
       self.AddModel(i,triangles.GetOutput())
+      self.showOneNeedle(i,visibility)
       
   def loadNeedles(self):
     pNode = self.parameterNode()
@@ -819,6 +1182,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     mrmlScene = slicer.mrmlScene
     modelNode.SetName(fileName)  
     modelNode.SetAndObservePolyData(polyData)
+    modelNode.SetAttribute("planned","1")
     
     mrmlScene.SaveStateForUndo()
     modelNode.SetScene(mrmlScene)
@@ -831,8 +1195,8 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     mrmlScene.AddNode(modelNode)
     modelNode.SetAndObserveStorageNodeID(storageNode.GetID())
     modelNode.SetAndObserveDisplayNodeID(displayNode.GetID())
-    self.transformNode = slicer.mrmlScene.GetNodeByID("vtkMRMLLinearTransformNode4")
-    modelNode.SetAndObserveTransformNodeID(self.transformNode.GetID())
+    if self.transform != None:
+      modelNode.SetAndObserveTransformNodeID(self.transform.GetID())
     displayNode.SetPolyData(modelNode.GetPolyData())
     self.colorLabel()
     displayNode.SetColor(self.color[i])

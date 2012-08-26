@@ -2118,6 +2118,8 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
   def updateWidgetFromParameters(self, pNode):
   
     baselineVolume = Helper.getNodeByID(pNode.GetParameter('baselineVolumeID'))
+    transformNodeID = pNode.GetParameter('followupTransformID')
+    self.transform = Helper.getNodeByID(transformNodeID)
     
   
 ###############################################################################
@@ -3636,7 +3638,7 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
           polyData.GetPoint(nb,coord)    
           fiducialNode.SetName(self.option[i])
           fiducialNode.SetFiducialCoordinates(coord)         
-          fiducialNode.SetAndObserveTransformNodeID(self.transformNode.GetID())
+          fiducialNode.SetAndObserveTransformNodeID(self.transform.GetID())
           fiducialNode.Initialize(slicer.mrmlScene)
           fiducialNode.SetLocked(1)
           fiducialNode.SetSelectable(0)
@@ -3925,8 +3927,8 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
       collide.SetInput(0,ModelFromImageNode.GetPolyData())
       collide.SetMatrix(0, matrix0)
 
-      transformNode = mrmlScene.GetNodeByID("vtkMRMLLinearTransformNode6")
-      vtkmatInitial = transformNode.GetMatrixTransformToParent()
+      
+      vtkmatInitial = self.transform.GetMatrixTransformToParent()
 
       nContacts=0
       for i in xrange(63):
@@ -4086,8 +4088,8 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     mrmlScene.AddNode(modelNode)
     modelNode.SetAndObserveStorageNodeID(storageNode.GetID())
     modelNode.SetAndObserveDisplayNodeID(displayNode.GetID())
-    self.transformNode = slicer.mrmlScene.GetNodeByID("vtkMRMLLinearTransformNode4")
-    modelNode.SetAndObserveTransformNodeID(self.transformNode.GetID())
+    
+    modelNode.SetAndObserveTransformNodeID(self.transform.GetID())
     displayNode.SetPolyData(modelNode.GetPolyData())
     self.colorLabel()
     displayNode.SetColor(self.color[i])
