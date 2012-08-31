@@ -21,6 +21,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.setDescription( 'Segment the needles' )
     self.__parent = super( iGyneNeedleSegmentationStep, self )
     self.analysisGroupBox = None
+    self.buttonsGroupBox = None
     self.option = {0:'Ba',
        1:'Bb',
        2:'Bc',
@@ -273,7 +274,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
           theta = math.degrees(math.acos((tip[1]-base[1])/((tip[1]-base[1])**2+(tip[2]-base[2])**2)**0.5))
           psi = math.degrees(math.acos((tip[0]-base[0])/((tip[0]-base[0])**2+(tip[2]-base[2])**2)**0.5))
           angleDeviation = (phi1-phi)**2+(theta1-theta)**2+(psi1-psi)**2
-
+        
           result = "Needle " + self.option[int(modelNode.GetAttribute("nth"))] + ": Angle Deviation from ref: " + str(angleDeviation)+" Intensity average :" + str(indice) 
           analysisLine = qt.QLabel(result)
           self.analysisGroupBoxLayout.addRow(analysisLine)
@@ -311,7 +312,17 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
             total += pixelValue
         
           indice = total/float(nb-1) 
-     
+          polyData = modelNode.GetPolyData()
+          polyData.Update()
+          nb = polyData.GetNumberOfPoints()
+          base = [0,0,0]
+          tip = [0,0,0]
+          polyData.GetPoint(nb-1,tip)
+          polyData.GetPoint(0,base)
+          phi = math.degrees(math.acos((tip[0]-base[0])/((tip[0]*-base[0])**2+(tip[1]*100-base[1]*100)**2)**0.5))
+          theta = math.degrees(math.acos((tip[1]-base[1])/((tip[1]-base[1])**2+(tip[2]-base[2])**2)**0.5))
+          psi = math.degrees(math.acos((tip[0]-base[0])/((tip[0]-base[0])**2+(tip[2]-base[2])**2)**0.5))
+          print tip[0]-base[0],tip[1]-base[1],tip[2]-base[2]
           
           result = "Needle " + self.option[int(modelNode.GetAttribute("nth"))]  +" Intensity average :" + str(indice)
           analysisLine = qt.QLabel(result)
@@ -485,6 +496,8 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         displayNode.SliceIntersectionVisibilityOn()
       else:
         displayNode.SliceIntersectionVisibilityOff()
+    
+    self.addButtons()
         
         
   
@@ -580,6 +593,75 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     
     self.__editorFrame.collapsed = 1
     
+    self.addButtons()
+  
+  def addButtons(self):
+    if self.buttonsGroupBox != None:
+      self.__layout.removeWidget(self.buttonsGroupBox)
+      self.buttonsGroupBox.deleteLater()
+      self.buttonsGroupBox = None
+    self.buttonsGroupBox = qt.QGroupBox()
+    self.buttonsGroupBox.setTitle( 'Manage Needles' )
+    self.__layout.addRow( self.buttonsGroupBox )
+    self.buttonsGroupBoxLayout = qt.QFormLayout( self.buttonsGroupBox )
+    
+    modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
+    for modelNode in modelNodes.values():
+      if modelNode.GetAttribute("segmented") == "1":
+        i = int(modelNode.GetAttribute("nth"))
+        buttonDisplay = qt.QPushButton("Hide "+self.option[i])
+        buttonDisplay.checkable = True
+        buttonDisplay.connect("clicked()", lambda who=i: self.displayNeedle(who))
+        buttonReformat = qt.QPushButton("Reformat "+self.option[i])
+        buttonReformat.connect("clicked()", lambda who=i: self.reformatNeedle(who))
+        self.buttonsGroupBoxLayout.addRow(buttonDisplay,buttonReformat)
+      
+
+  def displayNeedle(self,i):
+    modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
+    for modelNode in modelNodes.values():
+      if modelNode.GetAttribute("nth")==str(i):
+        print str(i)
+        displayNode = modelNode.GetModelDisplayNode()
+        nVisibility = displayNode.GetVisibility()
+        print nVisibility
+        if nVisibility:
+          displayNode.SliceIntersectionVisibilityOff()
+          displayNode.SetVisibility(0)
+        else:
+          displayNode.SliceIntersectionVisibilityOn()
+          displayNode.SetVisibility(1)
+          
+  def reformatNeedle(self,i):
+    modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
+    for modelNode in modelNodes.values():
+      if modelNode.GetAttribute("nth")==str(i):
+        polyData = modelNode.GetPolyData()
+        nb = polyData.GetNumberOfPoints()
+        base = [0,0,0]
+        tip = [0,0,0]
+        polyData.GetPoint(nb-1,tip)
+        polyData.GetPoint(0,base)
+        phi = math.degrees(math.acos((tip[0]-base[0])/((tip[0]*-base[0])**2+(tip[1]*100-base[1]*100)**2)**0.5))
+        theta = math.degrees(math.acos((tip[1]-base[1])/((tip[1]-base[1])**2+(tip[2]-base[2])**2)**0.5))
+        psi = math.degrees(math.acos((tip[0]-base[0])/((tip[0]-base[0])**2+(tip[2]-base[2])**2)**0.5))
+        print base[0],tip[0],base[1],tip[1],base[2],tip[2]
+        a,b,c = tip[0]-base[0],tip[1]-base[1],tip[2]-base[2]
+        print '---------'
+        
+        sGreen = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeGreen")
+
+        reformatLogic = slicer.vtkSlicerReformatLogic()
+        sGreen.SetSliceVisible(1)
+        reformatLogic.SetSliceNormal(sGreen,0,-c/b,1)
+        m= sGreen.GetSliceToRAS()
+        m.SetElement(1,3,base[1])
+        m.SetElement(2,3,base[2])
+        sGreen.Modified()
+
+      
+        
+  
   def displayFiducial(self):
     
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
@@ -1093,7 +1175,6 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     
     if NeedleNode !=None:
       displayNode =NeedleNode.GetModelDisplayNode()
-      d =NeedleNode.GetModelDisplayNode()
       nVisibility=displayNode.GetVisibility()  
 
       if fiducialNode == None:
