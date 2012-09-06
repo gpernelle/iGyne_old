@@ -2112,17 +2112,13 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
       # self.onThresholdChanged()
       pNode.SetParameter('currentStep', self.stepid)
       self.loadNeedles()
-    
-
 
   def updateWidgetFromParameters(self, pNode):
   
     baselineVolume = Helper.getNodeByID(pNode.GetParameter('baselineVolumeID'))
     transformNodeID = pNode.GetParameter('followupTransformID')
     self.transform = Helper.getNodeByID(transformNodeID)
-    
-  
-###############################################################################
+      
 #################################################################################
   def createSpinbox(self, popup, popupSpinbox):
 
@@ -2276,6 +2272,22 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     Cylinder.SetHeight( float(200.0) )
     Cylinder.SetRadius( float(1.0) )
     self.m_polyCylinder=Cylinder.GetOutput()
+    
+    
+    quad = vtk.vtkQuadric()
+    quad.SetCoefficients(1,0.15,1,0,0,0,0,1,0,0)
+    sample = vtk.vtkSampleFunction()
+    sample.SetModelBounds(-30,30,-30,30,-30,30)
+    sample.SetCapping(0)
+    sample.SetComputeNormals(1)
+    sample.SetSampleDimensions(50,50,50)
+    sample.SetImplicitFunction(quad)
+    contour = vtk.vtkContourFilter()
+    contour.SetInputConnection(sample.GetOutputPort())
+    contour.ComputeNormalsOn()
+    contour.ComputeScalarsOn()
+    contour.GenerateValues(10,0,100)
+    self.m_polyRadiation = contour.GetOutput()
 
     self.m_vtkmat = vtk.vtkMatrix4x4()
     self.m_vtkmat.Identity()
@@ -2325,8 +2337,8 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     WorldMatrix.SetElement(3,3,1)
 
     WorldMatrix.Invert()
-    Restru2WorldMatrix.Multiply4x4(RestruMatrix,WorldMatrix,self.m_vtkmat)
 
+    Restru2WorldMatrix.Multiply4x4(RestruMatrix,WorldMatrix,self.m_vtkmat)
   ##-----------------------------------------------------------------------------
   def showIuNeedle(self):
 
@@ -3623,7 +3635,6 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     
     if NeedleNode !=None:
       displayNode =NeedleNode.GetModelDisplayNode()
-      d =NeedleNode.GetModelDisplayNode()
       nVisibility=displayNode.GetVisibility()  
 
       if fiducialNode == None:
@@ -3670,56 +3681,23 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
           fiducialNode.SetVisible(1)
 
     else:
-      vtkmat = vtk.vtkMatrix4x4()
-      vtkmat.DeepCopy(self.m_vtkmat)
-      vtkmat.SetElement(0,3,self.m_vtkmat.GetElement(0,3)+self.p[0][i])
-      vtkmat.SetElement(1,3,self.m_vtkmat.GetElement(1,3)+self.p[1][i])
-      vtkmat.SetElement(2,3,self.m_vtkmat.GetElement(2,3)+(30.0-150.0)/2.0)
+        
+      self.AddModel(i)
 
-      TransformPolyDataFilter=vtk.vtkTransformPolyDataFilter()
-      Transform=vtk.vtkTransform()        
-      TransformPolyDataFilter.SetInput(self.m_polyCylinder)
-      Transform.SetMatrix(vtkmat)
-      TransformPolyDataFilter.SetTransform(Transform)
-      TransformPolyDataFilter.Update()
-
-      triangles=vtk.vtkTriangleFilter()
-      triangles.SetInput(TransformPolyDataFilter.GetOutput())  
-      self.AddModel(i,triangles.GetOutput())
       
       self.showOneNeedle(i,RadioButton)
       self.showOneNeedle(i,RadioButton)
     
-
-  
-
-  # ##-----------------------------------------------------------------------------
-  # def showOneNeedle(self,i,bShowNeedels):
-
-    # filename= "vtkMRMLModelNode"+str(i+6)
-    # mrmlScene=slicer.mrmlScene
-    # NeedleNode = mrmlScene.GetNodeByID(filename)
-    # if NeedleNode !=None:
-      # displayNode =NeedleNode.GetModelDisplayNode()
-
-      # if bShowNeedels:
-        # displayNode.SetVisibility(1)
-        # displayNode.SetSliceIntersectionVisibility(1)    
-
-      # else:
-        # displayNode.SetVisibility(0)
-        # displayNode.SetSliceIntersectionVisibility(0)    
-
-
   ##-----------------------------------------------------------------------------
+
   def pushOneNeedle(self,i,nDepth):
 
     pNode = self.parameterNode()
     needleID = pNode.GetParameter(self.option[i]+'.vtk')  
+    radID = pNode.GetParameter('Rad'+self.option[i]+'.vtk')  
     NeedleNode = slicer.mrmlScene.GetNodeByID(needleID)
-    print NeedleNode.GetID()
+    RadNode = slicer.mrmlScene.GetNodeByID(radID)
     
-
     vtkmat = vtk.vtkMatrix4x4()
     vtkmat.DeepCopy(self.m_vtkmat) 
 
@@ -3733,13 +3711,24 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     Transform.SetMatrix(vtkmat)
     TransformPolyDataFilter.SetTransform(Transform)
     TransformPolyDataFilter.Update()
-
+    
     triangles=vtk.vtkTriangleFilter()
     triangles.SetInput(TransformPolyDataFilter.GetOutput())
+    
     if NeedleNode !=None:
       NeedleNode.SetAndObservePolyData(triangles.GetOutput())
-      print("push",nDepth)
+      
+    vtkmat.SetElement(2,3,self.m_vtkmat.GetElement(2,3)+20-nDepth)
+    TransformPolyDataFilter=vtk.vtkTransformPolyDataFilter()
+    Transform=vtk.vtkTransform()
+    TransformPolyDataFilter.SetInput(self.m_polyRadiation)
+    Transform.SetMatrix(vtkmat)
+    TransformPolyDataFilter.SetTransform(Transform)
+    TransformPolyDataFilter.Update()
     
+    if RadNode !=None:
+      RadNode.SetAndObservePolyData(TransformPolyDataFilter.GetOutput())
+      
   ##-----------------------------------------------------------------------------
   def setOneNeedleColor(self,i,ColorPushButton):
 
@@ -3770,146 +3759,6 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
           fidTN = fiducialNode.GetAnnotationTextDisplayNode()
           fidTN.SetColor(displayNode.GetColor())
        
-
-  #-----------------------------------------------------------------------------
-  # def showNeedles(self):
-
-    # if self.ShowNeedlesPushButton.isChecked():
-      # for i in xrange(63): 
-        # self.showOneNeedle(i,True)
-
-      # self.ShowNeedlesPushButton.setChecked(True)
-      # self.IuRadioButton.setChecked(True)
-      # self.AaRadioButton.setChecked(True)
-      # self.AbRadioButton.setChecked(True)
-      # self.AcRadioButton.setChecked(True)
-      # self.AdRadioButton.setChecked(True)
-      # self.AeRadioButton.setChecked(True)
-      # self.AfRadioButton.setChecked(True)
-      # self.BaRadioButton.setChecked(True)
-      # self.BbRadioButton.setChecked(True)
-      # self.BcRadioButton.setChecked(True)
-      # self.BdRadioButton.setChecked(True)
-      # self.BeRadioButton.setChecked(True)
-      # self.BfRadioButton.setChecked(True)
-      # self.BgRadioButton.setChecked(True)
-      # self.BhRadioButton.setChecked(True)
-      # self.BiRadioButton.setChecked(True)
-      # self.BjRadioButton.setChecked(True)
-      # self.BkRadioButton.setChecked(True)
-      # self.BlRadioButton.setChecked(True)
-      # self.CaRadioButton.setChecked(True)
-      # self.CbRadioButton.setChecked(True)
-      # self.CcRadioButton.setChecked(True)
-      # self.CdRadioButton.setChecked(True)
-      # self.CeRadioButton.setChecked(True)
-      # self.CfRadioButton.setChecked(True)
-      # self.CgRadioButton.setChecked(True)
-      # self.ChRadioButton.setChecked(True)
-      # self.CiRadioButton.setChecked(True)
-      # self.CjRadioButton.setChecked(True)
-      # self.CkRadioButton.setChecked(True)
-      # self.ClRadioButton.setChecked(True)
-      # self.CmRadioButton.setChecked(True)
-      # self.CnRadioButton.setChecked(True)
-      # self.CoRadioButton.setChecked(True)
-      # self.CpRadioButton.setChecked(True)
-      # self.CqRadioButton.setChecked(True)
-      # self.CrRadioButton.setChecked(True)
-      # self.DaRadioButton.setChecked(True)
-      # self.DbRadioButton.setChecked(True)
-      # self.DcRadioButton.setChecked(True)
-      # self.DdRadioButton.setChecked(True)
-      # self.DeRadioButton.setChecked(True)
-      # self.DfRadioButton.setChecked(True)
-      # self.DgRadioButton.setChecked(True)
-      # self.DhRadioButton.setChecked(True)
-      # self.DiRadioButton.setChecked(True)
-      # self.DjRadioButton.setChecked(True)
-      # self.EaRadioButton.setChecked(True)
-      # self.EbRadioButton.setChecked(True)
-      # self.EcRadioButton.setChecked(True)
-      # self.EdRadioButton.setChecked(True)
-      # self.EeRadioButton.setChecked(True)
-      # self.EfRadioButton.setChecked(True)
-      # self.EgRadioButton.setChecked(True)
-      # self.EhRadioButton.setChecked(True)
-      # self.FaRadioButton.setChecked(True)
-      # self.FbRadioButton.setChecked(True)
-      # self.FcRadioButton.setChecked(True)
-      # self.FdRadioButton.setChecked(True)
-      # self.FeRadioButton.setChecked(True)
-      # self.FfRadioButton.setChecked(True)
-      # self.FgRadioButton.setChecked(True)
-      # self.FhRadioButton.setChecked(True)
-    # else:
-      # for i in xrange(63):
-        # self.showOneNeedle(i,False)
-
-      # self.ShowNeedlesPushButton.setChecked(False)
-      # self.IuRadioButton.setChecked(False)
-      # self.AaRadioButton.setChecked(False)
-      # self.AbRadioButton.setChecked(False)
-      # self.AcRadioButton.setChecked(False)
-      # self.AdRadioButton.setChecked(False)
-      # self.AeRadioButton.setChecked(False)
-      # self.AfRadioButton.setChecked(False)
-      # self.BaRadioButton.setChecked(False)
-      # self.BbRadioButton.setChecked(False)
-      # self.BcRadioButton.setChecked(False)
-      # self.BdRadioButton.setChecked(False)
-      # self.BeRadioButton.setChecked(False)
-      # self.BfRadioButton.setChecked(False)
-      # self.BgRadioButton.setChecked(False)
-      # self.BhRadioButton.setChecked(False)
-      # self.BiRadioButton.setChecked(False)
-      # self.BjRadioButton.setChecked(False)
-      # self.BkRadioButton.setChecked(False)
-      # self.BlRadioButton.setChecked(False)
-      # self.CaRadioButton.setChecked(False)
-      # self.CbRadioButton.setChecked(False)
-      # self.CcRadioButton.setChecked(False)
-      # self.CdRadioButton.setChecked(False)
-      # self.CeRadioButton.setChecked(False)
-      # self.CfRadioButton.setChecked(False)
-      # self.CgRadioButton.setChecked(False)
-      # self.ChRadioButton.setChecked(False)
-      # self.CiRadioButton.setChecked(False)
-      # self.CjRadioButton.setChecked(False)
-      # self.CkRadioButton.setChecked(False)
-      # self.ClRadioButton.setChecked(False)
-      # self.CmRadioButton.setChecked(False)
-      # self.CnRadioButton.setChecked(False)
-      # self.CoRadioButton.setChecked(False)
-      # self.CpRadioButton.setChecked(False)
-      # self.CqRadioButton.setChecked(False)
-      # self.CrRadioButton.setChecked(False)
-      # self.DaRadioButton.setChecked(False)
-      # self.DbRadioButton.setChecked(False)
-      # self.DcRadioButton.setChecked(False)
-      # self.DdRadioButton.setChecked(False)
-      # self.DeRadioButton.setChecked(False)
-      # self.DfRadioButton.setChecked(False)
-      # self.DgRadioButton.setChecked(False)
-      # self.DhRadioButton.setChecked(False)
-      # self.DiRadioButton.setChecked(False)
-      # self.DjRadioButton.setChecked(False)
-      # self.EaRadioButton.setChecked(False)
-      # self.EbRadioButton.setChecked(False)
-      # self.EcRadioButton.setChecked(False)
-      # self.EdRadioButton.setChecked(False)
-      # self.EeRadioButton.setChecked(False)
-      # self.EfRadioButton.setChecked(False)
-      # self.EgRadioButton.setChecked(False)
-      # self.EhRadioButton.setChecked(False)
-      # self.FaRadioButton.setChecked(False)
-      # self.FbRadioButton.setChecked(False)
-      # self.FcRadioButton.setChecked(False)
-      # self.FdRadioButton.setChecked(False)
-      # self.FeRadioButton.setChecked(False)
-      # self.FfRadioButton.setChecked(False)
-      # self.FgRadioButton.setChecked(False)
-      # self.FhRadioButton.setChecked(False)
 
   def selectNeedles(self):
 
@@ -4065,7 +3914,24 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
       self.m_poly.DeepCopy(ObutratorNode.GetPolyData())
       
       
-  def AddModel(self,i,polyData):
+  def AddModel(self,i):
+  
+    vtkmat = vtk.vtkMatrix4x4()
+    vtkmat.DeepCopy(self.m_vtkmat)
+    vtkmat.SetElement(0,3,self.m_vtkmat.GetElement(0,3)+self.p[0][i])
+    vtkmat.SetElement(1,3,self.m_vtkmat.GetElement(1,3)+self.p[1][i])
+    vtkmat.SetElement(2,3,self.m_vtkmat.GetElement(2,3)-60)
+
+    TransformPolyDataFilter=vtk.vtkTransformPolyDataFilter()
+    Transform=vtk.vtkTransform()        
+    TransformPolyDataFilter.SetInput(self.m_polyCylinder)
+    Transform.SetMatrix(vtkmat)
+    TransformPolyDataFilter.SetTransform(Transform)
+    TransformPolyDataFilter.Update()
+
+    triangles=vtk.vtkTriangleFilter()
+    triangles.SetInput(TransformPolyDataFilter.GetOutput())
+  
     modelNode = slicer.vtkMRMLModelNode()
     displayNode = slicer.vtkMRMLModelDisplayNode()
     storageNode = slicer.vtkMRMLModelStorageNode()
@@ -4075,7 +3941,7 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
 
     mrmlScene = slicer.mrmlScene
     modelNode.SetName(fileName)  
-    modelNode.SetAndObservePolyData(polyData)
+    modelNode.SetAndObservePolyData(triangles.GetOutput())
     
     mrmlScene.SaveStateForUndo()
     modelNode.SetScene(mrmlScene)
@@ -4098,9 +3964,60 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     pNode.SetParameter(fileName,modelNode.GetID())
     mrmlScene.AddNode(modelNode)
     displayNode.SetVisibility(1)
+    self.AddRadiation(i,modelNode.GetID())
     
+  def AddRadiation(self,i,needleID):
+  
+    vtkmat = vtk.vtkMatrix4x4()
+    vtkmat.DeepCopy(self.m_vtkmat)
+    vtkmat.SetElement(0,3,self.m_vtkmat.GetElement(0,3)+self.p[0][i])
+    vtkmat.SetElement(1,3,self.m_vtkmat.GetElement(1,3)+self.p[1][i])
+    vtkmat.SetElement(2,3,self.m_vtkmat.GetElement(2,3)-150)
 
+    TransformPolyDataFilter=vtk.vtkTransformPolyDataFilter()
+    Transform=vtk.vtkTransform()        
+    TransformPolyDataFilter.SetInput(self.m_polyRadiation)
+    Transform.SetMatrix(vtkmat)
+    TransformPolyDataFilter.SetTransform(Transform)
+    TransformPolyDataFilter.Update()
+  
+    modelNode = slicer.vtkMRMLModelNode()
+    displayNode = slicer.vtkMRMLModelDisplayNode()
+    storageNode = slicer.vtkMRMLModelStorageNode()
+ 
+    fileName = 'Rad_'+self.option[i]+'.vtk'
 
+    mrmlScene = slicer.mrmlScene
+    modelNode.SetName(fileName)
+    modelNode.SetAttribute("radiation","planned")
+    modelNode.SetAttribute("needleID",str(needleID))    
+    modelNode.SetAndObservePolyData(TransformPolyDataFilter.GetOutput())
+    
+    mrmlScene.SaveStateForUndo()
+    modelNode.SetScene(mrmlScene)
+    storageNode.SetScene(mrmlScene)
+    storageNode.SetFileName(fileName)  
+    displayNode.SetScene(mrmlScene)
+    displayNode.SetVisibility(1)
+    mrmlScene.AddNode(storageNode)
+    mrmlScene.AddNode(displayNode)
+    mrmlScene.AddNode(modelNode)
+    modelNode.SetAndObserveStorageNodeID(storageNode.GetID())
+    modelNode.SetAndObserveDisplayNodeID(displayNode.GetID())
+    
+    modelNode.SetAndObserveTransformNodeID(self.transform.GetID())
+    displayNode.SetPolyData(modelNode.GetPolyData())
+
+    displayNode.SetSliceIntersectionVisibility(1)
+    displayNode.SetScalarVisibility(1)
+    displayNode.SetActiveScalarName('scalars')
+    displayNode.SetScalarRange(0,230)
+    displayNode.SetOpacity(0.1)
+    displayNode.SetAndObserveColorNodeID('vtkMRMLColorTableNodeFileHotToColdRainbow.txt')
+    displayNode.SetBackfaceCulling(0)
+    pNode= self.parameterNode()
+    pNode.SetParameter(fileName,modelNode.GetID())
+    mrmlScene.AddNode(modelNode)
 
   def colorLabel(self):
     self.color= [[0,0,0] for i in range(310)]
@@ -4314,6 +4231,8 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
       for j in range(3):
         self.color255[i][j] = self.color[i][j]
         self.color[i][j] = self.color[i][j]/float(255)
-    
-    
 
+
+
+  
+ 

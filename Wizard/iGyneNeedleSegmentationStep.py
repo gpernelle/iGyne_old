@@ -132,15 +132,13 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       self.__layout.connect('mrmlSceneChanged(vtkMRMLScene*)',
                         self.__volumeSelector, 'setMRMLScene(vtkMRMLScene*)')
 
-	
-	  #Segment Needle Button 
+    #Segment Needle Button 
     self.needleButton = qt.QPushButton('Segment Needles')
     self.__layout.addRow(self.needleButton)
     self.needleButton.connect('clicked()', self.needleSegmentation)
     
     self.updateWidgetFromParameters(self.parameterNode())
-    
-    
+      
   	#Filter Needles Button
     self.__filterFrame = ctk.ctkCollapsibleButton()
     self.__filterFrame.text = "Filter Needles"
@@ -152,7 +150,6 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.filterValueButton.setMaximum(500)
     fLabel = qt.QLabel("Max Deviation Value: ")
     
-   
     self.removeDuplicates = qt.QCheckBox('Remove duplicates by segmenting')
     self.removeDuplicates.setChecked(1)
     self.removeDuplicatesButton = qt.QPushButton('Remove duplicates')
@@ -160,8 +157,6 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     
     filterNeedlesButton = qt.QPushButton('Filter Needles')
     filterNeedlesButton.connect('clicked()', self.angleFilteringNeedles)
-    
-    
     
     filterFrame.addRow(self.removeDuplicates)
     filterFrame.addRow(self.removeDuplicatesButton)
@@ -171,14 +166,39 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     
     self.displayFiducialButton = qt.QPushButton('Display Labels On Needles')
     self.displayFiducialButton.connect('clicked()',self.displayFiducial)
+    self.displayRadPlannedButton = qt.QPushButton('Hide Radiation On Planned Needles')
+    self.displayRadPlannedButton.checkable = True
+    self.displayRadPlannedButton.connect('clicked()',self.displayRadPlanned)
+    self.displayRadSegmentedButton = qt.QPushButton('Hide Radiation On Segmented Needles')
+    self.displayRadSegmentedButton.checkable = True
+    self.displayRadSegmentedButton.connect('clicked()',self.displayRadSegmented)
     self.analysisReportButton = qt.QPushButton('Print Analysis')
     self.analysisReportButton.connect('clicked()',self.analyzeSegmentation)
     
     
     self.__layout.addRow(self.displayFiducialButton)
+    self.__layout.addRow(self.displayRadPlannedButton)
+    self.__layout.addRow(self.displayRadSegmentedButton)
     self.__layout.addRow(self.analysisReportButton)
     
-  
+  def displayRadPlanned(self):
+    modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
+    for modelNode in modelNodes.values():
+      displayNode = modelNode.GetDisplayNode()
+      if modelNode.GetAttribute("radiation") == "planned":
+        needleNode = slicer.mrmlScene.GetNodeByID(modelNode.GetAttribute("needleID"))
+        if needleNode.GetDisplayVisibility()==1:
+          modelNode.SetDisplayVisibility(abs(int(self.displayRadPlannedButton.checked)-1))
+            
+  def displayRadSegmented(self):
+    modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
+    for modelNode in modelNodes.values():
+      if modelNode.GetAttribute("radiation") == "segmented":
+        needleNode = slicer.mrmlScene.GetNodeByID(modelNode.GetAttribute("needleID"))
+        if needleNode != None:
+          if needleNode.GetDisplayVisibility()==1:
+            modelNode.SetDisplayVisibility(abs(int(self.displayRadSegmentedButton.checked)-1))
+
   def analyzeSegmentation(self):
   
     if self.analysisGroupBox != None:
@@ -327,8 +347,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
           result = "Needle " + self.option[int(modelNode.GetAttribute("nth"))]  +" Intensity average :" + str(indice)
           analysisLine = qt.QLabel(result)
           self.analysisGroupBoxLayout.addRow(analysisLine)
-      
-  
+        
   def angleDeviationEvaluation(self, modelNode):
     if self.transform !=None :
       # transformation matrix
@@ -415,8 +434,6 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.removeDuplicatesButton.setEnabled(0)
     self.removeDuplicatesButton.setChecked(1)
 
-  
- 
   def angleFilteringNeedles(self):
     
     # transformation matrix
@@ -498,9 +515,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         displayNode.SliceIntersectionVisibilityOff()
     
     self.addButtons()
-        
-        
-  
+                
   def needleSegmentation(self):
     scene = slicer.mrmlScene
     pNode = self.parameterNode()
@@ -518,8 +533,6 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.outputVolumeNode = slicer.mrmlScene.CreateNodeByClass('vtkMRMLModelNode')
     self.outputVolumeNode.SetName("Output Needle Model")
     outputVolumeStorageNode = slicer.mrmlScene.CreateNodeByClass('vtkMRMLModelStorageNode')
-    #outputVolumeName = inputImageName.replace(".nrrd","-OutputNeedleModel.vtk")
-    #outputVolumeStorageNode.SetFileName(outputVolumeName)
     slicer.mrmlScene.AddNode(self.outputVolumeNode)
     slicer.mrmlScene.AddNode(outputVolumeStorageNode)
     self.outputVolumeNode.AddAndObserveStorageNodeID(outputVolumeStorageNode.GetID())
@@ -558,17 +571,19 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.fiducialnode = [0 for j in range(63)]
 
     for i in xrange(63):
-      
-      
+
       pathneedle = foldername+'/'+str(i)+'.vtk'
 
       self.needlenode[i] = slicer.util.loadModel(pathneedle, True)
+      
+      
       # print pathneedle
-      if self.needlenode[i][0] == True:
+      if self.needlenode[i][0] == True and self.needlenode[i][1] != None:
         self.displaynode[i] = self.needlenode[i][1].GetDisplayNode()
+
+        self.AddRadiation(i,self.needlenode[i][1].GetID())
         polydata = self.needlenode[i][1].GetPolyData()
-        polydata.GetPoint(0,self.base[i]) 
-                
+        polydata.GetPoint(0,self.base[i])        
       
         self.displaynode[i].SliceIntersectionVisibilityOn()
         bestmatch = None
@@ -611,12 +626,13 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         i = int(modelNode.GetAttribute("nth"))
         buttonDisplay = qt.QPushButton("Hide "+self.option[i])
         buttonDisplay.checkable = True
+        if modelNode.GetDisplayVisibility() ==0:
+          buttonDisplay.setChecked(1)
         buttonDisplay.connect("clicked()", lambda who=i: self.displayNeedle(who))
         buttonReformat = qt.QPushButton("Reformat "+self.option[i])
         buttonReformat.connect("clicked()", lambda who=i: self.reformatNeedle(who))
         self.buttonsGroupBoxLayout.addRow(buttonDisplay,buttonReformat)
       
-
   def displayNeedle(self,i):
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
     for modelNode in modelNodes.values():
@@ -631,6 +647,19 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         else:
           displayNode.SliceIntersectionVisibilityOn()
           displayNode.SetVisibility(1)
+          if self.displayRadPlannedButton.checked == 0:
+            for radNode in modelNodes.values():
+              if radNode.GetName()=='Rad'+self.option[i]+'.vtk':
+                radNode.SetDisplayVisibility(1)
+              
+            
+          
+    modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
+    for modelNode in modelNodes.values():
+      if modelNode.GetAttribute("radiation") == "segmented":
+        needleNode = slicer.mrmlScene.GetNodeByID(modelNode.GetAttribute("needleID"))
+        if needleNode.GetDisplayVisibility()==0:
+          modelNode.SetDisplayVisibility(0)
           
   def reformatNeedle(self,i):
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
@@ -650,7 +679,8 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         print '---------'
         
         sGreen = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeGreen")
-
+        if sGreen ==None :
+          sGreen = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNode3")        
         reformatLogic = slicer.vtkSlicerReformatLogic()
         sGreen.SetSliceVisible(1)
         reformatLogic.SetSliceNormal(sGreen,0,-c/b,1)
@@ -658,10 +688,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         m.SetElement(1,3,base[1])
         m.SetElement(2,3,base[2])
         sGreen.Modified()
-
-      
-        
-  
+ 
   def displayFiducial(self):
     
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
@@ -698,8 +725,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
               self.displayFiducialButton.text = "Hide Labels on Needles"
             else:
               self.displayFiducialButton.text = "Display Labels on Needles"
-
-              
+             
   def validate( self, desiredBranchId ):
     '''
     '''
@@ -737,8 +763,6 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
 
       pNode.SetParameter('currentStep', self.stepid)
       
-
-
   def updateWidgetFromParameters(self, pNode):
   
     self.baselineVolume = Helper.getNodeByID(pNode.GetParameter('baselineVolumeID'))
@@ -891,9 +915,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       
       print self.p[0]
       print self.p[1]
-        
-        
-
+             
   def colorLabel(self):
     self.color= [[0,0,0] for i in range(310)] 
     self.color[0]=[221,108,158]
@@ -1114,6 +1136,21 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     Cylinder.SetHeight( float(200.0) )
     Cylinder.SetRadius( float(1.0) )
     self.m_polyCylinder=Cylinder.GetOutput()
+    
+    quad = vtk.vtkQuadric()
+    quad.SetCoefficients(1,1,1,0,0,0,0,1,0,0)
+    sample = vtk.vtkSampleFunction()
+    sample.SetModelBounds(-30,30,-60,60,-30,30)
+    sample.SetCapping(0)
+    sample.SetComputeNormals(1)
+    sample.SetSampleDimensions(50,50,50)
+    sample.SetImplicitFunction(quad)
+    contour = vtk.vtkContourFilter()
+    contour.SetInputConnection(sample.GetOutputPort())
+    contour.ComputeNormalsOn()
+    contour.ComputeScalarsOn()
+    contour.GenerateValues(6,0,100)
+    self.m_polyRadiation = contour.GetOutput()
 
     self.m_vtkmat = vtk.vtkMatrix4x4()
     self.m_vtkmat.Identity()
@@ -1250,8 +1287,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       
       self.m_poly = vtk.vtkPolyData()  
       self.m_poly.DeepCopy(ObutratorNode.GetPolyData())
-      
-      
+            
   def AddModel(self,i,polyData):
     modelNode = slicer.vtkMRMLModelNode()
     displayNode = slicer.vtkMRMLModelDisplayNode()
@@ -1286,4 +1322,116 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     pNode.SetParameter(fileName,modelNode.GetID())
     mrmlScene.AddNode(modelNode)
     displayNode.SetVisibility(1)
+    
+  def AddRadiation(self,i,needleID):
+    needleNode = slicer.mrmlScene.GetNodeByID(needleID)
+    polyData = needleNode.GetPolyData()
+    nb = polyData.GetNumberOfPoints()
+    base = [0,0,0]
+    tip = [[0,0,0] for k in range(11)]
+    if nb>100:
+      
+      polyData.GetPoint(nb-1,tip[10])
+      polyData.GetPoint(0,base)
+    
+    a = tip[10][0]-base[0]
+    b = tip[10][1]-base[1]
+    c = tip[10][2]-base[2]
+    
+    for l in range(7):
+      tip[9-l][0] = tip[10][0]-0.06*a*(l+1)
+      tip[9-l][1] = tip[10][1]-0.06*b*(l+1)
+      tip[9-l][2] = tip[10][2]-0.06*c*(l+1)
+    for l in range(1,3):
+      tip[l][0] = tip[10][0]+0.06*a*l
+      tip[l][1] = tip[10][1]+0.06*b*l
+      tip[l][2] = tip[10][2]+0.06*c*l
+      
+    # nu = (base[0]**2+base[1]**2+base[2]**2)**0.5  
+    # nv = (tip[0]**2+tip[1]**2+tip[2]**2)**0.5  
+    # ux=base[0]/nu
+    # uy=base[1]/nu
+    # uz=base[2]/nu
+    # vx=tip[0]/nv
+    # vy=tip[1]/nv
+    # vz=tip[2]/nv
+    
+    # Nx = tip[0]-base[0]
+    # Ny = tip[1]-base[1]
+    # Nz = tip[2]-base[2]
+    # NN = ( Nx**2+Ny**2+Nz**2 )**0.5
+    # nx = Nx /NN
+    # ny = Ny /NN
+    # nz = Nz /NN
+    
+    # costheta=ux*vx + uy*vy + uz*vz
+    # uXv = [uy*vz-uz*vy,uz*vx-ux*vz,ux*vy-uy*vx]
+    # sintheta = (uXv[0]**2+uXv[1]**2+uXv[2]**2)**0.5
+    
+    # # R2.SetElement(0,0, nx**2 + (1-nx**2)*costheta )
+    # # R2.SetElement(0,1, nx*ny*(1-costheta)-nz*sintheta)
+    # # R2.SetElement(0,2, nx*nz*(1-costheta)+ny*sintheta)
+    # # R2.SetElement(1,0, nx*ny*(1-costheta)+nz*sintheta)
+    # # R2.SetElement(1,1, ny**2 + (1-ny**2)*costheta)
+    # # R2.SetElement(1,2, ny*nz*(1-costheta)-nx*sintheta)
+    # # R2.SetElement(2,0, nx*nz*(1-costheta)-ny*sintheta)
+    # # R2.SetElement(2,1, ny*nz*(1-costheta)+nx*sintheta)
+    # # R2.SetElement(2,2, nz**2 + (1-nz**2)*costheta)
+    # # R2.SetElement(0,3,tip[0])
+    # # R2.SetElement(1,3,tip[1])
+    # # R2.SetElement(2,3,tip[2])   
+
+    # print R2    
+    rad = vtk.vtkAppendPolyData()  
+    
+    for l in range(1,11):
+      TransformPolyDataFilter=vtk.vtkTransformPolyDataFilter()
+      Transform=vtk.vtkTransform()        
+      TransformPolyDataFilter.SetInput(self.m_polyRadiation)
+
+      vtkmat = Transform.GetMatrix()
+      vtkmat.SetElement(0,3,tip[l][0])
+      vtkmat.SetElement(1,3,tip[l][1])
+      vtkmat.SetElement(2,3,tip[l][2])
+      TransformPolyDataFilter.SetTransform(Transform)
+      TransformPolyDataFilter.Update()
+    
+      rad.AddInput(TransformPolyDataFilter.GetOutput())
+    
+    modelNode = slicer.vtkMRMLModelNode()
+    displayNode = slicer.vtkMRMLModelDisplayNode()
+    storageNode = slicer.vtkMRMLModelStorageNode()
+ 
+    fileName = 'Rad'+self.option[i]+'.vtk'
+
+    mrmlScene = slicer.mrmlScene
+    modelNode.SetName(fileName)
+    modelNode.SetAttribute("radiation","segmented")
+    modelNode.SetAttribute("needleID",str(needleID))    
+    modelNode.SetAndObservePolyData(rad.GetOutput()) 
+
+    modelNode.SetScene(mrmlScene)
+    storageNode.SetScene(mrmlScene)
+    storageNode.SetFileName(fileName)  
+    displayNode.SetScene(mrmlScene)
+    displayNode.SetVisibility(0)
+    mrmlScene.AddNode(storageNode)
+    mrmlScene.AddNode(displayNode)
+    mrmlScene.AddNode(modelNode)
+    modelNode.SetAndObserveStorageNodeID(storageNode.GetID())
+    modelNode.SetAndObserveDisplayNodeID(displayNode.GetID())
+    
+    displayNode.SetPolyData(modelNode.GetPolyData())
+
+    displayNode.SetSliceIntersectionVisibility(0)
+    displayNode.SetScalarVisibility(1)
+    displayNode.SetActiveScalarName('scalars')
+    displayNode.SetScalarRange(0,230)
+    displayNode.SetOpacity(0.06)
+    displayNode.SetAndObserveColorNodeID('vtkMRMLColorTableNodeFileHotToColdRainbow.txt')
+    displayNode.SetBackfaceCulling(0)
+    pNode= self.parameterNode()
+    pNode.SetParameter(fileName,modelNode.GetID())
+    mrmlScene.AddNode(modelNode)
+    
     
