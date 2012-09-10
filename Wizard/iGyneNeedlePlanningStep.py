@@ -1974,77 +1974,14 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
       self.createSpinbox(popupIu,self.popupSpinboxIu)
       self.popupSpinboxIu.connect("valueChanged(int)", self.pushIuNeedle)
 
-      #-------------------------------------------------------------------
-          
-      self.CqColorPushButton.setText("Cq")
-      self.CpColorPushButton.setText("Cp")
-      self.CrColorPushButton.setText("Cr")
-      # self.LoadTemplatePushButton.setText("Load(Scene/Template)")
-      # self.AddVolumePushButton.setText("AddVolume")
-      # self.ShowNeedlesPushButton.setText("ShowNeedles")
-      # self.SelectNeedlesPushButton.setText("SelectNeedles")
-      # self.CADmodel2ImageRegPushButton.setText("CADmodel2Image")
-      self.CaColorPushButton.setText("Ca")
-      self.CbColorPushButton.setText("Cb")
-      self.CcColorPushButton.setText("Cc")
-      self.CdColorPushButton.setText("Cd")
-      self.CeColorPushButton.setText("Ce")
-      self.CfColorPushButton.setText("Cf")
-      self.CgColorPushButton.setText("Cg")
-      self.ChColorPushButton.setText("Ch")
-      self.CiColorPushButton.setText("Ci")
-      self.CjColorPushButton.setText("Cj")
-      self.CkColorPushButton.setText("Ck")
-      self.ClColorPushButton.setText("Cl")
-      self.CmColorPushButton.setText("Cm")
-      self.CnColorPushButton.setText("Cn")
-      self.CoColorPushButton.setText("Co")
-      self.BaColorPushButton.setText("Ba")
-      self.BbColorPushButton.setText("Bb")
-      self.BcColorPushButton.setText("Bc")
-      self.BdColorPushButton.setText("Bd")
-      self.BeColorPushButton.setText("Be")
-      self.BfColorPushButton.setText("Bf")
-      self.BgColorPushButton.setText("Bg")
-      self.BhColorPushButton.setText("Bh")
-      self.BiColorPushButton.setText("Bi")
-      self.BjColorPushButton.setText("Bj")
-      self.BkColorPushButton.setText("Bk")
-      self.BlColorPushButton.setText("Bl")
-      self.AaColorPushButton.setText("Aa")
-      self.AbColorPushButton.setText("Ab")
-      self.AcColorPushButton.setText("Ac")
-      self.AdColorPushButton.setText("Ad")
-      self.AeColorPushButton.setText("Ae")
-      self.AfColorPushButton.setText("Af")
-      self.IuColorPushButton.setText("Iu")
-      self.DaColorPushButton.setText("Da")
-      self.DbColorPushButton.setText("Db")
-      self.DcColorPushButton.setText("Dc")
-      self.DdColorPushButton.setText("Dd")
-      self.DeColorPushButton.setText("De")
-      self.DfColorPushButton.setText("Df")
-      self.DgColorPushButton.setText("Dg")
-      self.DhColorPushButton.setText("Dh")
-      self.DiColorPushButton.setText("Di")
-      self.DjColorPushButton.setText("Dj")
-      self.EaColorPushButton.setText("Ea")
-      self.EbColorPushButton.setText("Eb")
-      self.EcColorPushButton.setText("Ec")
-      self.EdColorPushButton.setText("Ed")
-      self.EeColorPushButton.setText("Ee")
-      self.EfColorPushButton.setText("Ef")
-      self.EgColorPushButton.setText("Eg")
-      self.EhColorPushButton.setText("Eh")
-      self.FaColorPushButton.setText("Fa")
-      self.FbColorPushButton.setText("Fb")
-      self.FhColorPushButton.setText("Fh")
-      self.FgColorPushButton.setText("Fg")
-      self.FcColorPushButton.setText("Fc")
-      self.FdColorPushButton.setText("Fd")
-      self.FeColorPushButton.setText("Fe")
-      self.FfColorPushButton.setText("Ff")
+      #-------------------------------------------------------------------    
+      
 
+      for i in range(63):
+        button= "self."+self.option[i]+"ColorPushButton"
+        eval(button).setText(self.option[i])
+              
+   
       #------------------------------------------
       mrmlScene = slicer.mrmlScene
       obturatorID = pNode.GetParameter('obturatorID')
@@ -2057,26 +1994,43 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
         self.m_poly = vtk.vtkPolyData()  
         self.m_poly.DeepCopy(self.ObturatorNode.GetPolyData())
 
-        # for i in xrange(63):
-          # filename= "vtkMRMLModelNode"+str(i+6)
-          # mrmlScene=slicer.mrmlScene
-          # NeedleNode = mrmlScene.GetNodeByID(filename)
-
-          # if NeedleNode !=None:
-            # displayNode =NeedleNode.GetModelDisplayNode()
-            # nVisibility=displayNode.GetVisibility()  
-
-            # if nVisibility==1 :
-              # self.setRadioButton(i,True)
-            # else:
-              # self.setRadioButton(i,False)  
-   
-      # qt.connectSlotsByName(TemplateSheetWidget)
-
-    ##############################################################################################
 
     TemplateSheetWidget.visible = True
+    
+    # self.refresh = qt.QPushButton("Refresh - segmented needles")
+    # self.refresh.connect('clicked()',self.refreshSegmented)
+    # self.__layout.addWidget(self.refresh)
     self.__layout.addWidget(TemplateSheetWidget)
+    
+    
+ 
+  def refreshSegmented(self):
+    self.segmented = [0 for i in range(63)]
+    modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
+    print 'refresh'
+    self.colorLabel()
+  
+    for modelNode in modelNodes.values():
+      if modelNode.GetAttribute("nth")!=None and modelNode.GetDisplayVisibility()==1:
+        self.segmented[int(modelNode.GetAttribute("nth"))]=1
+        print int(modelNode.GetAttribute("nth"))
+    
+    
+      if modelNode.GetAttribute("plannednth")!=None:
+        button= "self."+self.option[int(modelNode.GetAttribute("plannednth"))]+"RadioButton"
+        eval(button).setChecked(modelNode.GetDisplayVisibility())
+        
+    for i in range(63):
+      button= "self."+self.option[i]+"ColorPushButton"
+      
+      if self.segmented[i]==1:
+        eval(button).setText(self.option[i])
+        sColor = "background: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 rgb(255,255,255), stop: 1 rgb(" + str(self.color255[i][0]) +","+ str(self.color255[i][1]) +"," + str(self.color255[i][2]) + ")); color: black; font-weight: bold; "
+        sColor += "border-width: 2px;"
+        sColor +="border-color: rgb(170,0,0);"
+        sColor +="border-style: solid;"
+        sColor +="border-radius: 3;"
+        eval(button).setStyleSheet(sColor)
     
     
   def validate( self, desiredBranchId ):
@@ -2103,15 +2057,10 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
       pNode = self.parameterNode()
       self.updateWidgetFromParameters(pNode)
       Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
-      
-      # setup color transfer function once
-        
-      # labelsColorNode = slicer.modules.colors.logic().GetColorTableNodeID(10)
-     
-      # Helper.SetLabelVolume(self.__roiSegmentationNode.GetID())
-      # self.onThresholdChanged()
+
       pNode.SetParameter('currentStep', self.stepid)
       self.loadNeedles()
+      self.refreshSegmented()
 
   def updateWidgetFromParameters(self, pNode):
   
@@ -3663,7 +3612,8 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
           pNode.SetParameter(fidname,fiducialNode.GetID())
           sColor = "background-color: rgb(" + str(self.color255[i][0]) +","+ str(self.color255[i][1]) +"," + str(self.color255[i][2]) + ");"
           colorButtonName = "self." + self.option[i] + "ColorPushButton"
-          eval(colorButtonName).setStyleSheet(sColor)
+          if self.segmented[i]==0:
+            eval(colorButtonName).setStyleSheet(sColor)
           fiducialNode.SetVisible(1)
 
       if nVisibility ==1:
@@ -3694,9 +3644,9 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
 
     pNode = self.parameterNode()
     needleID = pNode.GetParameter(self.option[i]+'.vtk')  
-    radID = pNode.GetParameter('Rad'+self.option[i]+'.vtk')  
+    # radID = pNode.GetParameter('Rad'+self.option[i]+'.vtk')  
     NeedleNode = slicer.mrmlScene.GetNodeByID(needleID)
-    RadNode = slicer.mrmlScene.GetNodeByID(radID)
+    # RadNode = slicer.mrmlScene.GetNodeByID(radID)
     
     vtkmat = vtk.vtkMatrix4x4()
     vtkmat.DeepCopy(self.m_vtkmat) 
@@ -3726,8 +3676,8 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     TransformPolyDataFilter.SetTransform(Transform)
     TransformPolyDataFilter.Update()
     
-    if RadNode !=None:
-      RadNode.SetAndObservePolyData(TransformPolyDataFilter.GetOutput())
+    # if RadNode !=None:
+      # RadNode.SetAndObservePolyData(TransformPolyDataFilter.GetOutput())
       
   ##-----------------------------------------------------------------------------
   def setOneNeedleColor(self,i,ColorPushButton):
@@ -3760,75 +3710,74 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
           fidTN.SetColor(displayNode.GetColor())
        
 
-  def selectNeedles(self):
+  # def selectNeedles(self):
 
-    mrmlScene=slicer.mrmlScene
-    ModelFromImageNode = slicer.vtkMRMLModelNode()
-    ModelFromImageNode = mrmlScene.GetNodeByID("vtkMRMLModelNode70")
+    # mrmlScene=slicer.mrmlScene
+    # ModelFromImageNode = slicer.vtkMRMLModelNode()
+    # ModelFromImageNode = mrmlScene.GetNodeByID("vtkMRMLModelNode70")
 
-    if ModelFromImageNode!=None :
+    # if ModelFromImageNode!=None :
    
-      collide = vtk.vtkCollisionDetectionFilter()
-      matrix0 = vtk.vtkMatrix4x4()
-      matrix1 = vtk.vtkMatrix4x4()    
-      matrix2 = vtk.vtkMatrix4x4()  
+      # collide = vtk.vtkCollisionDetectionFilter()
+      # matrix0 = vtk.vtkMatrix4x4()
+      # matrix1 = vtk.vtkMatrix4x4()    
+      # matrix2 = vtk.vtkMatrix4x4()  
 
-      collide.SetInput(0,ModelFromImageNode.GetPolyData())
-      collide.SetMatrix(0, matrix0)
+      # collide.SetInput(0,ModelFromImageNode.GetPolyData())
+      # collide.SetMatrix(0, matrix0)
 
       
-      vtkmatInitial = self.transform.GetMatrixTransformToParent()
+      # vtkmatInitial = self.transform.GetMatrixTransformToParent()
 
-      nContacts=0
-      for i in xrange(63):
+      # nContacts=0
+      # for i in xrange(63):
 
-        sfilename="vtkMRMLModelNode"+ str(i+6)
 
-        NeedleNode = mrmlScene.GetNodeByID(filename)
+        # NeedleNode = mrmlScene.GetNodeByID(filename)
 
-        vtkmat = vtk.vtkMatrix4x4()
-        vtkmat.DeepCopy(self.m_vtkmat) 
+        # vtkmat = vtk.vtkMatrix4x4()
+        # vtkmat.DeepCopy(self.m_vtkmat) 
 
-        vtkmat.SetElement(0,3,self.m_vtkmat.GetElement(0,3)+self.p[0][i])
-        vtkmat.SetElement(1,3,self.m_vtkmat.GetElement(1,3)+self.p[1][i])
-        vtkmat.SetElement(2,3,self.m_vtkmat.GetElement(2,3)-100.0)
+        # vtkmat.SetElement(0,3,self.m_vtkmat.GetElement(0,3)+self.p[0][i])
+        # vtkmat.SetElement(1,3,self.m_vtkmat.GetElement(1,3)+self.p[1][i])
+        # vtkmat.SetElement(2,3,self.m_vtkmat.GetElement(2,3)-100.0)
 
-        matrix1.Multiply4x4(vtkmatInitial,vtkmat,matrix1)
+        # matrix1.Multiply4x4(vtkmatInitial,vtkmat,matrix1)
 
-        TransformPolyDataFilter=vtk.vtkTransformPolyDataFilter()
-        Transform=vtk.vtkTransform()
-        TransformPolyDataFilter.SetInput(self.m_polyCylinder)
-        Transform.SetMatrix(matrix1)
-        TransformPolyDataFilter.SetTransform(Transform)
-        TransformPolyDataFilter.Update()
+        # TransformPolyDataFilter=vtk.vtkTransformPolyDataFilter()
+        # Transform=vtk.vtkTransform()
+        # TransformPolyDataFilter.SetInput(self.m_polyCylinder)
+        # Transform.SetMatrix(matrix1)
+        # TransformPolyDataFilter.SetTransform(Transform)
+        # TransformPolyDataFilter.Update()
 
-        triangles=vtk.vtkTriangleFilter()
-        triangles.SetInput(TransformPolyDataFilter.GetOutput())
+        # triangles=vtk.vtkTriangleFilter()
+        # triangles.SetInput(TransformPolyDataFilter.GetOutput())
 
-        collide.SetInput(1,triangles.GetOutput())
-        collide.SetMatrix(1, matrix2)
-        collide.SetBoxTolerance(0.0)
-        collide.SetCellTolerance(0.0)
-        collide.SetNumberOfCellsPerBucket(2)
-        collide.SetCollisionModeToAllContacts()
-        collide.GenerateScalarsOn()
-        collide.Update()
+        # collide.SetInput(1,triangles.GetOutput())
+        # collide.SetMatrix(1, matrix2)
+        # collide.SetBoxTolerance(0.0)
+        # collide.SetCellTolerance(0.0)
+        # collide.SetNumberOfCellsPerBucket(2)
+        # collide.SetCollisionModeToAllContacts()
+        # collide.GenerateScalarsOn()
+        # collide.Update()
 
-        nContacts=collide.GetNumberOfContacts()
-        if NeedleNode !=None:  
-          displayNode =NeedleNode.GetModelDisplayNode()
+        # nContacts=collide.GetNumberOfContacts()
+        # if NeedleNode !=None:  
+          # displayNode =NeedleNode.GetModelDisplayNode()
 
-          if nContacts>0:
+          # if nContacts>0:
             
-            displayNode.SetVisibility(1)
-            displayNode.SetSliceIntersectionVisibility(1)
-            self.setRadioButton(i,True)
+            # displayNode.SetVisibility(1)
+            # displayNode.SetSliceIntersectionVisibility(1)
+            # self.setRadioButton(i,True)
             
-          else:
+          # else:
             
-            displayNode.SetVisibility(0)
-            displayNode.SetSliceIntersectionVisibility(0)
-            self.setRadioButton(i,False)
+            # displayNode.SetVisibility(0)
+            # displayNode.SetSliceIntersectionVisibility(0)
+            # self.setRadioButton(i,False)
           
   ##-----------------------------------------------------------------------------
   def setRadioButton(self,i,bShowNeedels):
@@ -3937,13 +3886,12 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     storageNode = slicer.vtkMRMLModelStorageNode()
  
     fileName = self.option[i]+'.vtk'
-    print("filename:",fileName)
 
     mrmlScene = slicer.mrmlScene
-    modelNode.SetName(fileName)  
+    modelNode.SetName(fileName)
+    modelNode.SetAttribute('plannednth',str(i))    
     modelNode.SetAndObservePolyData(triangles.GetOutput())
     
-    mrmlScene.SaveStateForUndo()
     modelNode.SetScene(mrmlScene)
     storageNode.SetScene(mrmlScene)
     storageNode.SetFileName(fileName)  
@@ -3964,60 +3912,60 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     pNode.SetParameter(fileName,modelNode.GetID())
     mrmlScene.AddNode(modelNode)
     displayNode.SetVisibility(1)
-    self.AddRadiation(i,modelNode.GetID())
+    # self.AddRadiation(i,modelNode.GetID())
     
-  def AddRadiation(self,i,needleID):
+  # def AddRadiation(self,i,needleID):
   
-    vtkmat = vtk.vtkMatrix4x4()
-    vtkmat.DeepCopy(self.m_vtkmat)
-    vtkmat.SetElement(0,3,self.m_vtkmat.GetElement(0,3)+self.p[0][i])
-    vtkmat.SetElement(1,3,self.m_vtkmat.GetElement(1,3)+self.p[1][i])
-    vtkmat.SetElement(2,3,self.m_vtkmat.GetElement(2,3)-150)
+    # vtkmat = vtk.vtkMatrix4x4()
+    # vtkmat.DeepCopy(self.m_vtkmat)
+    # vtkmat.SetElement(0,3,self.m_vtkmat.GetElement(0,3)+self.p[0][i])
+    # vtkmat.SetElement(1,3,self.m_vtkmat.GetElement(1,3)+self.p[1][i])
+    # vtkmat.SetElement(2,3,self.m_vtkmat.GetElement(2,3)-150)
 
-    TransformPolyDataFilter=vtk.vtkTransformPolyDataFilter()
-    Transform=vtk.vtkTransform()        
-    TransformPolyDataFilter.SetInput(self.m_polyRadiation)
-    Transform.SetMatrix(vtkmat)
-    TransformPolyDataFilter.SetTransform(Transform)
-    TransformPolyDataFilter.Update()
+    # TransformPolyDataFilter=vtk.vtkTransformPolyDataFilter()
+    # Transform=vtk.vtkTransform()        
+    # TransformPolyDataFilter.SetInput(self.m_polyRadiation)
+    # Transform.SetMatrix(vtkmat)
+    # TransformPolyDataFilter.SetTransform(Transform)
+    # TransformPolyDataFilter.Update()
   
-    modelNode = slicer.vtkMRMLModelNode()
-    displayNode = slicer.vtkMRMLModelDisplayNode()
-    storageNode = slicer.vtkMRMLModelStorageNode()
+    # modelNode = slicer.vtkMRMLModelNode()
+    # displayNode = slicer.vtkMRMLModelDisplayNode()
+    # storageNode = slicer.vtkMRMLModelStorageNode()
  
-    fileName = 'Rad_'+self.option[i]+'.vtk'
+    # fileName = 'Rad_'+self.option[i]+'.vtk'
 
-    mrmlScene = slicer.mrmlScene
-    modelNode.SetName(fileName)
-    modelNode.SetAttribute("radiation","planned")
-    modelNode.SetAttribute("needleID",str(needleID))    
-    modelNode.SetAndObservePolyData(TransformPolyDataFilter.GetOutput())
+    # mrmlScene = slicer.mrmlScene
+    # modelNode.SetName(fileName)
+    # modelNode.SetAttribute("radiation","planned")
+    # modelNode.SetAttribute("needleID",str(needleID))    
+    # modelNode.SetAndObservePolyData(TransformPolyDataFilter.GetOutput())
     
-    mrmlScene.SaveStateForUndo()
-    modelNode.SetScene(mrmlScene)
-    storageNode.SetScene(mrmlScene)
-    storageNode.SetFileName(fileName)  
-    displayNode.SetScene(mrmlScene)
-    displayNode.SetVisibility(1)
-    mrmlScene.AddNode(storageNode)
-    mrmlScene.AddNode(displayNode)
-    mrmlScene.AddNode(modelNode)
-    modelNode.SetAndObserveStorageNodeID(storageNode.GetID())
-    modelNode.SetAndObserveDisplayNodeID(displayNode.GetID())
+    # mrmlScene.SaveStateForUndo()
+    # modelNode.SetScene(mrmlScene)
+    # storageNode.SetScene(mrmlScene)
+    # storageNode.SetFileName(fileName)  
+    # displayNode.SetScene(mrmlScene)
+    # displayNode.SetVisibility(1)
+    # mrmlScene.AddNode(storageNode)
+    # mrmlScene.AddNode(displayNode)
+    # mrmlScene.AddNode(modelNode)
+    # modelNode.SetAndObserveStorageNodeID(storageNode.GetID())
+    # modelNode.SetAndObserveDisplayNodeID(displayNode.GetID())
     
-    modelNode.SetAndObserveTransformNodeID(self.transform.GetID())
-    displayNode.SetPolyData(modelNode.GetPolyData())
+    # modelNode.SetAndObserveTransformNodeID(self.transform.GetID())
+    # displayNode.SetPolyData(modelNode.GetPolyData())
 
-    displayNode.SetSliceIntersectionVisibility(1)
-    displayNode.SetScalarVisibility(1)
-    displayNode.SetActiveScalarName('scalars')
-    displayNode.SetScalarRange(0,230)
-    displayNode.SetOpacity(0.1)
-    displayNode.SetAndObserveColorNodeID('vtkMRMLColorTableNodeFileHotToColdRainbow.txt')
-    displayNode.SetBackfaceCulling(0)
-    pNode= self.parameterNode()
-    pNode.SetParameter(fileName,modelNode.GetID())
-    mrmlScene.AddNode(modelNode)
+    # displayNode.SetSliceIntersectionVisibility(1)
+    # displayNode.SetScalarVisibility(1)
+    # displayNode.SetActiveScalarName('scalars')
+    # displayNode.SetScalarRange(0,230)
+    # displayNode.SetOpacity(0.1)
+    # displayNode.SetAndObserveColorNodeID('vtkMRMLColorTableNodeFileHotToColdRainbow.txt')
+    # displayNode.SetBackfaceCulling(0)
+    # pNode= self.parameterNode()
+    # pNode.SetParameter(fileName,modelNode.GetID())
+    # mrmlScene.AddNode(modelNode)
 
   def colorLabel(self):
     self.color= [[0,0,0] for i in range(310)]

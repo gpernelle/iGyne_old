@@ -166,9 +166,9 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     
     self.displayFiducialButton = qt.QPushButton('Display Labels On Needles')
     self.displayFiducialButton.connect('clicked()',self.displayFiducial)
-    self.displayRadPlannedButton = qt.QPushButton('Hide Radiation On Planned Needles')
-    self.displayRadPlannedButton.checkable = True
-    self.displayRadPlannedButton.connect('clicked()',self.displayRadPlanned)
+    # self.displayRadPlannedButton = qt.QPushButton('Hide Radiation On Planned Needles')
+    # self.displayRadPlannedButton.checkable = True
+    # self.displayRadPlannedButton.connect('clicked()',self.displayRadPlanned)
     self.displayRadSegmentedButton = qt.QPushButton('Hide Radiation On Segmented Needles')
     self.displayRadSegmentedButton.checkable = True
     self.displayRadSegmentedButton.connect('clicked()',self.displayRadSegmented)
@@ -177,7 +177,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     
     
     self.__layout.addRow(self.displayFiducialButton)
-    self.__layout.addRow(self.displayRadPlannedButton)
+    # self.__layout.addRow(self.displayRadPlannedButton)
     self.__layout.addRow(self.displayRadSegmentedButton)
     self.__layout.addRow(self.analysisReportButton)
     
@@ -198,6 +198,8 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         if needleNode != None:
           if needleNode.GetDisplayVisibility()==1:
             modelNode.SetDisplayVisibility(abs(int(self.displayRadSegmentedButton.checked)-1))
+            d = modelNode.GetDisplayNode()
+            d.SetSliceIntersectionVisibility(abs(int(self.displayRadSegmentedButton.checked)-1))
 
   def analyzeSegmentation(self):
   
@@ -572,16 +574,12 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
 
     for i in xrange(63):
 
-      pathneedle = foldername+'/'+str(i)+'.vtk'
-
+      pathneedle = foldername+'/'+str(i)+'.vtp'
       self.needlenode[i] = slicer.util.loadModel(pathneedle, True)
-      
-      
-      # print pathneedle
+
       if self.needlenode[i][0] == True and self.needlenode[i][1] != None:
         self.displaynode[i] = self.needlenode[i][1].GetDisplayNode()
-
-        self.AddRadiation(i,self.needlenode[i][1].GetID())
+ 
         polydata = self.needlenode[i][1].GetPolyData()
         polydata.GetPoint(0,self.base[i])        
       
@@ -595,6 +593,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
             mindist = delta
 
         self.showOneNeedle(i,0)
+        self.AddRadiation(bestmatch,self.needlenode[i][1].GetID())
         self.displaynode[i].SetColor(self.color[bestmatch])
         self.needlenode[i][1].SetName(self.option[bestmatch]+"_segmented")
         self.needlenode[i][1].SetAttribute("segmented","1")
@@ -637,7 +636,6 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
     for modelNode in modelNodes.values():
       if modelNode.GetAttribute("nth")==str(i):
-        print str(i)
         displayNode = modelNode.GetModelDisplayNode()
         nVisibility = displayNode.GetVisibility()
         print nVisibility
@@ -647,7 +645,8 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         else:
           displayNode.SliceIntersectionVisibilityOn()
           displayNode.SetVisibility(1)
-          if self.displayRadPlannedButton.checked == 0:
+          
+          if self.displayRadSegmentedButton.checked == 0:
             for radNode in modelNodes.values():
               if radNode.GetName()=='Rad'+self.option[i]+'.vtk':
                 radNode.SetDisplayVisibility(1)
@@ -678,16 +677,17 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         a,b,c = tip[0]-base[0],tip[1]-base[1],tip[2]-base[2]
         print '---------'
         
-        sGreen = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeGreen")
-        if sGreen ==None :
-          sGreen = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNode3")        
+        sYellow = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeYellow")
+        if sYellow ==None :
+          sYellow = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNode2")        
         reformatLogic = slicer.vtkSlicerReformatLogic()
-        sGreen.SetSliceVisible(1)
-        reformatLogic.SetSliceNormal(sGreen,0,-c/b,1)
-        m= sGreen.GetSliceToRAS()
+        sYellow.SetSliceVisible(1)
+        reformatLogic.SetSliceNormal(sYellow,1,-a/b,0)
+        m= sYellow.GetSliceToRAS()
+        m.SetElement(0,3,base[0])
         m.SetElement(1,3,base[1])
         m.SetElement(2,3,base[2])
-        sGreen.Modified()
+        sYellow.Modified()
  
   def displayFiducial(self):
     
@@ -904,7 +904,6 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       transformMatrix = transformNode.GetMatrixTransformToParent()
       for i in xrange(63):
         vtkmat = vtk.vtkMatrix4x4()
-        # self.vtkmat.DeepCopy(self.m_vtkmat)
         vtkmat.SetElement(0,3,self.p[0][i])
         vtkmat.SetElement(1,3,self.p[1][i])
 
@@ -913,8 +912,6 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         self.p[0][i] = vtkmat.GetElement(0,3)
         self.p[1][i] = vtkmat.GetElement(1,3)
       
-      print self.p[0]
-      print self.p[1]
              
   def colorLabel(self):
     self.color= [[0,0,0] for i in range(310)] 
@@ -1149,7 +1146,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     contour.SetInputConnection(sample.GetOutputPort())
     contour.ComputeNormalsOn()
     contour.ComputeScalarsOn()
-    contour.GenerateValues(6,0,100)
+    contour.GenerateValues(4,0,100)
     self.m_polyRadiation = contour.GetOutput()
 
     self.m_vtkmat = vtk.vtkMatrix4x4()
@@ -1339,13 +1336,13 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     c = tip[10][2]-base[2]
     
     for l in range(7):
-      tip[9-l][0] = tip[10][0]-0.06*a*(l+1)
-      tip[9-l][1] = tip[10][1]-0.06*b*(l+1)
-      tip[9-l][2] = tip[10][2]-0.06*c*(l+1)
+      tip[9-l][0] = tip[10][0]-0.1*a*(l+1)
+      tip[9-l][1] = tip[10][1]-0.1*b*(l+1)
+      tip[9-l][2] = tip[10][2]-0.1*c*(l+1)
     for l in range(1,3):
-      tip[l][0] = tip[10][0]+0.06*a*l
-      tip[l][1] = tip[10][1]+0.06*b*l
-      tip[l][2] = tip[10][2]+0.06*c*l
+      tip[l][0] = tip[10][0]+0.1*a*l
+      tip[l][1] = tip[10][1]+0.1*b*l
+      tip[l][2] = tip[10][2]+0.1*c*l
       
     # nu = (base[0]**2+base[1]**2+base[2]**2)**0.5  
     # nv = (tip[0]**2+tip[1]**2+tip[2]**2)**0.5  
