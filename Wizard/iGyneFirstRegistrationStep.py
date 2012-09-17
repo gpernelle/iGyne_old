@@ -4,6 +4,7 @@ from iGyneStep import *
 from Helper import *
 import PythonQt
 import string
+import json
 
 class iGyneFirstRegistrationStep( iGyneStep ) :
 
@@ -54,6 +55,10 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     self.__layout.addRow(self.firstRegButton)
     self.firstRegButton.connect('clicked()', self.firstRegistration)
     
+    self.automaticRegistrationButton = qt.QPushButton('Automatic Registration')
+    self.automaticRegistrationButton.connect('clicked()', self.automaticRegistration)
+    self.__layout.addRow(self.automaticRegistrationButton)
+    
      #VOI
     roiLabel = qt.QLabel( 'Select ROI:' )
     self.__roiSelector = slicer.qMRMLNodeComboBox()
@@ -71,6 +76,159 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     voiGroupBoxLayout = qt.QFormLayout( voiGroupBox )
     self.__roiWidget = PythonQt.qSlicerAnnotationsModuleWidgets.qMRMLAnnotationROIWidget()
     voiGroupBoxLayout.addRow( self.__roiWidget )
+    
+  def automaticRegistration(self):
+  
+    outputVolume = slicer.mrmlScene.CreateNodeByClass('vtkMRMLScalarVolumeNode')
+    slicer.mrmlScene.AddNode(outputVolume)
+    
+    parameters = {}
+    parameters["inputVolume"] = self.__baselineVolume
+    parameters["outputVolume"] = outputVolume
+    parameters["numberOfSpheres"] = 8
+    parameters["minRadius"] = 0
+    parameters["maxRadius"] = 6.3
+    parameters["sigmaGradient"] = 1
+    parameters["variance"] = 0.5
+    parameters["sphereRadiusRatio"] = 10
+    parameters["votingRadiusRatio"] = 10
+    parameters["threshold"] = 100
+    parameters["outputThreshold"] = 0.6
+    parameters["gradientThreshold"] = 100
+    parameters["nbOfThreads"] = 12
+    parameters["samplingRatio"] = 1
+    
+     
+    houghtransformcli = slicer.modules.houghtransformcli
+    self.__cliNode = None
+    self.__cliNode = slicer.cli.run(houghtransformcli, self.__cliNode, parameters)
+
+    
+    self.__cliObserverTag = self.__cliNode.AddObserver('ModifiedEvent', self.processRegistrationCompletion)
+    self.__registrationStatus.setText('Wait ...')
+    
+    
+    self.__cliObserverTag = self.__cliNode.AddObserver('ModifiedEvent', self.processDataHoughTransform)
+    self.__registrationStatus.setText('Wait ...')
+    self.firstRegButton.setEnabled(0)
+
+
+  def processDataHoughTransform(self, node, event):
+    status = node.GetStatusString()
+    self.__registrationStatus.setText('Hough Transforn '+status)
+    if status == 'Completed':
+      self.firstRegButton.setEnabled(1)
+
+      file = open("/output.txt", "r").readlines()
+      spherecenters = [[0,0,0] for i in range(9)]
+      nbLine = 0
+      for line in file:
+        if len(line) >= 10:
+          spherecenters[nbLine] = json.loads(line)
+        nbLine += 1
+      for i in range(nbLine+1):
+        for j in range(nbLine+1): 
+          if i != j and spherecenters[i]!=[0,0,0]:
+            d2 = (spherecenters[i][0]-spherecenters[j][0])**2+(spherecenters[i][1]-spherecenters[j][1])**2+(spherecenters[i][2]-spherecenters[j][2])**2
+            d = d2**0.5
+            # print spherecenters[i],spherecenters[j]
+            # print d
+       
+      point = [0]
+      for i in range(nbLine+1):
+        U,V,W = 0,0,0
+        for j in range(nbLine+1): 
+          if i != j and spherecenters[i]!=[0,0,0]:
+            d2 = (spherecenters[i][0]-spherecenters[j][0])**2+(spherecenters[i][1]-spherecenters[j][1])**2+(spherecenters[i][2]-spherecenters[j][2])**2
+            d = d2**0.5
+            # print spherecenters[i],spherecenters[j]
+            # print d
+            if d >=75 and d<=80:
+              U += 1
+            elif d >=70 and d<75:  
+              V +=1
+            elif d >=100 and d<112:  
+              W +=1 
+        # print U,V,W      
+        if U+V+W>=3:
+          print spherecenters[i]
+          point.extend([i])
+
+      point.remove(0)
+      minX = [-1,-1,-1,-1]
+      maxX = [-1,-1,-1,-1]
+
+
+      sorted = [[0,0,0] for l in range(4)]
+      sortedConverted = [[0,0,0] for l in range(4)]
+      for i in range(2):  
+        for k in point:
+          if spherecenters[k][0]<= minX[0] or minX[0] == -1:
+            minX[0] = spherecenters[k][0]
+            minX[1] = k
+          elif spherecenters[k][0]<= minX[2] or minX[2] == -1:
+            minX[2] = spherecenters[k][0]
+            minX[3] = k
+          if spherecenters[k][0]>= maxX[0] or maxX[0] == -1:
+            maxX[0] = spherecenters[k][0]
+            maxX[1] = k
+          elif spherecenters[k][0]>= maxX[2] or maxX[2] == -1:
+            maxX[2] = spherecenters[k][0]
+            maxX[3] = k    
+
+      if spherecenters[minX[1]][1] < spherecenters[minX[3]][1]:
+        sorted[0] = minX[1]
+        sorted[1] = minX[3]
+      else:
+        sorted[0] = minX[3]
+        sorted[1] = minX[1]      
+        
+      if spherecenters[maxX[1]][1]>spherecenters[maxX[3]][1]:
+        sorted[2] = maxX[1]
+        sorted[3] = maxX[3]
+      else:
+        sorted[2] = maxX[3]
+        sorted[3] = maxX[1]
+      
+      
+      sorted2 = [0,0,0,0]
+      sorted2[0]=sorted[3]
+      sorted2[2]=sorted[1]
+      sorted2[1]=sorted[0]
+      sorted2[3]=sorted[2]
+      
+      
+      
+      ijkToRAS = vtk.vtkMatrix4x4()
+      
+      print sorted2
+      self.__baselineVolume.GetIJKToRASMatrix(ijkToRAS)
+      for l in range(4):
+        Matrix = vtk.vtkMatrix4x4()      
+        for i in range(3):
+          Matrix.SetElement(i,3,spherecenters[sorted2[l]][i])
+          ijkToRAS.Multiply4x4(ijkToRAS,Matrix,  Matrix)
+          sortedConverted[l][i]=Matrix.GetElement(i,3)
+      
+     
+
+      print sortedConverted  
+        
+      
+      logic = slicer.modules.annotations.logic()
+      logic.SetActiveHierarchyNodeID("vtkMRMLAnnotationHierarchyNode4")    
+      for k in range(4) :  
+        fiducial = slicer.mrmlScene.CreateNodeByClass('vtkMRMLAnnotationFiducialNode')
+        fiducial.SetReferenceCount(fiducial.GetReferenceCount()-1)
+        fiducial.SetFiducialCoordinates(sortedConverted[k])
+        fiducial.SetName(str(k)) 
+        fiducial.Initialize(slicer.mrmlScene)
+        # adding to hierarchy is handled by the Reporting logic
+        # self.fixedLandmarks.AddItem(fiducial)
+    
+    self.firstRegistration()
+    # self.stop()
+
 
   def onROIChanged(self):
     roi = self.__roiSelector.currentNode()
@@ -264,18 +422,41 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       fiducial = slicer.mrmlScene.CreateNodeByClass('vtkMRMLAnnotationFiducialNode')
       fiducial.SetReferenceCount(fiducial.GetReferenceCount()-1)
       fiducial.SetFiducialCoordinates(ras)
-      if self.click == 0:
-        fiducial.SetName("top")
-        self.click += 1
-      elif self.click == 1:
-        fiducial.SetName("left")
-        self.click += 1
-      elif self.click == 2:
-        fiducial.SetName("right")
-        self.click = 0
-        self.fiducialButton.setEnabled(0)
-        self.firstRegistration()
-        self.stop()
+      pNode = self.parameterNode()
+
+      applicator  = pNode.GetParameter('Template')  
+      if applicator == "3points":  
+        
+        if self.click == 0:
+          fiducial.SetName("top")
+          self.click += 1
+        elif self.click == 1:
+          fiducial.SetName("left")
+          self.click += 1
+        elif self.click == 2:
+          fiducial.SetName("right")
+          self.click = 0
+          self.fiducialButton.setEnabled(0)
+          self.firstRegistration()
+          self.stop()
+      
+      elif applicator == "4points":  
+        
+        if self.click == 0:
+          fiducial.SetName("1")
+          self.click += 1
+        elif self.click == 1:
+          fiducial.SetName("2")
+          self.click += 1
+        elif self.click == 2:
+          fiducial.SetName("3")
+          self.click += 1
+        elif self.click == 3:
+          fiducial.SetName("4")
+          self.click = 0
+          self.fiducialButton.setEnabled(0)
+          self.firstRegistration()
+          self.stop()
         
       fiducial.Initialize(slicer.mrmlScene)
       # adding to hierarchy is handled by the Reporting logic

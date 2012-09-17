@@ -17,12 +17,13 @@ class iGyneSelectApplicatorStep( iGyneStep ) :
   def createUserInterface( self ):
   
     self.__layout = self.__parent.createUserInterface()
-    self.checkBox1 = qt.QCheckBox("Neblett Template and Obturator")
+    self.checkBox1 = qt.QCheckBox("Neblett Template and Obturator 4 points")
     self.checkBox1.setChecked(1)
     
     # checkBox2 = qt.QCheckBox("Obturator")
     # checkBox2.setEnabled(0)
-    checkBox3 = qt.QCheckBox("Intrauterine Tandem")
+    self.checkBox3 = qt.QCheckBox("Neblett Template and Obturator 3 points")
+    # checkBox3 = qt.QCheckBox("Intrauterine Tandem")
     # checkBox3.setCheckable(0)
     checkBox4 = qt.QCheckBox("Intravaginal Ovoids")
     # checkBox4.setCheckable(0)
@@ -36,7 +37,7 @@ class iGyneSelectApplicatorStep( iGyneStep ) :
     # checkBox8.setCheckable(0)
     self.__layout.addRow(self.checkBox1)
     # self.__layout.addRow(checkBox2)
-    self.__layout.addRow(checkBox3)
+    self.__layout.addRow(self.checkBox3)
     self.__layout.addRow(checkBox4)
     self.__layout.addRow(checkBox5)
     self.__layout.addRow(checkBox6)
@@ -57,7 +58,10 @@ class iGyneSelectApplicatorStep( iGyneStep ) :
   def onExit(self, goingTo, transitionType):
     if self.checkBox1.isChecked():
       pNode = self.parameterNode()
-      pNode.SetParameter('Template', "Template+Obturator")  
+      pNode.SetParameter('Template', "4points")
+    if self.checkBox3.isChecked():
+      pNode = self.parameterNode()
+      pNode.SetParameter('Template', "3points")       
     if goingTo.id() != 'SelectProcedure' and goingTo.id() != 'LoadModel':
       return
    

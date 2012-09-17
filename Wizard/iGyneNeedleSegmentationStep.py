@@ -3,7 +3,7 @@ from __main__ import qt, ctk, slicer
 from iGyneStep import *
 from Helper import *
 from EditorLib import *
-import math,time
+import math,time, functools
 
 import string
 
@@ -172,15 +172,69 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.displayRadSegmentedButton = qt.QPushButton('Hide Radiation On Segmented Needles')
     self.displayRadSegmentedButton.checkable = True
     self.displayRadSegmentedButton.connect('clicked()',self.displayRadSegmented)
+    self.displayContourButton = qt.QPushButton('Draw Isosurfaces')
+    self.displayContourButton.checkable = False
+    self.displayContourButton.connect('clicked()',self.drawIsoSurfaces)
     self.analysisReportButton = qt.QPushButton('Print Analysis')
     self.analysisReportButton.connect('clicked()',self.analyzeSegmentation)
     
     
     self.__layout.addRow(self.displayFiducialButton)
     # self.__layout.addRow(self.displayRadPlannedButton)
-    self.__layout.addRow(self.displayRadSegmentedButton)
+    # self.__layout.addRow(self.displayRadSegmentedButton)
+    self.__layout.addRow(self.displayContourButton)
     self.__layout.addRow(self.analysisReportButton)
+ 
+  def drawIsoSurfaces( self ):
+    modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
     
+    # b = vtk.vtkImplicitBoolean()
+    # b.SetOperationTypeToUnion()
+    
+    # for modelNode in modelNodes.values():
+      # if modelNode.GetAttribute("contour")=="1":
+        # print modelNode.GetID()
+        # v = vtk.vtkImplicitDataSet()
+        # v.SetDataSet(modelNode.GetPolyData())
+        # b.AddFunction(v)
+    
+    v= vtk.vtkAppendPolyData()
+    
+    for modelNode in modelNodes.values():
+      if modelNode.GetAttribute("nth")!=None and modelNode.GetDisplayVisibility()==1 :
+        v.AddInput(modelNode.GetPolyData())
+       
+    modeller = vtk.vtkImplicitModeller()
+    modeller.SetInput(v.GetOutput())
+    modeller.SetSampleDimensions(50,50,50)
+    modeller.SetCapping(0)
+    # modeller.AdjustBoundsOn()
+    modeller.SetProcessModeToPerVoxel() 
+    modeller.SetAdjustDistance(1)
+    modeller.SetMaximumDistance(1)    
+        
+    # sample = vtk.vtkSampleFunction()
+    # sample.SetImplicitFunction(b)
+    # sample.SetModelBounds(-10,10,-10,10,-10,10)
+    # sample.SetCapping(0)
+    # sample.SetComputeNormals(1)
+    # sample.SetSampleDimensions(10,10,10)
+    
+    contourFilter = vtk.vtkContourFilter()
+    contourFilter.SetNumberOfContours(3)
+    contourFilter.SetInputConnection(modeller.GetOutputPort())    
+    contourFilter.ComputeNormalsOn()
+    contourFilter.ComputeScalarsOn()
+    contourFilter.GenerateValues(3,0,30)
+    isoSurface = contourFilter.GetOutput()
+    
+    
+    self.AddContour(isoSurface)
+    
+    
+    
+    
+      
   def displayRadPlanned(self):
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
     for modelNode in modelNodes.values():
@@ -200,6 +254,29 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
             modelNode.SetDisplayVisibility(abs(int(self.displayRadSegmentedButton.checked)-1))
             d = modelNode.GetDisplayNode()
             d.SetSliceIntersectionVisibility(abs(int(self.displayRadSegmentedButton.checked)-1))
+            
+  def displayContour(self,i,visibility):
+    # print i, visibility
+    modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
+    for modelNode in modelNodes.values():
+      if modelNode.GetAttribute("contour") == "1" and modelNode.GetAttribute("nth")==str(i) :
+        needleNode = slicer.mrmlScene.GetNodeByID(modelNode.GetAttribute("needleID"))
+        if needleNode != None:
+          if needleNode.GetDisplayVisibility()==1:
+            modelNode.SetDisplayVisibility(visibility)
+            d = modelNode.GetDisplayNode()
+            d.SetSliceIntersectionVisibility(visibility)
+            
+  def displayContours(self):
+    modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
+    for modelNode in modelNodes.values():
+      if modelNode.GetAttribute("contour") == "1":
+        needleNode = slicer.mrmlScene.GetNodeByID(modelNode.GetAttribute("needleID"))
+        if needleNode != None:
+          if needleNode.GetDisplayVisibility()==1:
+            modelNode.SetDisplayVisibility(abs(int(self.displayContourButton.checked)-1))
+            d = modelNode.GetDisplayNode()
+            d.SetSliceIntersectionVisibility(abs(int(self.displayContourButton.checked)-1))
 
   def analyzeSegmentation(self):
   
@@ -344,7 +421,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
           phi = math.degrees(math.acos((tip[0]-base[0])/((tip[0]*-base[0])**2+(tip[1]*100-base[1]*100)**2)**0.5))
           theta = math.degrees(math.acos((tip[1]-base[1])/((tip[1]-base[1])**2+(tip[2]-base[2])**2)**0.5))
           psi = math.degrees(math.acos((tip[0]-base[0])/((tip[0]-base[0])**2+(tip[2]-base[2])**2)**0.5))
-          print tip[0]-base[0],tip[1]-base[1],tip[2]-base[2]
+          # print tip[0]-base[0],tip[1]-base[1],tip[2]-base[2]
           
           result = "Needle " + self.option[int(modelNode.GetAttribute("nth"))]  +" Intensity average :" + str(indice)
           analysisLine = qt.QLabel(result)
@@ -542,14 +619,14 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     
     outputID = self.outputVolumeNode.GetID()
     
-    foldername = '/NeedleModels/' + datetime
+    self.foldername = '/NeedleModels/' + datetime
     
     # Set the parameters for the CLI module    
     parameters = {} 
     parameters['inputVolume'] = inputVolumeID
     parameters['inputLabel'] = inputLabelID
     parameters['outputVtk'] = outputID
-    parameters['outputFolderName'] = foldername
+    parameters['outputFolderName'] = self.foldername
     module = slicer.modules.mainlabelneedletrackingcli 
     self.__cliNode = None
     self.__cliNode = slicer.cli.run(module, None, parameters, wait_for_completion=True)
@@ -569,17 +646,22 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.base = [[0 for j in range(3)] for j in range(63)]
     self.tip = [[0 for j in range(3)] for j in range(63)]
     self.needlenode = [[0 for j in range(2)] for j in range(63)]
+    # self.contourNode = [[0 for j in range(2)] for j in range(63)]
     self.displaynode = [0 for j in range(63)]
+    # self.displayContourNode = [0 for j in range(63)]
     self.fiducialnode = [0 for j in range(63)]
 
     for i in xrange(63):
 
-      pathneedle = foldername+'/'+str(i)+'.vtp'
+      pathneedle = self.foldername+'/'+str(i)+'.vtp'
+      
       self.needlenode[i] = slicer.util.loadModel(pathneedle, True)
+      # self.contourNode[i] = slicer.util.loadModel(pathcontour, True)
 
       if self.needlenode[i][0] == True and self.needlenode[i][1] != None:
         self.displaynode[i] = self.needlenode[i][1].GetDisplayNode()
- 
+        # self.displayContourNode[i] = self.contourNode[i][1].GetDisplayNode()
+         
         polydata = self.needlenode[i][1].GetPolyData()
         polydata.GetPoint(0,self.base[i])        
       
@@ -592,12 +674,28 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
             bestmatch = j
             mindist = delta
 
-        self.showOneNeedle(i,0)
-        self.AddRadiation(bestmatch,self.needlenode[i][1].GetID())
+        # self.showOneNeedle(i,0)
+        # self.AddRadiation(bestmatch,self.needlenode[i][1].GetID())
         self.displaynode[i].SetColor(self.color[bestmatch])
+        # self.displayContourNode[i].SetColor(self.color[bestmatch])
         self.needlenode[i][1].SetName(self.option[bestmatch]+"_segmented")
+        # self.contourNode[i][1].SetName(self.option[bestmatch]+"_segmented_contour")
         self.needlenode[i][1].SetAttribute("segmented","1")
         self.needlenode[i][1].SetAttribute("nth",str(bestmatch))
+        self.needlenode[i][1].SetAttribute("needleID",self.needlenode[i][1].GetID())
+        # self.contourNode[i][1].SetAttribute("contour","1")
+        # self.contourNode[i][1].SetAttribute("nth",str(bestmatch))
+        # self.contourNode[i][1].SetAttribute("needleID",self.needlenode[i][1].GetID())
+        
+        # self.displayContourNode[i].SetSliceIntersectionVisibility(0)
+        # self.displayContourNode[i].SetScalarVisibility(1)
+        # self.displayContourNode[i].SetActiveScalarName('scalars')
+        # self.displayContourNode[i].SetScalarRange(0,230)
+        # self.displayContourNode[i].SetOpacity(0.06)
+        # self.displayContourNode[i].SetAndObserveColorNodeID('vtkMRMLColorTableNodeFileHotToColdRainbow.txt')
+        # self.displayContourNode[i].SetBackfaceCulling(0)
+        # self.displayContourNode[i].SetVisibility(0)
+        
     
     if self.removeDuplicates.isChecked():
       self.positionFilteringNeedles()
@@ -624,21 +722,31 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       if modelNode.GetAttribute("segmented") == "1":
         i = int(modelNode.GetAttribute("nth"))
         buttonDisplay = qt.QPushButton("Hide "+self.option[i])
+        # buttonDisplayContour = qt.QPushButton("Distance "+self.option[i])
         buttonDisplay.checkable = True
+        # buttonDisplayContour.checkable = True
         if modelNode.GetDisplayVisibility() ==0:
           buttonDisplay.setChecked(1)
+          # buttonDisplayContour.setChecked(1)
         buttonDisplay.connect("clicked()", lambda who=i: self.displayNeedle(who))
+        # buttonDisplayContour.connect("clicked()", functools.partial(self.displayContour,i,buttonDisplayContour.checked))
         buttonReformat = qt.QPushButton("Reformat "+self.option[i])
         buttonReformat.connect("clicked()", lambda who=i: self.reformatNeedle(who))
-        self.buttonsGroupBoxLayout.addRow(buttonDisplay,buttonReformat)
-      
+        widget = qt.QWidget()
+        hlay = qt.QHBoxLayout(widget)
+        hlay.addWidget(buttonDisplay)
+        # hlay.addWidget(buttonDisplayContour)
+        hlay.addWidget(buttonReformat)
+        self.buttonsGroupBoxLayout.addRow(widget)
+         
+   
   def displayNeedle(self,i):
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
     for modelNode in modelNodes.values():
       if modelNode.GetAttribute("nth")==str(i):
         displayNode = modelNode.GetModelDisplayNode()
         nVisibility = displayNode.GetVisibility()
-        print nVisibility
+        # print nVisibility
         if nVisibility:
           displayNode.SliceIntersectionVisibilityOff()
           displayNode.SetVisibility(0)
@@ -646,19 +754,28 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
           displayNode.SliceIntersectionVisibilityOn()
           displayNode.SetVisibility(1)
           
-          if self.displayRadSegmentedButton.checked == 0:
-            for radNode in modelNodes.values():
-              if radNode.GetName()=='Rad'+self.option[i]+'.vtk':
-                radNode.SetDisplayVisibility(1)
-              
-            
+          # if self.displayRadSegmentedButton.checked == 0:
+            # for radNode in modelNodes.values():
+              # if radNode.GetName()=='Rad'+self.option[i]+'.vtk':
+                # radNode.SetDisplayVisibility(1)
           
-    modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
-    for modelNode in modelNodes.values():
-      if modelNode.GetAttribute("radiation") == "segmented":
-        needleNode = slicer.mrmlScene.GetNodeByID(modelNode.GetAttribute("needleID"))
-        if needleNode.GetDisplayVisibility()==0:
-          modelNode.SetDisplayVisibility(0)
+          # if self.displayContourButton.checked == 0:
+            # for radNode in modelNodes.values():
+              # if radNode.GetName()==self.option[i]+'_segmented_contour':
+                # radNode.SetDisplayVisibility(1)
+                  
+    # modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
+    # for modelNode in modelNodes.values():
+      # if modelNode.GetAttribute("radiation") == "segmented":
+        # needleNode = slicer.mrmlScene.GetNodeByID(modelNode.GetAttribute("needleID"))
+        # if needleNode.GetDisplayVisibility()==0:
+          # modelNode.SetDisplayVisibility(0)
+    # modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
+    # for modelNode in modelNodes.values():
+      # if modelNode.GetAttribute("contour") == "1":
+        # needleNode = slicer.mrmlScene.GetNodeByID(modelNode.GetAttribute("needleID"))
+        # if needleNode.GetDisplayVisibility()==0:
+          # modelNode.SetDisplayVisibility(0)
           
   def reformatNeedle(self,i):
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
@@ -699,7 +816,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         if 1:
           i = int(modelNode.GetAttribute("nth"))
           if self.fiducialnode[i] == 0:    
-            polyData = displayNode.GetPolyData()
+            polyData = modelNode.GetPolyData()
             nb = int(polyData.GetNumberOfPoints()-1)
             coord = [0,0,0]
             if nb>10:
@@ -911,8 +1028,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
 
         self.p[0][i] = vtkmat.GetElement(0,3)
         self.p[1][i] = vtkmat.GetElement(1,3)
-      
-             
+                 
   def colorLabel(self):
     self.color= [[0,0,0] for i in range(310)] 
     self.color[0]=[221,108,158]
@@ -1202,7 +1318,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
   def showOneNeedle(self,i,visibility):
     fidname = "fid"+self.option[i]
     pNode = self.parameterNode()
-    needleID = pNode.GetParameter(self.option[i]+'.vtk')
+    needleID = pNode.GetParameter(self.option[i]+'.vtp')
     fidID = pNode.GetParameter(fidname)    
     NeedleNode = slicer.mrmlScene.GetNodeByID(needleID)
     fiducialNode = slicer.mrmlScene.GetNodeByID(fidID)    
@@ -1214,7 +1330,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       if fiducialNode == None:
         displayNode.SetVisibility(1)    
         displayNode.SetOpacity(0.9)
-        polyData = displayNode.GetPolyData()
+        polyData = NeedleNode.GetPolyData()
         polyData.Update()
         nb = int(polyData.GetNumberOfPoints()-1)
         coord = [0,0,0]
@@ -1290,7 +1406,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     displayNode = slicer.vtkMRMLModelDisplayNode()
     storageNode = slicer.vtkMRMLModelStorageNode()
  
-    fileName = self.option[i]+'.vtk'
+    fileName = self.option[i]+'.vtp'
     print("filename:",fileName)
 
     mrmlScene = slicer.mrmlScene
@@ -1311,7 +1427,6 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     modelNode.SetAndObserveDisplayNodeID(displayNode.GetID())
     if self.transform != None:
       modelNode.SetAndObserveTransformNodeID(self.transform.GetID())
-    displayNode.SetPolyData(modelNode.GetPolyData())
     self.colorLabel()
     displayNode.SetColor(self.color[i])
     displayNode.SetSliceIntersectionVisibility(0)
@@ -1319,116 +1434,152 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     pNode.SetParameter(fileName,modelNode.GetID())
     mrmlScene.AddNode(modelNode)
     displayNode.SetVisibility(1)
-    
-  def AddRadiation(self,i,needleID):
-    needleNode = slicer.mrmlScene.GetNodeByID(needleID)
-    polyData = needleNode.GetPolyData()
-    nb = polyData.GetNumberOfPoints()
-    base = [0,0,0]
-    tip = [[0,0,0] for k in range(11)]
-    if nb>100:
-      
-      polyData.GetPoint(nb-1,tip[10])
-      polyData.GetPoint(0,base)
-    
-    a = tip[10][0]-base[0]
-    b = tip[10][1]-base[1]
-    c = tip[10][2]-base[2]
-    
-    for l in range(7):
-      tip[9-l][0] = tip[10][0]-0.1*a*(l+1)
-      tip[9-l][1] = tip[10][1]-0.1*b*(l+1)
-      tip[9-l][2] = tip[10][2]-0.1*c*(l+1)
-    for l in range(1,3):
-      tip[l][0] = tip[10][0]+0.1*a*l
-      tip[l][1] = tip[10][1]+0.1*b*l
-      tip[l][2] = tip[10][2]+0.1*c*l
-      
-    # nu = (base[0]**2+base[1]**2+base[2]**2)**0.5  
-    # nv = (tip[0]**2+tip[1]**2+tip[2]**2)**0.5  
-    # ux=base[0]/nu
-    # uy=base[1]/nu
-    # uz=base[2]/nu
-    # vx=tip[0]/nv
-    # vy=tip[1]/nv
-    # vz=tip[2]/nv
-    
-    # Nx = tip[0]-base[0]
-    # Ny = tip[1]-base[1]
-    # Nz = tip[2]-base[2]
-    # NN = ( Nx**2+Ny**2+Nz**2 )**0.5
-    # nx = Nx /NN
-    # ny = Ny /NN
-    # nz = Nz /NN
-    
-    # costheta=ux*vx + uy*vy + uz*vz
-    # uXv = [uy*vz-uz*vy,uz*vx-ux*vz,ux*vy-uy*vx]
-    # sintheta = (uXv[0]**2+uXv[1]**2+uXv[2]**2)**0.5
-    
-    # # R2.SetElement(0,0, nx**2 + (1-nx**2)*costheta )
-    # # R2.SetElement(0,1, nx*ny*(1-costheta)-nz*sintheta)
-    # # R2.SetElement(0,2, nx*nz*(1-costheta)+ny*sintheta)
-    # # R2.SetElement(1,0, nx*ny*(1-costheta)+nz*sintheta)
-    # # R2.SetElement(1,1, ny**2 + (1-ny**2)*costheta)
-    # # R2.SetElement(1,2, ny*nz*(1-costheta)-nx*sintheta)
-    # # R2.SetElement(2,0, nx*nz*(1-costheta)-ny*sintheta)
-    # # R2.SetElement(2,1, ny*nz*(1-costheta)+nx*sintheta)
-    # # R2.SetElement(2,2, nz**2 + (1-nz**2)*costheta)
-    # # R2.SetElement(0,3,tip[0])
-    # # R2.SetElement(1,3,tip[1])
-    # # R2.SetElement(2,3,tip[2])   
-
-    # print R2    
-    rad = vtk.vtkAppendPolyData()  
-    
-    for l in range(1,11):
-      TransformPolyDataFilter=vtk.vtkTransformPolyDataFilter()
-      Transform=vtk.vtkTransform()        
-      TransformPolyDataFilter.SetInput(self.m_polyRadiation)
-
-      vtkmat = Transform.GetMatrix()
-      vtkmat.SetElement(0,3,tip[l][0])
-      vtkmat.SetElement(1,3,tip[l][1])
-      vtkmat.SetElement(2,3,tip[l][2])
-      TransformPolyDataFilter.SetTransform(Transform)
-      TransformPolyDataFilter.Update()
-    
-      rad.AddInput(TransformPolyDataFilter.GetOutput())
-    
+  
+  def AddContour(self,polyData):
+    # print polyData
+    modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
+    for modelNode in modelNodes.values():
+      if modelNode.GetAttribute('isocontours') == "1":
+        slicer.mrmlScene.RemoveNode(modelNode)        
+  
     modelNode = slicer.vtkMRMLModelNode()
     displayNode = slicer.vtkMRMLModelDisplayNode()
-    storageNode = slicer.vtkMRMLModelStorageNode()
  
-    fileName = 'Rad'+self.option[i]+'.vtk'
+    fileName = 'Contour'
+    # print("contour:",fileName)
 
     mrmlScene = slicer.mrmlScene
-    modelNode.SetName(fileName)
-    modelNode.SetAttribute("radiation","segmented")
-    modelNode.SetAttribute("needleID",str(needleID))    
-    modelNode.SetAndObservePolyData(rad.GetOutput()) 
-
+    modelNode.SetName(fileName)  
+    modelNode.SetAndObservePolyData(polyData)
+    modelNode.SetAttribute("isocontours","1")
     modelNode.SetScene(mrmlScene)
-    storageNode.SetScene(mrmlScene)
-    storageNode.SetFileName(fileName)  
     displayNode.SetScene(mrmlScene)
-    displayNode.SetVisibility(0)
-    mrmlScene.AddNode(storageNode)
+    
+    
     mrmlScene.AddNode(displayNode)
     mrmlScene.AddNode(modelNode)
-    modelNode.SetAndObserveStorageNodeID(storageNode.GetID())
     modelNode.SetAndObserveDisplayNodeID(displayNode.GetID())
     
-    displayNode.SetPolyData(modelNode.GetPolyData())
-
-    displayNode.SetSliceIntersectionVisibility(0)
-    displayNode.SetScalarVisibility(1)
-    displayNode.SetActiveScalarName('scalars')
-    displayNode.SetScalarRange(0,230)
+    displayNode.SetVisibility(1)
     displayNode.SetOpacity(0.06)
+    displayNode.SetSliceIntersectionVisibility(1)
+    displayNode.SetScalarVisibility(1)
+    displayNode.SetActiveScalarName('ImageScalars') 
     displayNode.SetAndObserveColorNodeID('vtkMRMLColorTableNodeFileHotToColdRainbow.txt')
+    displayNode.SetScalarRange(10,40)
     displayNode.SetBackfaceCulling(0)
+
     pNode= self.parameterNode()
     pNode.SetParameter(fileName,modelNode.GetID())
-    mrmlScene.AddNode(modelNode)
+
+    qt.QApplication.processEvents()
+	
+    if int(slicer.app.repositoryRevision)>= 20973:
+      parameters = {}
+      parameters['nodeID'] = modelNode.GetID()
+      parameters['fileName'] = self.foldername+'/Isocontours.vtp'
+      slicer.app.coreIOManager().saveNodes('modelFile', parameters)
+    else:
+      storageNode = slicer.vtkMRMLModelStorageNode()
+      storageNode.SetScene(mrmlScene)
+      mrmlScene.AddNode(storageNode)
+      storageNode.SetFileName(self.foldername+'/Isocontours.vtp')
+      modelNode.SetAndObserveStorageNodeID(storageNode.GetID())
+      storageNode.WriteData(modelNode)
+	
+    slicer.mrmlScene.RemoveNode(storageNode)
+    modelNode.SetDisplayVisibility(0)
+    slicer.mrmlScene.RemoveNode(modelNode)
+	
+    contourModel = slicer.util.loadModel(self.foldername+'/Isocontours.vtp', True)
+    if contourModel[0] == True and contourModel[1] != None:
+      contourModel[1].SetAttribute("isocontours","1")
+      displayNode = contourModel[1].GetDisplayNode()
+      displayNode.SetVisibility(1)
+      displayNode.SetSliceIntersectionVisibility(1)
+      displayNode.SetPolyData(modelNode.GetPolyData())
+      displayNode.SetActiveScalarName('ImageScalars')
+      displayNode.SetScalarRange(10,40)
+      displayNode.SetOpacity(0.06)
+      displayNode.SetAndObserveColorNodeID('vtkMRMLColorTableNodeFileHotToColdRainbow.txt')
+      displayNode.SetBackfaceCulling(0)
+      
+    
+  def AddRadiation(self,i,needleID):
+    pass
+    # needleNode = slicer.mrmlScene.GetNodeByID(needleID)
+    # polyData = needleNode.GetPolyData()
+    # nb = polyData.GetNumberOfPoints()
+    # base = [0,0,0]
+    # tip = [[0,0,0] for k in range(11)]
+    # if nb>100:
+      
+      # polyData.GetPoint(nb-1,tip[10])
+      # polyData.GetPoint(0,base)
+    
+    # a = tip[10][0]-base[0]
+    # b = tip[10][1]-base[1]
+    # c = tip[10][2]-base[2]
+    
+    # for l in range(7):
+      # tip[9-l][0] = tip[10][0]-0.1*a*(l+1)
+      # tip[9-l][1] = tip[10][1]-0.1*b*(l+1)
+      # tip[9-l][2] = tip[10][2]-0.1*c*(l+1)
+    # for l in range(1,3):
+      # tip[l][0] = tip[10][0]+0.1*a*l
+      # tip[l][1] = tip[10][1]+0.1*b*l
+      # tip[l][2] = tip[10][2]+0.1*c*l
+         
+    # rad = vtk.vtkAppendPolyData()  
+    
+    # for l in range(1,11):
+      # TransformPolyDataFilter=vtk.vtkTransformPolyDataFilter()
+      # Transform=vtk.vtkTransform()        
+      # TransformPolyDataFilter.SetInput(self.m_polyRadiation)
+
+      # vtkmat = Transform.GetMatrix()
+      # vtkmat.SetElement(0,3,tip[l][0])
+      # vtkmat.SetElement(1,3,tip[l][1])
+      # vtkmat.SetElement(2,3,tip[l][2])
+      # TransformPolyDataFilter.SetTransform(Transform)
+      # TransformPolyDataFilter.Update()
+    
+      # rad.AddInput(TransformPolyDataFilter.GetOutput())
+    
+    # modelNode = slicer.vtkMRMLModelNode()
+    # displayNode = slicer.vtkMRMLModelDisplayNode()
+    # storageNode = slicer.vtkMRMLModelStorageNode()
+ 
+    # fileName = 'Rad'+self.option[i]+'.vtk'
+
+    # mrmlScene = slicer.mrmlScene
+    # modelNode.SetName(fileName)
+    # modelNode.SetAttribute("radiation","segmented")
+    # modelNode.SetAttribute("needleID",str(needleID))    
+    # modelNode.SetAndObservePolyData(rad.GetOutput()) 
+
+    # modelNode.SetScene(mrmlScene)
+    # storageNode.SetScene(mrmlScene)
+    # storageNode.SetFileName(fileName)  
+    # displayNode.SetScene(mrmlScene)
+    # displayNode.SetVisibility(0)
+    # mrmlScene.AddNode(storageNode)
+    # mrmlScene.AddNode(displayNode)
+    # mrmlScene.AddNode(modelNode)
+    # modelNode.SetAndObserveStorageNodeID(storageNode.GetID())
+    # modelNode.SetAndObserveDisplayNodeID(displayNode.GetID())
+    
+    # displayNode.SetPolyData(modelNode.GetPolyData())
+
+    # displayNode.SetSliceIntersectionVisibility(0)
+    # displayNode.SetScalarVisibility(1)
+    # displayNode.SetActiveScalarName('scalars')
+    # displayNode.SetScalarRange(0,230)
+    # displayNode.SetOpacity(0.06)
+    # displayNode.SetAndObserveColorNodeID('vtkMRMLColorTableNodeFileHotToColdRainbow.txt')
+    # displayNode.SetBackfaceCulling(0)
+    # pNode= self.parameterNode()
+    # pNode.SetParameter(fileName,modelNode.GetID())
+    # mrmlScene.AddNode(modelNode)
     
     

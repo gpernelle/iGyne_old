@@ -205,8 +205,10 @@ class iGyneLoadModelStep( iGyneStep ) :
     pNode = self.parameterNode()
     pNode.SetParameter('currentStep', self.stepid) 
     applicator  = pNode.GetParameter('Template')
-    if applicator == "Template+Obturator":
-      self.loadTemplate()    
+    if applicator == "4points":
+      self.loadTemplate(4)
+    if applicator == "3points":
+      self.loadTemplate(3)      
     if self.skip == 0:
       self.updateWidgetFromParameters(self.parameterNode())
    
@@ -256,11 +258,14 @@ class iGyneLoadModelStep( iGyneStep ) :
     roiTransformNode.SetAndObserveMatrixTransformToParent(dm)     
 
 
-  def loadTemplate(self):
+  def loadTemplate(self,nb):
     pNode = self.parameterNode()
     alreadyloaded = pNode.GetParameter("Template-loaded")
     if alreadyloaded != "1":
-      pathToScene = slicer.modules.igynepy.path.replace("iGynePy.py","iGynePyTemplate/Template/Template.mrml")
+      if nb == 3:
+        pathToScene = slicer.modules.igynepy.path.replace("iGynePy.py","iGynePyTemplate/Template/3points/Template.mrml")
+      elif nb ==4:
+        pathToScene = slicer.modules.igynepy.path.replace("iGynePy.py","iGynePyTemplate/Template/4points/Template.mrml")
       slicer.util.loadScene( pathToScene, True)
       self.loadTemplateButton.setEnabled(0)
       pNode.SetParameter("Template-loaded","1")
