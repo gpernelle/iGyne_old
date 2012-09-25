@@ -102,6 +102,14 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     
     basicFrameLayout.addRow(threshLabel, self.__threshRange)
     basicFrameLayout.addRow(self.__applyButton)
+    
+    self.__autosegButton = qt.QPushButton('Automatic Obturator Segmentation')
+    self.__autosegButton.connect('clicked()', self.obturatorSegmentation)
+    
+   
+    basicFrameLayout.addRow(self.__autosegButton)
+    
+    
     advFrameLayout.addRow(threshCheckLabel, self.__useThresholdsCheck)
     advFrameLayout.addRow( roiLabel, self.__roiLabelSelector )
 
@@ -111,7 +119,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     groupbox = qt.QGroupBox()
     groupboxLayout  = qt.QFormLayout(groupbox)
     groupboxLayout.addRow(slicer.modules.editor.widgetRepresentation())
-    self.__layout.addRow(groupbox)
+    advFrameLayout.addRow(groupbox)
     
     self.__secondReg = qt.QPushButton('3/ ICP Registration')
     string = 'Register Template and Model.'
@@ -144,6 +152,34 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     fLabel = qt.QLabel("Pull Obturator: ")
     self.__layout.addRow(fLabel,self.pushObturatorValueButton)
     self.pushObturatorValueButton.connect('valueChanged(int)', self.pushObturator)
+    
+    
+    self.nbIterButton = qt.QSpinBox()
+    self.nbIterButton.setMinimum(0)
+    self.nbIterButton.setMaximum(1000)
+    self.nbIterButton.setValue(20)
+    nbIterButtonLabel = qt.QLabel('Nb Iterations')
+    advFrameLayout.addRow( nbIterButtonLabel, self.nbIterButton)
+    self.checkMeandist = qt.QSpinBox()
+    self.checkMeandist.setMinimum(0)
+    self.checkMeandist.setMaximum(1)
+    self.checkMeandist.setValue(0)
+    checkMeandistLabel = qt.QLabel('Check Mean Distance')
+    advFrameLayout.addRow( checkMeandistLabel, self.checkMeandist)
+    self.Meandist = qt.QSpinBox()
+    self.Meandist.setMinimum(0)
+    self.Meandist.setMaximum(10000)
+    self.Meandist.setValue(20)
+    meandistLabel = qt.QLabel('Mean Distance Stop (/10000)')
+    advFrameLayout.addRow( meandistLabel, self.Meandist)
+    self.landmarksNb = qt.QSpinBox()
+    self.landmarksNb.setMinimum(0)
+    self.landmarksNb.setMaximum(10000)
+    self.landmarksNb.setValue(1000)
+    landmarksNbLabel = qt.QLabel('LandMarksNb')
+    advFrameLayout.addRow( landmarksNbLabel, self.landmarksNb)
+    
+    
     
 
   def pushObturator(self):
@@ -188,24 +224,32 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
   
   def ICPRegistration(self):
     
-    if self.regIter==0:
-      nbIteration = 20
-    elif self.regIter==1:
-      nbIteration = 100
-    else:
-      nbIteration = 300
+    # if self.regIter==0:
+      # nbIteration = 20
+    # elif self.regIter==1:
+      # nbIteration = 40
+    # else:
+      # nbIteration = 20
     
     
     numNodes = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLModelNode" ) 
     segmentationModel = None 
     modelFromImageNode = None
+    modelFromImageNodeManu = None
+    modelFromImageNodeAuto = None
     for n in xrange(numNodes): 
       node = slicer.mrmlScene.GetNthNodeByClass( n, "vtkMRMLModelNode" ) 
       if node.GetName() == "baselineROI_segmentation_10_Post-Gyrus": 
         segmentationModel = node 
       if node.GetName() == "obturator": 
-        modelFromImageNode = node 
-        break
+        modelFromImageNodeManu = node 
+      elif node.GetName() == "obturator_10_Post-Gyrus": 
+        modelFromImageNodeAuto = node 
+    
+    if modelFromImageNodeManu != None and modelFromImageNodeAuto !=None :
+      modelFromImageNode = modelFromImageNodeManu
+    elif modelFromImageNodeAuto !=None:
+      modelFromImageNode = modelFromImageNodeAuto
     if modelFromImageNode != None: 
       self.__registrationStatus.setText('Please Wait ...')
       self.__secondReg.setEnabled(0)
@@ -278,10 +322,10 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       icpTransform = vtk.vtkIterativeClosestPointTransform()
       icpTransform.SetSource(addSource.GetOutput())
       icpTransform.SetTarget(addTarget.GetOutput())
-      icpTransform.SetCheckMeanDistance(0)
-      icpTransform.SetMaximumMeanDistance(0.1)
-      icpTransform.SetMaximumNumberOfIterations(nbIteration)
-      icpTransform.SetMaximumNumberOfLandmarks(1000)
+      icpTransform.SetCheckMeanDistance(self.checkMeandist.value)
+      icpTransform.SetMaximumMeanDistance(self.Meandist.value/10000)
+      icpTransform.SetMaximumNumberOfIterations(self.nbIterButton.value)
+      icpTransform.SetMaximumNumberOfLandmarks(self.landmarksNb.value)
       icpTransform.SetMeanDistanceModeToRMS()
       icpTransform.GetLandmarkTransform().SetModeToRigidBody()
       icpTransform.Update()
@@ -304,6 +348,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     Helper.SetLabelVolume('None')
     self.obturatorDisplayModel.SetVisibility(0)
     self.templateDisplayModel.SetVisibility(0)
+    pNode =self.parameterNode()
+    Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
     
     # self.removeNodes()
 
@@ -508,6 +554,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     baselineROIRange = baselineROIVolume.GetImageData().GetScalarRange()
     self.__threshRange.minimum = baselineROIRange[0]
     self.__threshRange.maximum = baselineROIRange[1]
+    
 
     if pNode.GetParameter('useSegmentationThresholds') == 'True':
       self.__useThresholds = True
@@ -679,4 +726,144 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.m.SetElement(0,3,x)
     self.m.SetElement(1,3,y)
     self.m.SetElement(2,3,z)
+    
+  def obturatorSegmentation(self):
+    x=  (46.1749-23.8251)/2+23.8251
+    y = (65.1951-42.9222)/2+42.9222
+    z = 150/2-120
+    pNode = self.parameterNode()
+    volume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
+    modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
+    for modelNode in modelNodes.values():
+      if modelNode.GetName()=='Obturator_reg':
+        obturator = modelNode
+    
+    coord=[0,0,0]
+    polydata = obturator.GetPolyData()
+    polydata.GetPoint(polydata.GetNumberOfPoints()-1,coord)
+    
+    
+    # create ROI
+    roi = slicer.mrmlScene.CreateNodeByClass('vtkMRMLAnnotationROINode')
+    slicer.mrmlScene.AddNode(roi)
+    roi.VisibleOn()
+    # Transform ROI to match the obturator after the first (fiducial) registration
+    transform = slicer.vtkMRMLLinearTransformNode()
+    slicer.mrmlScene.AddNode(transform)
+    transformID = obturator.GetTransformNodeID()
+    transform = slicer.mrmlScene.GetNodeByID(transformID)
+    M = transform.GetMatrixTransformToParent()
+    m = vtk.vtkMatrix4x4()
+    t = slicer.mrmlScene.CreateNodeByClass('vtkMRMLLinearTransformNode')
+    slicer.mrmlScene.AddNode(t)
+    # obturator in initial position to get the boundaries of the model -> boundaries of ROI
+    obturator.SetAndObserveTransformNodeID(t.GetID())
+    bounds = [0,0,0,0,0,0]
+    obturator.GetRASBounds(bounds)
+    roi.SetRadiusXYZ(abs(bounds[0]-bounds[1])*1.2,abs(bounds[2]-bounds[3])*1.2,abs(bounds[4]-bounds[5])/3)
+    # move again obturator in previous position (after first registration)
+    obturator.SetAndObserveTransformNodeID(transform.GetID())
+    m.DeepCopy(M)
+    m0=vtk.vtkMatrix4x4()
+    m0.SetElement(0,3,x)
+    m0.SetElement(1,3,y)
+    m0.SetElement(2,3,z)
+    m.Multiply4x4(m,m0,m)
+    t.SetAndObserveMatrixTransformToParent(m)
+    roi.SetAndObserveTransformNodeID(t.GetID())
+    roi.SetLocked(1)
+    roi.SetXYZ([0,0,-50+self.pushObturatorValueButton.value])
+    #crop volume
+    cropVolumeNode =slicer.mrmlScene.CreateNodeByClass('vtkMRMLCropVolumeParametersNode')
+    cropVolumeNode.SetScene(slicer.mrmlScene)
+    cropVolumeNode.SetName('obturator_CropVolume_node')
+    cropVolumeNode.SetIsotropicResampling(True)
+    cropVolumeNode.SetSpacingScalingConst(0.5)
+    slicer.mrmlScene.AddNode(cropVolumeNode)
+    cropVolumeNode.SetInputVolumeNodeID(volume.GetID())
+    cropVolumeNode.SetROINodeID(roi.GetID())
+    cropVolumeLogic = slicer.modules.cropvolume.logic()
+    cropVolumeLogic.Apply(cropVolumeNode)
+    outputVolume = slicer.mrmlScene.GetNodeByID(cropVolumeNode.GetOutputVolumeNodeID())
+    outputVolume.SetName("obturatorROI")
+    self.outputMedianVolume = slicer.mrmlScene.CreateNodeByClass('vtkMRMLScalarVolumeNode')
+    self.outputMedianVolume.SetName('Median Filter Output')
+    slicer.mrmlScene.AddNode(self.outputMedianVolume)
+    #median filter processing
+    parameters = {}
+    parameters["inputVolume"] = outputVolume
+    parameters["outputVolume"] = self.outputMedianVolume
+    parameters["neighborhood"] = 3,8,1
+    medianfiltercli = slicer.modules.medianimagefilter
+    __cliNode = None
+    __cliNode = slicer.cli.run(medianfiltercli, __cliNode, parameters)
+    
+    self.__cliObserverTag = __cliNode.AddObserver('ModifiedEvent', self.thresholdObturator)
+    # self.__registrationStatus.setText('Wait ...')
+    
+  def thresholdObturator(self, node, event):
+    pNode = self.parameterNode()
+    status = node.GetStatusString()
+    # self.__registrationStatus.setText('Hough Transforn '+status)
+    if status == 'Completed':
+      vl = slicer.modules.volumes.logic()
+      roiSegmentation = vl.CreateLabelVolume(slicer.mrmlScene, self.outputMedianVolume, 'obturator_segmentation')
+      # roiRange = outputVolume.GetImageData().GetScalarRange()
+      # default threshold is half-way of the range
+      # thresholdParameter = str(0)+','+str(roiRange[1])
+      
+      labelsColorNode = slicer.modules.colors.logic().GetColorTableNodeID(10)
+      roiSegmentation.GetDisplayNode().SetAndObserveColorNodeID(labelsColorNode)
+      
+      thresh = vtk.vtkImageThreshold()
+      thresh.SetInput(self.outputMedianVolume.GetImageData())
+      thresh.ThresholdBetween(0, 30)
+      thresh.SetInValue(10)
+      thresh.SetOutValue(0)
+      thresh.ReplaceOutOn()
+      thresh.ReplaceInOn()
+      thresh.Update()
+      roiSegmentation.SetAndObserveImageData(thresh.GetOutput())
+      
+      #make model from segmented labelmap
+     # set up the model maker node 
+      parameters = {} 
+      parameters['Name'] = 'obturator'
+      parameters["InputVolume"] = roiSegmentation.GetID() 
+      parameters['FilterType'] = "Sinc" 
+      # build only the currently selected model. 
+      # parameters['Labels'] = self.getPaintLabel() 
+      parameters["StartLabel"] = -1 
+      parameters["EndLabel"] = -1 
+      parameters['GenerateAll'] = True 
+      parameters["JointSmoothing"] = False 
+      parameters["SplitNormals"] = True 
+      parameters["PointNormals"] = True 
+      parameters["SkipUnNamed"] = True 
+      parameters["Decimate"] = 0.25 
+      parameters["Smooth"] = 10 
+      # output 
+      # - make a new hierarchy node if needed 
+      #
+      Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')      
+      numNodes = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLModelHierarchyNode" ) 
+      segmentationModel = None 
+      for n in xrange(numNodes): 
+        node = slicer.mrmlScene.GetNthNodeByClass( n, "vtkMRMLModelHierarchyNode" ) 
+        if node.GetName() == "Obturator Segmentation Model": 
+          segmentationModel = node 
+          break  
+      if not segmentationModel: 
+        segmentationModel = slicer.vtkMRMLModelHierarchyNode() 
+        segmentationModel.SetScene( slicer.mrmlScene ) 
+        segmentationModel.SetName( "Obturator Segmentation Model" ) 
+        slicer.mrmlScene.AddNode( segmentationModel )
+           
+      parameters["ModelSceneFile"] = segmentationModel 
+      modelMaker = slicer.modules.modelmaker 
+      __cliNode = None
+      __cliNode = slicer.cli.run(modelMaker, __cliNode, parameters) 
+      
+      Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
+
     

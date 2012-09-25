@@ -69,10 +69,17 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     self.__layout.addRow( roiLabel, self.__roiSelector )
     self.__roiSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onROIChanged)
 
+    
+    self.__advancedFrame = ctk.ctkCollapsibleButton()
+    self.__advancedFrame.text = "VOI Parameters"
+    self.__advancedFrame.collapsed = 1
+    advFrameLayout = qt.QFormLayout(self.__advancedFrame)
+    self.__layout.addRow(self.__advancedFrame)
+    
     # the VOI parameters
     voiGroupBox = qt.QGroupBox()
     voiGroupBox.setTitle( 'Define VOI' )
-    self.__layout.addRow( voiGroupBox )
+    advFrameLayout.addRow( voiGroupBox )
     voiGroupBoxLayout = qt.QFormLayout( voiGroupBox )
     self.__roiWidget = PythonQt.qSlicerAnnotationsModuleWidgets.qMRMLAnnotationROIWidget()
     voiGroupBoxLayout.addRow( self.__roiWidget )
@@ -225,6 +232,18 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
         fiducial.Initialize(slicer.mrmlScene)
         # adding to hierarchy is handled by the Reporting logic
         # self.fixedLandmarks.AddItem(fiducial)
+    
+      sRed = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeRed")
+      if sRed ==None :
+        sRed = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNode1")        
+      
+      # sRed.SetSliceVisible(1)
+     
+      m= sRed.GetSliceToRAS()
+      m.SetElement(0,3,sortedConverted[3][0])
+      m.SetElement(1,3,sortedConverted[3][1])
+      m.SetElement(2,3,sortedConverted[3][2])
+      sRed.Modified()
     
     self.firstRegistration()
     # self.stop()

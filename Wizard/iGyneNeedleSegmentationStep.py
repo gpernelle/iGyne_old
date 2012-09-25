@@ -184,20 +184,99 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     # self.__layout.addRow(self.displayRadSegmentedButton)
     self.__layout.addRow(self.displayContourButton)
     self.__layout.addRow(self.analysisReportButton)
- 
-  def drawIsoSurfaces( self ):
+    
+    # self.dim = qt.QSpinBox()
+    # self.dim.setMinimum(-500)
+    # self.dim.setMaximum(500)
+    # dimLabel = qt.QLabel("Dimensions: ")
+    # self.__layout.addRow(dimLabel,self.dim)
+    # self.adist = qt.QSpinBox()
+    # self.adist.setMinimum(-50000)
+    # self.adist.setMaximum(50000)
+    # aLabel = qt.QLabel("Adjust Distance: ")
+    # self.__layout.addRow(aLabel,self.adist)
+    # self.maxdist = qt.QSpinBox()
+    # self.maxdist.setMinimum(-50000)
+    # self.maxdist.setMaximum(50000)
+    # mdistLabel = qt.QLabel("Maximum Distance: ")
+    # self.__layout.addRow(mdistLabel,self.maxdist)
+    # self.nb = qt.QSpinBox()
+    # self.nb.setMinimum(0)
+    # self.nb.setMaximum(50)
+    # nbLabel = qt.QLabel("Nb contours: ")
+    # self.__layout.addRow(nbLabel,self.nb)
+    # self.minRange = qt.QSpinBox()
+    # self.minRange.setMinimum(0)
+    # self.minRange.setMaximum(500)
+    
+    
+    # self.abonds = qt.QSpinBox()
+    # self.abonds.setMinimum(0)
+    # self.abonds.setMaximum(1)
+    # abondsLabel = qt.QLabel("Adjust Bonds: ")
+    # self.__layout.addRow(abondsLabel,self.abonds)
+    # self.cells = qt.QSpinBox()
+    # self.cells.setMinimum(0)
+    # self.cells.setMaximum(1)
+    # cellsLabel = qt.QLabel("Cell/Voxel: ")
+    # self.__layout.addRow(cellsLabel,self.cells)
+    
+    # self.contour = qt.QSpinBox()
+    # self.contour.setMinimum(0)
+    # self.contour.setMaximum(10)
+    # contourLabel = qt.QLabel("Contour: ")
+    # self.__layout.addRow(contourLabel,self.contour)
+    # self.contourValue = qt.QSpinBox()
+    # self.contourValue.setMinimum(0)
+    # self.contourValue.setMaximum(1000)
+    # contourValueLabel = qt.QLabel("Contour Value: ")
+    # self.__layout.addRow(contourValueLabel,self.contourValue)
+    # self.contour2 = qt.QSpinBox()
+    # self.contour2.setMinimum(0)
+    # self.contour2.setMaximum(10)
+    # contourLabel = qt.QLabel("Contour: ")
+    # self.__layout.addRow(contourLabel,self.contour2)
+    # self.contourValue2 = qt.QSpinBox()
+    # self.contourValue2.setMinimum(0)
+    # self.contourValue2.setMaximum(1000)
+    # contourValueLabel = qt.QLabel("Contour Value: ")
+    # self.__layout.addRow(contourValueLabel,self.contourValue2)
+    # self.contour3 = qt.QSpinBox()
+    # self.contour3.setMinimum(0)
+    # self.contour3.setMaximum(10)
+    # contourLabel = qt.QLabel("Contour: ")
+    # self.__layout.addRow(contourLabel,self.contour3)
+    # self.contourValue3 = qt.QSpinBox()
+    # self.contourValue3.setMinimum(0)
+    # self.contourValue3.setMaximum(1000)
+    # contourValueLabel = qt.QLabel("Contour Value: ")
+    # self.__layout.addRow(contourValueLabel,self.contourValue3)
+    # self.contour4 = qt.QSpinBox()
+    # self.contour4.setMinimum(0)
+    # self.contour4.setMaximum(10)
+    # contourLabel = qt.QLabel("Contour: ")
+    # self.__layout.addRow(contourLabel,self.contour4)
+    # self.contourValue4 = qt.QSpinBox()
+    # self.contourValue4.setMinimum(0)
+    # self.contourValue4.setMaximum(1000)
+    # contourValueLabel = qt.QLabel("Contour Value: ")
+    # self.__layout.addRow(contourValueLabel,self.contourValue4)
+    # self.contour5 = qt.QSpinBox()
+    # self.contour5.setMinimum(0)
+    # self.contour5.setMaximum(10)
+    # contourLabel = qt.QLabel("Contour: ")
+    # self.__layout.addRow(contourLabel,self.contour5)
+    # self.contourValue5 = qt.QSpinBox()
+    # self.contourValue5.setMinimum(0)
+    # self.contourValue5.setMaximum(1000)
+    # contourValueLabel = qt.QLabel("Contour Value: ")
+    # self.__layout.addRow(contourValueLabel,self.contourValue5)
+    
+    
+  
+  def drawIsoSurfaces0( self ):
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
-    
-    # b = vtk.vtkImplicitBoolean()
-    # b.SetOperationTypeToUnion()
-    
-    # for modelNode in modelNodes.values():
-      # if modelNode.GetAttribute("contour")=="1":
-        # print modelNode.GetID()
-        # v = vtk.vtkImplicitDataSet()
-        # v.SetDataSet(modelNode.GetPolyData())
-        # b.AddFunction(v)
-    
+       
     v= vtk.vtkAppendPolyData()
     
     for modelNode in modelNodes.values():
@@ -206,34 +285,64 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
        
     modeller = vtk.vtkImplicitModeller()
     modeller.SetInput(v.GetOutput())
-    modeller.SetSampleDimensions(50,50,50)
+    modeller.SetSampleDimensions(self.dim.value,self.dim.value,self.dim.value)
     modeller.SetCapping(0)
-    # modeller.AdjustBoundsOn()
+    modeller.SetAdjustBounds(self.abonds.value)
     modeller.SetProcessModeToPerVoxel() 
-    modeller.SetAdjustDistance(1)
-    modeller.SetMaximumDistance(1)    
-        
-    # sample = vtk.vtkSampleFunction()
-    # sample.SetImplicitFunction(b)
-    # sample.SetModelBounds(-10,10,-10,10,-10,10)
-    # sample.SetCapping(0)
-    # sample.SetComputeNormals(1)
-    # sample.SetSampleDimensions(10,10,10)
+    modeller.SetAdjustDistance(self.adist.value/100)
+    modeller.SetMaximumDistance(self.maxdist.value/100)    
     
     contourFilter = vtk.vtkContourFilter()
-    contourFilter.SetNumberOfContours(3)
+    contourFilter.SetNumberOfContours(self.nb.value)
     contourFilter.SetInputConnection(modeller.GetOutputPort())    
     contourFilter.ComputeNormalsOn()
     contourFilter.ComputeScalarsOn()
-    contourFilter.GenerateValues(3,0,30)
+    contourFilter.UseScalarTreeOn()
+    contourFilter.SetValue(self.contour.value,self.contourValue.value)
+    contourFilter.SetValue(self.contour2.value,self.contourValue2.value)
+    contourFilter.SetValue(self.contour3.value,self.contourValue3.value)
+    contourFilter.SetValue(self.contour4.value,self.contourValue4.value)
+    contourFilter.SetValue(self.contour5.value,self.contourValue5.value)
+
+    isoSurface = contourFilter.GetOutput()
+    
+    
+    self.AddContour(isoSurface)  
+ 
+  def drawIsoSurfaces( self ):
+    modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
+       
+    v= vtk.vtkAppendPolyData()
+    
+    for modelNode in modelNodes.values():
+      if modelNode.GetAttribute("nth")!=None and modelNode.GetDisplayVisibility()==1 :
+        v.AddInput(modelNode.GetPolyData())
+       
+    modeller = vtk.vtkImplicitModeller()
+    modeller.SetInput(v.GetOutput())
+    modeller.SetSampleDimensions(80,80,80)
+    modeller.SetCapping(0)
+    modeller.AdjustBoundsOn()
+    modeller.SetProcessModeToPerVoxel() 
+    modeller.SetAdjustDistance(1)
+    modeller.SetMaximumDistance(1)    
+    
+    contourFilter = vtk.vtkContourFilter()
+    contourFilter.SetNumberOfContours(5)
+    contourFilter.SetInputConnection(modeller.GetOutputPort())    
+    contourFilter.ComputeNormalsOn()
+    contourFilter.ComputeScalarsOn()
+    contourFilter.UseScalarTreeOn()
+    contourFilter.SetValue(1,11)
+    contourFilter.SetValue(2,13)
+    contourFilter.SetValue(3,15)
+    contourFilter.SetValue(4,20)
+    contourFilter.SetValue(5,25)
     isoSurface = contourFilter.GetOutput()
     
     
     self.AddContour(isoSurface)
-    
-    
-    
-    
+
       
   def displayRadPlanned(self):
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
@@ -1465,7 +1574,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     displayNode.SetSliceIntersectionVisibility(1)
     displayNode.SetScalarVisibility(1)
     displayNode.SetActiveScalarName('ImageScalars') 
-    displayNode.SetAndObserveColorNodeID('vtkMRMLColorTableNodeFileHotToColdRainbow.txt')
+    displayNode.SetAndObserveColorNodeID('vtkMRMLColorTableNodeFileHotToColdRainbow2.txt')
     displayNode.SetScalarRange(10,40)
     displayNode.SetBackfaceCulling(0)
 
@@ -1501,7 +1610,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       displayNode.SetActiveScalarName('ImageScalars')
       displayNode.SetScalarRange(10,40)
       displayNode.SetOpacity(0.06)
-      displayNode.SetAndObserveColorNodeID('vtkMRMLColorTableNodeFileHotToColdRainbow.txt')
+      displayNode.SetAndObserveColorNodeID('vtkMRMLColorTableNodeFileHotToColdRainbow2.txt')
       displayNode.SetBackfaceCulling(0)
       
     
