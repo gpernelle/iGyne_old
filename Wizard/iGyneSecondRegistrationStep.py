@@ -239,17 +239,21 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     modelFromImageNodeAuto = None
     for n in xrange(numNodes): 
       node = slicer.mrmlScene.GetNthNodeByClass( n, "vtkMRMLModelNode" ) 
-      if node.GetName() == "baselineROI_segmentation_10_Post-Gyrus": 
+      if node.GetName() == "templateSegmentedModel": 
         segmentationModel = node 
       if node.GetName() == "obturator": 
         modelFromImageNodeManu = node 
-      elif node.GetName() == "obturator_10_Post-Gyrus": 
-        modelFromImageNodeAuto = node 
+    
+    modelnodes = slicer.util.getNodes('modelobturator')
+    for node in modelnodes.values():
+      modelFromImageNodeAuto=node
     
     if modelFromImageNodeManu != None and modelFromImageNodeAuto !=None :
       modelFromImageNode = modelFromImageNodeManu
     elif modelFromImageNodeAuto !=None:
       modelFromImageNode = modelFromImageNodeAuto
+    else:
+      modelFromImageNode = modelFromImageNodeManu
     if modelFromImageNode != None: 
       self.__registrationStatus.setText('Please Wait ...')
       self.__secondReg.setEnabled(0)
@@ -343,35 +347,16 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
   def processRegistrationCompletion(self):
     
     self.__registrationStatus.setText('Done')
+    self.updateROItemplate()
     self.__secondReg.setEnabled(1)
     self.__secondReg.setChecked(0)
     Helper.SetLabelVolume('None')
-    self.obturatorDisplayModel.SetVisibility(0)
-    self.templateDisplayModel.SetVisibility(0)
+    # self.obturatorDisplayModel.SetVisibility(0)
+    # self.templateDisplayModel.SetVisibility(0)
     pNode =self.parameterNode()
     Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
     
-    # self.removeNodes()
 
-  # def removeNodes(self):
-  
-    # numNodes = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLScalarVolumeNode" ) 
-    
-    # # for n in xrange(numNodes): 
-      # # node = slicer.mrmlScene.GetNthNodeByClass( n, "vtkMRMLScalarVolumeNode" )
-      # # print n      
-      # # if node and node.GetAttribute('LabelMap') == "1": 
-        # # slicer.mrmlScene.RemoveNode(node)
-        # # print(node.GetID()," removed")
-        
-    # # numNodes2 = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLModelNode" ) 
-    # # segmentationModel = None 
-    # # for n in xrange(numNodes2): 
-      # # node = slicer.mrmlScene.GetNthNodeByClass( n, "vtkMRMLModelNode" ) 
-      # # if node.GetName() == "baselineROI_segmentation_10_Post-Gyrus": 
-        # # slicer.mrmlScene.RemoveNode(node)
-      # # if node.GetName() == "obturator":
-        # # slicer.mrmlScene.RemoveNode(node)      
   
   def onRunButtonToggled(self, checked):
     if checked:
@@ -417,15 +402,22 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       self.__threshRange.setEnabled(0)
     
   def applyModelMaker(self):
+    
+    modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
+    for modelNode in modelNodes.values():
+      if modelNode.GetName()=='templateSegmentedModel':
+        slicer.mrmlScene.RemoveNode(modelNode)
+    
+    
     pNode = self.parameterNode()
     range0 = self.__threshRange.minimumValue
     range1 = self.__threshRange.maximumValue
-    self.__roiVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
-    self.__roiSegmentationNode = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeSegmentationID'))
+    roiVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
+    roiSegmentationNode = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeSegmentationID'))
 
     # update the label volume accordingly
     thresh = vtk.vtkImageThreshold()
-    thresh.SetInput(self.__roiVolume.GetImageData())
+    thresh.SetInput(roiVolume.GetImageData())
     thresh.ThresholdBetween(range0, range1)
     thresh.SetInValue(10)
     thresh.SetOutValue(0)
@@ -434,21 +426,21 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     thresh.Update()
 
     # self.__modelNode = slicer.mrmlScene.CreateNodeByClass('vtkMRMLModelNode')
-    self.__roiSegmentationNode.SetAndObserveImageData(thresh.GetOutput())
+    roiSegmentationNode.SetAndObserveImageData(thresh.GetOutput())
     Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
     self.__secondReg.setEnabled(1)
 
     # set up the model maker node 
     parameters = {} 
-    parameters['Name'] = self.__roiSegmentationNode.GetName() 
-    parameters["InputVolume"] = self.__roiSegmentationNode.GetID() 
+    parameters['Name'] = 'templateSegmentedModel' 
+    parameters["InputVolume"] = roiSegmentationNode.GetID() 
     parameters['FilterType'] = "Sinc" 
 
     # build only the currently selected model. 
-    # parameters['Labels'] = self.getPaintLabel() 
+    parameters['Labels'] = 10
     parameters["StartLabel"] = -1 
     parameters["EndLabel"] = -1 
-    parameters['GenerateAll'] = True 
+    parameters['GenerateAll'] = False 
     parameters["JointSmoothing"] = False 
     parameters["SplitNormals"] = True 
     parameters["PointNormals"] = True 
@@ -497,6 +489,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     
     self.__roiSegmentationNode.SetAndObserveImageData(thresh.GetOutput())
     Helper.SetBgFgVolumes(pNode.GetParameter('BaselineVolumeID'),'')
+    Helper.SetLabelVolume(self.__roiSegmentationNode.GetID())
 
   def processSegmentationCompletion(self, node, event):
 
@@ -517,7 +510,10 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       if self.segmentationModel:
         self.segmentationModel.RemoveAllChildrenNodes()
         slicer.mrmlScene.RemoveNode(self.segmentationModel)
+    self.obturatorDisplayModel.SetVisibility(0)
+    self.templateDisplayModel.SetVisibility(0)    
     super(iGyneSecondRegistrationStep, self).onExit(goingTo, transitionType)
+    
 
   def onEntry(self,comingFrom,transitionType):
     '''
@@ -786,22 +782,29 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     cropVolumeLogic.Apply(cropVolumeNode)
     outputVolume = slicer.mrmlScene.GetNodeByID(cropVolumeNode.GetOutputVolumeNodeID())
     outputVolume.SetName("obturatorROI")
-    self.outputMedianVolume = slicer.mrmlScene.CreateNodeByClass('vtkMRMLScalarVolumeNode')
-    self.outputMedianVolume.SetName('Median Filter Output')
-    slicer.mrmlScene.AddNode(self.outputMedianVolume)
-    #median filter processing
-    parameters = {}
-    parameters["inputVolume"] = outputVolume
-    parameters["outputVolume"] = self.outputMedianVolume
-    parameters["neighborhood"] = 3,8,1
-    medianfiltercli = slicer.modules.medianimagefilter
-    __cliNode = None
-    __cliNode = slicer.cli.run(medianfiltercli, __cliNode, parameters)
     
-    self.__cliObserverTag = __cliNode.AddObserver('ModifiedEvent', self.thresholdObturator)
-    # self.__registrationStatus.setText('Wait ...')
     
-  def thresholdObturator(self, node, event):
+    # self.outputMedianVolume = slicer.mrmlScene.CreateNodeByClass('vtkMRMLScalarVolumeNode')
+    # self.outputMedianVolume.SetName('Median Filter Output')
+    # slicer.mrmlScene.AddNode(self.outputMedianVolume)
+    # #median filter processing
+    # parameters = {}
+    # parameters["inputVolume"] = outputVolume
+    # parameters["outputVolume"] = self.outputMedianVolume
+    # parameters["neighborhood"] = 3,8,1
+    # medianfiltercli = slicer.modules.medianimagefilter
+    # __cliNode = None
+    # __cliNode = slicer.cli.run(medianfiltercli, __cliNode, parameters)
+    
+    # self.__cliObserverTag = __cliNode.AddObserver('ModifiedEvent', self.thresholdObturator)
+    # # self.__registrationStatus.setText('Wait ...')
+    
+    imagefiltered = self.outputLowPassFilter(outputVolume.GetID())
+
+    self.thresholdObturator(imagefiltered) 
+
+   
+  def thresholdObturator0(self, node, event):
     pNode = self.parameterNode()
     status = node.GetStatusString()
     # self.__registrationStatus.setText('Hough Transforn '+status)
@@ -817,25 +820,41 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       
       thresh = vtk.vtkImageThreshold()
       thresh.SetInput(self.outputMedianVolume.GetImageData())
-      thresh.ThresholdBetween(0, 30)
-      thresh.SetInValue(10)
+      thresh.ThresholdBetween(0, 20)
+      thresh.SetInValue(30)
       thresh.SetOutValue(0)
       thresh.ReplaceOutOn()
       thresh.ReplaceInOn()
       thresh.Update()
       roiSegmentation.SetAndObserveImageData(thresh.GetOutput())
+  
+      Helper.SetLabelVolume(roiSegmentation.GetID())   
+
+      editUtil = EditorLib.EditUtil.EditUtil()
+      parameterNode = editUtil.getParameterNode()
+      sliceLogic = editUtil.getSliceLogic()
+      lm = slicer.app.layoutManager()
+      sliceWidget = lm.sliceWidget('Red')
+      islandsEffect = EditorLib.IdentifyIslandsEffectOptions()
+      islandsEffect.setMRMLDefaults()
+      islandsEffect.__del__()
+      
+      islandTool = EditorLib.IdentifyIslandsEffectLogic(sliceLogic)
+      parameterNode.SetParameter("IslandEffect,minimumSize",'100000')
+      islandTool.removeIslands()
+      
       
       #make model from segmented labelmap
      # set up the model maker node 
       parameters = {} 
-      parameters['Name'] = 'obturator'
+      parameters['Name'] = 'modelobturator'
       parameters["InputVolume"] = roiSegmentation.GetID() 
       parameters['FilterType'] = "Sinc" 
       # build only the currently selected model. 
-      # parameters['Labels'] = self.getPaintLabel() 
+      parameters['Labels'] = 1
       parameters["StartLabel"] = -1 
       parameters["EndLabel"] = -1 
-      parameters['GenerateAll'] = True 
+      parameters['GenerateAll'] = False 
       parameters["JointSmoothing"] = False 
       parameters["SplitNormals"] = True 
       parameters["PointNormals"] = True 
@@ -845,7 +864,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       # output 
       # - make a new hierarchy node if needed 
       #
-      Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')      
+      Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
+   
       numNodes = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLModelHierarchyNode" ) 
       segmentationModel = None 
       for n in xrange(numNodes): 
@@ -866,4 +886,216 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       
       Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
 
+  
+
+  def thresholdObturator(self, inputImageFiltered):
+    pNode = self.parameterNode()
+   
+    vl = slicer.modules.volumes.logic()
+    roiSegmentation = vl.CreateLabelVolume(slicer.mrmlScene, inputImageFiltered, 'obturator_segmentation')
+    # roiRange = outputVolume.GetImageData().GetScalarRange()
+    # default threshold is half-way of the range
+    # thresholdParameter = str(0)+','+str(roiRange[1])
     
+    labelsColorNode = slicer.modules.colors.logic().GetColorTableNodeID(10)
+    roiSegmentation.GetDisplayNode().SetAndObserveColorNodeID(labelsColorNode)
+    
+    thresh = vtk.vtkImageThreshold()
+    thresh.SetInput(inputImageFiltered.GetImageData())
+    thresh.ThresholdBetween(0, 20)
+    thresh.SetInValue(30)
+    thresh.SetOutValue(0)
+    thresh.ReplaceOutOn()
+    thresh.ReplaceInOn()
+    thresh.Update()
+    roiSegmentation.SetAndObserveImageData(thresh.GetOutput())
+
+    Helper.SetLabelVolume(roiSegmentation.GetID())   
+
+    editUtil = EditorLib.EditUtil.EditUtil()
+    parameterNode = editUtil.getParameterNode()
+    sliceLogic = editUtil.getSliceLogic()
+    lm = slicer.app.layoutManager()
+    sliceWidget = lm.sliceWidget('Red')
+    islandsEffect = EditorLib.IdentifyIslandsEffectOptions()
+    islandsEffect.setMRMLDefaults()
+    islandsEffect.__del__()
+    
+    islandTool = EditorLib.IdentifyIslandsEffectLogic(sliceLogic)
+    parameterNode.SetParameter("IslandEffect,minimumSize",'100000')
+    islandTool.removeIslands()
+    
+    
+    #make model from segmented labelmap
+   # set up the model maker node 
+    parameters = {} 
+    parameters['Name'] = 'modelobturator'
+    parameters["InputVolume"] = roiSegmentation.GetID() 
+    parameters['FilterType'] = "Sinc" 
+    # build only the currently selected model. 
+    parameters['Labels'] = 1
+    parameters["StartLabel"] = -1 
+    parameters["EndLabel"] = -1 
+    parameters['GenerateAll'] = False 
+    parameters["JointSmoothing"] = False 
+    parameters["SplitNormals"] = True 
+    parameters["PointNormals"] = True 
+    parameters["SkipUnNamed"] = True 
+    parameters["Decimate"] = 0.25 
+    parameters["Smooth"] = 10 
+    # output 
+    # - make a new hierarchy node if needed 
+    #
+    Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
+ 
+    numNodes = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLModelHierarchyNode" ) 
+    segmentationModel = None 
+    for n in xrange(numNodes): 
+      node = slicer.mrmlScene.GetNthNodeByClass( n, "vtkMRMLModelHierarchyNode" ) 
+      if node.GetName() == "Obturator Segmentation Model": 
+        segmentationModel = node 
+        break  
+    if not segmentationModel: 
+      segmentationModel = slicer.vtkMRMLModelHierarchyNode() 
+      segmentationModel.SetScene( slicer.mrmlScene ) 
+      segmentationModel.SetName( "Obturator Segmentation Model" ) 
+      slicer.mrmlScene.AddNode( segmentationModel )
+         
+    parameters["ModelSceneFile"] = segmentationModel 
+    modelMaker = slicer.modules.modelmaker 
+    __cliNode = None
+    __cliNode = slicer.cli.run(modelMaker, __cliNode, parameters) 
+    
+    Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
+
+
+  
+  def updateROItemplate(self):
+    x=  (46.1749-23.8251)/2+23.8251
+    y = (65.1951-42.9222)/2+42.9222
+    z = 0
+    pNode = self.parameterNode()
+    ### remove old nodes cropped volume and labelmap
+    roiVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
+    roiSegmentationNode = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeSegmentationID'))
+    if roiVolume != None:
+      slicer.mrmlScene.RemoveNode(roiVolume)
+    if roiSegmentationNode != None:
+      slicer.mrmlScene.RemoveNode(roiSegmentationNode)
+      
+    template = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('templateID'))
+    volume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
+    
+    # create ROI
+    roi = slicer.mrmlScene.CreateNodeByClass('vtkMRMLAnnotationROINode')
+    slicer.mrmlScene.AddNode(roi)
+    roi.VisibleOn()
+    # Transform ROI to match the template after the first (fiducial) registration
+    transform = slicer.vtkMRMLLinearTransformNode()
+    slicer.mrmlScene.AddNode(transform)
+    transformID = template.GetTransformNodeID()
+    transform = slicer.mrmlScene.GetNodeByID(transformID)
+    M = transform.GetMatrixTransformToParent()
+    m = vtk.vtkMatrix4x4()
+    t = slicer.mrmlScene.CreateNodeByClass('vtkMRMLLinearTransformNode')
+    slicer.mrmlScene.AddNode(t)
+    # template in initial position to get the boundaries of the model -> boundaries of ROI
+    template.SetAndObserveTransformNodeID(t.GetID())
+    bounds = [0,0,0,0,0,0]
+    template.GetRASBounds(bounds)
+    roi.SetRadiusXYZ(abs(bounds[0]-bounds[1])/2,abs(bounds[2]-bounds[3])/2,abs(bounds[4]-bounds[5])/2)
+    # move again template in previous position (after first registration)
+    template.SetAndObserveTransformNodeID(transform.GetID())
+    m.DeepCopy(M)
+    m0=vtk.vtkMatrix4x4()
+    m0.SetElement(0,3,x)
+    m0.SetElement(1,3,y)
+    m0.SetElement(2,3,z)
+    m.Multiply4x4(m,m0,m)
+    t.SetAndObserveMatrixTransformToParent(m)
+    roi.SetAndObserveTransformNodeID(t.GetID())
+
+    roi.SetLocked(1)
+    #crop volume
+    cropVolumeNode =slicer.mrmlScene.CreateNodeByClass('vtkMRMLCropVolumeParametersNode')
+    cropVolumeNode.SetScene(slicer.mrmlScene)
+    cropVolumeNode.SetName('obturator_CropVolume_node')
+    cropVolumeNode.SetIsotropicResampling(True)
+    cropVolumeNode.SetSpacingScalingConst(0.5)
+    slicer.mrmlScene.AddNode(cropVolumeNode)
+    cropVolumeNode.SetInputVolumeNodeID(volume.GetID())
+    cropVolumeNode.SetROINodeID(roi.GetID())
+    cropVolumeLogic = slicer.modules.cropvolume.logic()
+    cropVolumeLogic.Apply(cropVolumeNode)
+    roiVolume = slicer.mrmlScene.GetNodeByID(cropVolumeNode.GetOutputVolumeNodeID())
+    
+    
+    roiVolume.SetName("baselineROI")
+    pNode.SetParameter('croppedBaselineVolumeID',cropVolumeNode.GetOutputVolumeNodeID())
+    pNode.SetParameter('cropVolumeNodeID',cropVolumeNode.GetID())
+    
+    vl = slicer.modules.volumes.logic()
+    roiSegmentationNode = vl.CreateLabelVolume(slicer.mrmlScene, roiVolume, 'baselineROI_segmentation')
+    pNode.SetParameter('croppedBaselineVolumeSegmentationID', roiSegmentationNode.GetID())
+    
+    
+    baselineROIVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
+    baselineROIRange = baselineROIVolume.GetImageData().GetScalarRange()
+    
+    labelsColorNode = slicer.modules.colors.logic().GetColorTableNodeID(10)
+    roiSegmentationNode.GetDisplayNode().SetAndObserveColorNodeID(labelsColorNode)
+    Helper.SetLabelVolume(roiSegmentationNode.GetID())
+    self.onThresholdChanged()
+    
+    Helper.SetBgFgVolumes(pNode.GetParameter('BaselineVolumeID'),'')
+    
+    
+  def outputLowPassFilter(self, inputImageID):
+  
+    inputImage = slicer.mrmlScene.GetNodeByID(inputImageID)
+    fftFilter = vtk.vtkImageFFT()
+    fftFilter.SetInput(inputImage.GetImageData())
+    fftFilter.Update()
+
+    fftCastFilter = vtk.vtkImageCast()
+    fftCastFilter.SetOutputScalarTypeToDouble()
+    fftCastFilter.SetInputConnection(fftFilter.GetOutputPort())
+    fftCastFilter.Update()
+
+
+    # fftImage = fftCastFilter.GetOutput()
+    # fftImage.Update()
+
+    lowPassFilter = vtk.vtkImageIdealLowPass()
+    lowPassFilter.SetInputConnection(fftCastFilter.GetOutputPort())
+    lowPassFilter.SetXCutOff(0.03)
+    lowPassFilter.SetYCutOff(0.03)
+    lowPassFilter.SetZCutOff(0.03)
+    lowPassFilter.Update()
+
+    rfftFilter = vtk.vtkImageRFFT()
+    rfftFilter.SetInputConnection(lowPassFilter.GetOutputPort())
+    rfftFilter.Update()
+
+    rfftCastFilter = vtk.vtkImageCast()
+    rfftCastFilter.SetOutputScalarTypeToDouble()
+    rfftCastFilter.SetInputConnection(rfftFilter.GetOutputPort())
+    rfftCastFilter.Update()
+
+    # rfftImage = fftCastFilter.GetOutput()
+    # rfftImage.Update()
+
+    real = vtk.vtkImageExtractComponents()
+    real.SetInputConnection(rfftCastFilter.GetOutputPort())
+    real.SetComponents(0)
+    real.Update()
+
+    imagefiltered = slicer.mrmlScene.CreateNodeByClass('vtkMRMLScalarVolumeNode')
+    imagefiltered.SetAndObserveImageData(real.GetOutput())
+
+    matrix = vtk.vtkMatrix4x4()
+    inputImage.GetIJKToRASMatrix(matrix)
+    imagefiltered.SetIJKToRASMatrix(matrix)
+
+    slicer.mrmlScene.AddNode(imagefiltered)
+    return imagefiltered

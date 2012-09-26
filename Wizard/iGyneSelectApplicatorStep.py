@@ -18,11 +18,12 @@ class iGyneSelectApplicatorStep( iGyneStep ) :
   
     self.__layout = self.__parent.createUserInterface()
     self.checkBox1 = qt.QCheckBox("Neblett Template and Obturator 4 points")
-    self.checkBox1.setChecked(1)
+    self.checkBox1.setChecked(0)
     
     # checkBox2 = qt.QCheckBox("Obturator")
     # checkBox2.setEnabled(0)
     self.checkBox3 = qt.QCheckBox("Neblett Template and Obturator 3 points")
+    self.checkBox3.setChecked(1)
     # checkBox3 = qt.QCheckBox("Intrauterine Tandem")
     # checkBox3.setCheckable(0)
     checkBox4 = qt.QCheckBox("Intravaginal Ovoids")
