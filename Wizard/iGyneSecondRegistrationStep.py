@@ -57,7 +57,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.TransformPolyDataFilter=vtk.vtkTransformPolyDataFilter()
     self.Transform=vtk.vtkTransform()
     self.__roiSegmentationNode = None
-    self.__roiVolume = None
     self.regIter = 0
     self.initialTransformMatrix = None
     self.status = None
@@ -69,6 +68,11 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
 
   def createUserInterface( self ):
     '''
+    The user interface is composed from:
+    - fully auto seg/reg button + restore initial regI
+    - frame with semi manual operations
+    - frame with the embedded editor modules
+    - frame with parameters for segmentation/registration
     '''
     self.skip = 0
     self.__layout = self.__parent.createUserInterface()
@@ -147,11 +151,11 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     
 
     ###Obturator SpinBox
-    self.pushObturatorValueButton = qt.QSpinBox()
-    self.pushObturatorValueButton.setMinimum(-500)
-    self.pushObturatorValueButton.setMaximum(500)
+    self.pullObturatorValueButton = qt.QSpinBox()
+    self.pullObturatorValueButton.setMinimum(-500)
+    self.pullObturatorValueButton.setMaximum(500)
     fLabel = qt.QLabel("Pull Obturator: ")
-    self.pushObturatorValueButton.connect('valueChanged(int)', self.pushObturator)
+    self.pullObturatorValueButton.connect('valueChanged(int)', self.pullObturator)
     
     
     ###ICP registration settings groupbox
@@ -217,7 +221,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     basicFrameLayout.addRow(make3DModelButton)
     basicFrameLayout.addRow(autoSegmentationButton)
     basicFrameLayout.addRow(self.ICPRegistrationButton)
-    basicFrameLayout.addRow(fLabel,self.pushObturatorValueButton)
+    basicFrameLayout.addRow(fLabel,self.pullObturatorValueButton)
     
     ###Buttons Full Auto Seg + Reg and Restore Registration
     widget = qt.QWidget()
@@ -238,9 +242,12 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.__layout.addRow(editorFrame)
     self.__layout.addRow(advancedFrame)
 
-  def pushObturator(self):
-    
-    nDepth = self.pushObturatorValueButton.value-self.pos0
+  def pullObturator(self):
+    '''
+    Move the obturator along its z-axis. Positive value to pull.
+    '''
+    ###give the step size
+    nDepth = self.pullObturatorValueButton.value-self.pos0
     pNode=self.parameterNode()
     mrmlScene=slicer.mrmlScene  
     obturatorID = pNode.GetParameter('obturatorID')
@@ -249,6 +256,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       self.m_poly = vtk.vtkPolyData()  
       self.m_poly.DeepCopy(self.ObturatorNode.GetPolyData())
     
+    ### 4x4 transformation matrix. Only z (2,3) is to be modified
     vtkmat = vtk.vtkMatrix4x4()
     vtkmat.SetElement(2,3,nDepth)
     
@@ -257,13 +265,17 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     
     self.TransformPolyDataFilter.SetTransform(self.Transform)
     self.TransformPolyDataFilter.Update()
-
+    
+    ###Apply the transformation
     triangles=vtk.vtkTriangleFilter()
     triangles.SetInput(self.TransformPolyDataFilter.GetOutput())
     self.ObturatorNode.SetAndObservePolyData(triangles.GetOutput())
-    self.pos0 = self.pushObturatorValueButton.value   
+    self.pos0 = self.pullObturatorValueButton.value   
  
   def setPointData(self,fHoleOriginX,fHoleOriginY):
+    '''
+    Create a list of points used for the ICP registration
+    '''
     fTipPoint,fTipPointTrans=[0,0,0,0],[0,0,0,0]
     for k in xrange(10):
       for i in xrange(36):
@@ -276,23 +288,20 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
 
         self.glyphPoints.InsertPoint(self.pointId, fTipPointTrans[0], fTipPointTrans[1],fTipPointTrans[2])
         self.pointId += 1
-        # print(self.pointId,self.vtkMatInitial )
+      
   
   def ICPRegistration(self):
-    
-    # if self.regIter==0:
-      # nbIteration = 20
-    # elif self.regIter==1:
-      # nbIteration = 40
-    # else:
-      # nbIteration = 20
-    
-    
-    numNodes = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLModelNode" ) 
+    '''
+    ICP Registration based on vtk.vtkIterativeClosestPointTransform()
+    '''
+    ### Initialisation
     segmentationModel = None 
     modelFromImageNode = None
     modelFromImageNodeManu = None
     modelFromImageNodeAuto = None
+    
+    ### Scroll all the model nodes. Keep the CAD template and CAD Obturator
+    numNodes = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLModelNode" ) 
     for n in xrange(numNodes): 
       node = slicer.mrmlScene.GetNthNodeByClass( n, "vtkMRMLModelNode" ) 
       if node.GetName() == "templateSegmentedModel": 
@@ -300,6 +309,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       if node.GetName() == "obturator": 
         modelFromImageNodeManu = node 
     
+    ### Scroll all the model nodes. Keep nodes from automatic segmentation and from manual/growCut Segmentation. Keep in priority these last one.
     modelnodes = slicer.util.getNodes('modelobturator')
     for node in modelnodes.values():
       modelFromImageNodeAuto=node
@@ -310,16 +320,20 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       modelFromImageNode = modelFromImageNodeAuto
     else:
       modelFromImageNode = modelFromImageNodeManu
+    
+    ### Need segmented obturator to continue
     if modelFromImageNode != None:
           
       self.__registrationStatus.setText('Please Wait ...')
+      ###Block the ICP Registration button to avoid user to click during the process
       self.ICPRegistrationButton.setEnabled(0)
       scene = slicer.mrmlScene
       pNode= self.parameterNode()
-
-      self.vtkMatInitial = self.transform.GetMatrixTransformToParent()
-      # print(self.vtkMatInitial)
       
+      ### Get the transformation matrix
+      self.vtkMatInitial = self.transform.GetMatrixTransformToParent()
+      
+      ### Set a list of known points from template CAD Model
       self.setPointData(50,28.019)
       self.setPointData(40.209,24.456)
       self.setPointData(35,14)
@@ -340,7 +354,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       self.setPointData(47.941,102.296)
       self.setPointData(47.941,5.704)
       self.setPointData(39.358,4.19)
-      # print(self.glyphPoints)
+ 
       self.glyphInputData.SetPoints(self.glyphPoints)
       self.glyphInputData.Update()
 
@@ -351,13 +365,17 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       self.glyphPoints3D.SetInput(self.glyphInputData)
       self.glyphPoints3D.SetSource(self.glyphBalls.GetOutput())
       self.glyphPoints3D.Update()  
-
-      inputSurface = scene.GetNodeByID("vtkMRMLModelNode4")
-
+      
+      ### Get CAD Template 
+      template = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('templateID'))
+      inputSurface = template
+      
+      ### Get Segmented Template
       targetSurface = segmentationModel
       self.templateDisplayModel = segmentationModel.GetDisplayNode()
       self.obturatorDisplayModel = modelFromImageNode.GetDisplayNode()
       
+      ### Define target : segmented obturator (modelFromImageNode) + segmented template (targetSurface)
       addTarget = vtk.vtkAppendPolyData()
       addTarget.AddInput(targetSurface.GetPolyData())
       addTarget.AddInput(modelFromImageNode.GetPolyData())
@@ -375,11 +393,13 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       TransformPolyDataFilter.SetTransform(Transform)
       TransformPolyDataFilter.Update()
       
+      ### Define source: list of known points on the CAD template (the holes) + polydata filter on the CAD obturator
       addSource = vtk.vtkAppendPolyData()
       addSource.AddInput( self.glyphInputData)
       addSource.AddInput(TransformPolyDataFilter.GetOutput())
       addSource.Update()
       
+      ### Set parameters to the ICP transformation
       icpTransform = vtk.vtkIterativeClosestPointTransform()
       icpTransform.SetSource(addSource.GetOutput())
       icpTransform.SetTarget(addTarget.GetOutput())
@@ -392,39 +412,41 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       icpTransform.Update()
       self.nIterations = icpTransform.GetNumberOfIterations()
       FinalMatrix = vtk.vtkMatrix4x4()
-
+      
+      ### Apply the transformation: Multiply the transformation matrix
       FinalMatrix.Multiply4x4(icpTransform.GetMatrix(),self.vtkMatInitial,FinalMatrix)
+      ### Update the linear transform with the computed transformation matrix  
       self.transform.SetAndObserveMatrixTransformToParent(FinalMatrix)
 
+      ### post registration stuffs
       self.processRegistrationCompletion()
+    
+    ### In case the user try the ICP without having a manually segmented obturator named 'obturator' 
+    ### or an auto segmented obturator named 'modelobturator'
     elif self.fullAutoRegOn == 0:
       messageBox = qt.QMessageBox.warning( self, 'Error','Please make a model named "obturator"')
       self.ICPRegistrationButton.setChecked(0)
       self.ICPRegistrationButton.text = "3/ ICP Registration"
   def processRegistrationCompletion(self):
+    '''
+    Once the ICP is completed, display a message telling so, uncheck the ICP button, restore default view
+    '''
     
     self.__registrationStatus.setText('ICP Registration Completed')
     self.updateROItemplate()
     self.ICPRegistrationButton.setEnabled(1)
     self.ICPRegistrationButton.setChecked(0)
     Helper.SetLabelVolume('None')
-    # self.obturatorDisplayModel.SetVisibility(0)
-    # self.templateDisplayModel.SetVisibility(0)
     pNode =self.parameterNode()
+    ### restore the default view
     Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
     
     
-
-  
-  def onRunButtonToggled(self, checked):
-    if checked:
-      self.start()
-      self.fiducialButton.text = "Stop"  
-    else:
-      self.stop()
-      self.fiducialButton.text = "ICP Registration"
-      
   def onICPButtonToggled(self,checked):
+    '''
+    Run ICP reg when ICP button is toogled
+    Possibility to watch the registration evolving but takes more time, so commented
+    '''
     if checked:  
       self.startICP()
       self.regIter += 1
@@ -460,20 +482,24 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       self.__threshRange.setEnabled(0)
     
   def applyModelMaker(self):
+    '''
+    Create a model (vtkMRMLModelNode) for labelmap done with threshold the volume cropped by a box adjusted around the CAD templated 
+    '''
     
+    ### Scroll all the model nodes. Keep the Segmented templated if existing, then delete it, because we're going to make a new one!
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
     for modelNode in modelNodes.values():
       if modelNode.GetName()=='templateSegmentedModel':
         slicer.mrmlScene.RemoveNode(modelNode)
     
-    
+    ### Parameters used from on step to another
     pNode = self.parameterNode()
     range0 = self.__threshRange.minimumValue
     range1 = self.__threshRange.maximumValue
     roiVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
     roiSegmentationNode = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeSegmentationID'))
 
-    # update the label volume accordingly
+    ### threshold segmentation. 
     thresh = vtk.vtkImageThreshold()
     thresh.SetInput(roiVolume.GetImageData())
     thresh.ThresholdBetween(range0, range1)
@@ -483,18 +509,18 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     thresh.ReplaceInOn()
     thresh.Update()
 
-    # self.__modelNode = slicer.mrmlScene.CreateNodeByClass('vtkMRMLModelNode')
+    ### Adjust the labelmap accordingly
     roiSegmentationNode.SetAndObserveImageData(thresh.GetOutput())
     Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
-    self.ICPRegistrationButton.setEnabled(1)
+    
 
-    # set up the model maker node 
+    ### set up the model maker node 
     parameters = {} 
     parameters['Name'] = 'templateSegmentedModel' 
     parameters["InputVolume"] = roiSegmentationNode.GetID() 
     parameters['FilterType'] = "Sinc" 
 
-    # build only the currently selected model. 
+    ### build only the currently selected model. 
     parameters['Labels'] = 10
     parameters["StartLabel"] = -1 
     parameters["EndLabel"] = -1 
@@ -506,9 +532,9 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     parameters["Decimate"] = 0.25 
     parameters["Smooth"] = 10 
   
-    # output 
-    # - make a new hierarchy node if needed 
-    # 
+    ### output 
+    ### - make a new hierarchy node if needed 
+    ### 
     numNodes = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLModelHierarchyNode" ) 
     self.segmentationModel = None 
     for n in xrange(numNodes): 
@@ -527,18 +553,23 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     modelMaker = slicer.modules.modelmaker 
     self.__cliNode = None
     self.__cliNode = slicer.cli.run(modelMaker, self.__cliNode, parameters)
-    self.__registrationStatus.setText('Template Segmented...')    
+    self.__registrationStatus.setText('Template Segmented...')  
+
+    ### We have a segmented templated, we can allow the user to start an ICP registration
+    self.ICPRegistrationButton.setEnabled(1)    
         
-  def onThresholdChanged(self): 
+  def onThresholdChanged(self):
+    '''
+    Every time the threshold slicer is moved, adjust the labelmap
+    '''    
     pNode = self.parameterNode()
     range0 = self.__threshRange.minimumValue
     range1 = self.__threshRange.maximumValue
-    self.__roiVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
+    roiVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
     self.__roiSegmentationNode = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeSegmentationID'))
 
-    # update the label volume accordingly
     thresh = vtk.vtkImageThreshold()
-    thresh.SetInput(self.__roiVolume.GetImageData())
+    thresh.SetInput(roiVolume.GetImageData())
     thresh.ThresholdBetween(range0, range1)
     thresh.SetInValue(10)
     thresh.SetOutValue(0)
@@ -546,13 +577,11 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     thresh.ReplaceInOn()
     thresh.Update()
     
+    ### update the label volume accordingly
     self.__roiSegmentationNode.SetAndObserveImageData(thresh.GetOutput())
     Helper.SetBgFgVolumes(pNode.GetParameter('BaselineVolumeID'),'')
     Helper.SetLabelVolume(self.__roiSegmentationNode.GetID())
 
-  def processSegmentationCompletion(self, node, event):
-
-    print("event")
   def validate( self, desiredBranchId ):
     '''
     '''
@@ -829,7 +858,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     t.SetAndObserveMatrixTransformToParent(m)
     roi.SetAndObserveTransformNodeID(t.GetID())
     roi.SetLocked(1)
-    roi.SetXYZ([0,0,-50+self.pushObturatorValueButton.value])
+    roi.SetXYZ([0,0,-50+self.pullObturatorValueButton.value])
     #crop volume
     cropVolumeNode =slicer.mrmlScene.CreateNodeByClass('vtkMRMLCropVolumeParametersNode')
     cropVolumeNode.SetScene(slicer.mrmlScene)
@@ -961,27 +990,19 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
     
 
-
   def updateStatus(self, node, event):
     slicer.mrmlScene.Modified()
     status = node.GetStatusString()
-    # self.__registrationStatus.setText('Hough Transforn '+status)
     if status == 'Completed':
       self.status = 'Segmentation Completed'
-      # segmentationModel = slicer.mrmlScene.GetNodeByID(self.segmentationModelID)
+
       if self.fullAutoRegOn == 1 :
         for i in range(100):
           print 'wait...'
 
         self.startICP()        
       self.fullAutoRegOn = 0
-      # segmentationModel.RemoveAllObservers()  
-      
-
-        
-        
-      
-      
+  
       
   def updateROItemplate(self):
     x=  (46.1749-23.8251)/2+23.8251
@@ -1076,10 +1097,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     fftCastFilter.SetInputConnection(fftFilter.GetOutputPort())
     fftCastFilter.Update()
 
-
-    # fftImage = fftCastFilter.GetOutput()
-    # fftImage.Update()
-
     lowPassFilter = vtk.vtkImageIdealLowPass()
     lowPassFilter.SetInputConnection(fftCastFilter.GetOutputPort())
     lowPassFilter.SetXCutOff(float(self.cutOffLowPassFilter.value)/1000)
@@ -1095,9 +1112,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     rfftCastFilter.SetOutputScalarTypeToDouble()
     rfftCastFilter.SetInputConnection(rfftFilter.GetOutputPort())
     rfftCastFilter.Update()
-
-    # rfftImage = fftCastFilter.GetOutput()
-    # rfftImage.Update()
 
     real = vtk.vtkImageExtractComponents()
     real.SetInputConnection(rfftCastFilter.GetOutputPort())
