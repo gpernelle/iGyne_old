@@ -586,7 +586,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       roiRange = outputVolume.GetImageData().GetScalarRange()
 
       # default threshold is half-way of the range
-      thresholdParameter = str(0.3*(roiRange[0]+roiRange[1]))+','+str(roiRange[1])
+      thresholdParameter = str(0.15*(roiRange[0]+roiRange[1]))+','+str(roiRange[1])
       pNode.SetParameter('thresholdRange', thresholdParameter)
       pNode.SetParameter('useSegmentationThresholds', 'True')
 

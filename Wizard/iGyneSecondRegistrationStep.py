@@ -59,6 +59,12 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.__roiSegmentationNode = None
     self.__roiVolume = None
     self.regIter = 0
+    self.initialTransformMatrix = None
+    self.status = None
+    self.fullAutoRegOn = 0
+    self.ICP = 0
+    self.previousmodelID = None
+    self.lastModelNode = None
     
 
   def createUserInterface( self ):
@@ -66,28 +72,39 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     '''
     self.skip = 0
     self.__layout = self.__parent.createUserInterface()
-
-    self.__basicFrame = ctk.ctkCollapsibleButton()
-    self.__basicFrame.text = "Basic settings"
-    self.__basicFrame.collapsed = 0
-    basicFrameLayout = qt.QFormLayout(self.__basicFrame)
-    self.__layout.addRow(self.__basicFrame)
-
-    self.__advancedFrame = ctk.ctkCollapsibleButton()
-    self.__advancedFrame.text = "Advanced settings"
-    self.__advancedFrame.collapsed = 1
-    advFrameLayout = qt.QFormLayout(self.__advancedFrame)
-    self.__layout.addRow(self.__advancedFrame)
-
+    
+    ###Basic Settings Frame
+    basicFrame = ctk.ctkCollapsibleButton()
+    basicFrame.text = "Basic settings"
+    basicFrame.collapsed = 0
+    basicFrameLayout = qt.QFormLayout(basicFrame)
+    
+    ###Advanced Settings Frame
+    advancedFrame = ctk.ctkCollapsibleButton()
+    advancedFrame.text = "Advanced settings"
+    advancedFrame.collapsed = 1
+    advFrameLayout = qt.QFormLayout(advancedFrame)
+    
+    ### Editor Frame
+    editorFrame = ctk.ctkCollapsibleButton()
+    editorFrame.text = "Editor Tools (GrowCut Segmentation)"
+    editorFrame.collapsed = 1
+    editorFrameLayout = qt.QFormLayout(editorFrame)
+    
+    ###Threshold slider for template segmentation
     threshLabel = qt.QLabel('1/ Make the holes visible:')
     self.__threshRange = slicer.qMRMLRangeWidget()
     self.__threshRange.decimals = 0
     self.__threshRange.singleStep = 1
 
+    ###disabled...
     self.__useThresholdsCheck = qt.QCheckBox()
     self.__useThresholdsCheck.setEnabled(0)
     threshCheckLabel = qt.QLabel('Use thresholds for segmentation')
+    self.__threshRange.connect('valuesChanged(double,double)', self.onThresholdChanged)
+    self.__useThresholdsCheck.connect('stateChanged(int)', self.onThresholdsCheckChanged)
 
+    ###Select segmentation button (disabled)
     roiLabel = qt.QLabel( 'Select segmentation:' )
     self.__roiLabelSelector = slicer.qMRMLNodeComboBox()
     self.__roiLabelSelector.nodeTypes = ( 'vtkMRMLScalarVolumeNode', '' )
@@ -96,91 +113,130 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.__roiLabelSelector.nodeTypes = ['vtkMRMLScalarVolumeNode']
     self.__roiLabelSelector.addEnabled = 0
     self.__roiLabelSelector.setMRMLScene(slicer.mrmlScene)
-
-    self.__applyButton = qt.QPushButton('2/ Make a 3D Model')
-    self.__applyButton.connect('clicked()', self.applyModelMaker)
     
-    basicFrameLayout.addRow(threshLabel, self.__threshRange)
-    basicFrameLayout.addRow(self.__applyButton)
-    
-    self.__autosegButton = qt.QPushButton('Automatic Obturator Segmentation')
-    self.__autosegButton.connect('clicked()', self.obturatorSegmentation)
-    
-   
-    basicFrameLayout.addRow(self.__autosegButton)
+    ###Make a 3D Model Button 
+    make3DModelButton = qt.QPushButton('2/ Make a 3D Model')
+    make3DModelButton.connect('clicked()', self.applyModelMaker)
+     
+    ###Auto Segmentation of Obturator Button     
+    autoSegmentationButton = qt.QPushButton('Automatic Obturator Segmentation')
+    autoSegmentationButton.connect('clicked()', self.obturatorSegmentation)
     
     
-    advFrameLayout.addRow(threshCheckLabel, self.__useThresholdsCheck)
-    advFrameLayout.addRow( roiLabel, self.__roiLabelSelector )
-
-    self.__threshRange.connect('valuesChanged(double,double)', self.onThresholdChanged)
-    self.__useThresholdsCheck.connect('stateChanged(int)', self.onThresholdsCheckChanged)
-    
+    ###Editor Widget
     groupbox = qt.QGroupBox()
     groupboxLayout  = qt.QFormLayout(groupbox)
     groupboxLayout.addRow(slicer.modules.editor.widgetRepresentation())
-    advFrameLayout.addRow(groupbox)
+    editorFrameLayout.addRow(groupbox)
     
-    self.__secondReg = qt.QPushButton('3/ ICP Registration')
-    string = 'Register Template and Model.'
+    ###Start ICP reg button
+    self.ICPRegistrationButton = qt.QPushButton('3/ ICP Registration')
+    string = 'Register Template and Model'
     self.__registrationStatus = qt.QLabel(string)
-    self.__layout.addRow(self.__registrationStatus, self.__secondReg)
-    self.__secondReg.connect('toggled(bool)', self.onICPButtonToggled)
-    self.__secondReg.setEnabled(0)
-    self.__secondReg.checkable = True
-    self.__layout.addRow(self.__secondReg)
+    self.ICPRegistrationButton.connect('toggled(bool)', self.onICPButtonToggled)
+    self.ICPRegistrationButton.setEnabled(0)
+    self.ICPRegistrationButton.checkable = True 
     
-    # self.fiducialButton = qt.QPushButton('Manual Registration')
-    # self.fiducialButton.checkable = True
-    # self.__layout.addRow(self.fiducialButton)
-    # self.fiducialButton.connect('toggled(bool)', self.onRunButtonToggled)
-    # self.iter=0
-    # self.obturatorSlider = ctk.ctkSliderWidget()
-    # self.obturatorSlider.minimum = -10
-    # self.obturatorSlider.maximum = 300
-    # self.obturatorSlider.singleStep = 1
-    # self.obturatorSlider.value = 0
-    # self.obturatorSlider.connect('valueChanged(double)', self.pushObturator)
-    # self.__layout.addRow(self.obturatorSlider)
+    ###I Feel Lucky Button
+    IFeelLuckyButton = qt.QPushButton('I am Feeling Lucky')
+    IFeelLuckyButton.connect('clicked()',self.IFeelLucky)
     
-    # Obturator SpinBox
+    ###Restore Initial Registration Button
+    backToInitialRegistrationButton = qt.QPushButton('Restore Initial Registration')
+    backToInitialRegistrationButton.connect('clicked()',self.backToInitialRegistration)
     
+
+    ###Obturator SpinBox
     self.pushObturatorValueButton = qt.QSpinBox()
     self.pushObturatorValueButton.setMinimum(-500)
     self.pushObturatorValueButton.setMaximum(500)
-    
     fLabel = qt.QLabel("Pull Obturator: ")
-    self.__layout.addRow(fLabel,self.pushObturatorValueButton)
     self.pushObturatorValueButton.connect('valueChanged(int)', self.pushObturator)
     
     
+    ###ICP registration settings groupbox
+    ICPGroupBox = qt.QGroupBox()
+    ICPGroupBox.setTitle( 'ICP Registration Settings' )
+    advFrameLayout.addRow( ICPGroupBox )
+    ICPGroupBoxLayout = qt.QFormLayout( ICPGroupBox )
+    
+    ###CP Registration Settings -> Advanced Settings group
     self.nbIterButton = qt.QSpinBox()
     self.nbIterButton.setMinimum(0)
     self.nbIterButton.setMaximum(1000)
     self.nbIterButton.setValue(20)
     nbIterButtonLabel = qt.QLabel('Nb Iterations')
-    advFrameLayout.addRow( nbIterButtonLabel, self.nbIterButton)
+    ICPGroupBoxLayout.addRow( nbIterButtonLabel, self.nbIterButton)
     self.checkMeandist = qt.QSpinBox()
     self.checkMeandist.setMinimum(0)
     self.checkMeandist.setMaximum(1)
     self.checkMeandist.setValue(0)
     checkMeandistLabel = qt.QLabel('Check Mean Distance')
-    advFrameLayout.addRow( checkMeandistLabel, self.checkMeandist)
+    ICPGroupBoxLayout.addRow( checkMeandistLabel, self.checkMeandist)
     self.Meandist = qt.QSpinBox()
     self.Meandist.setMinimum(0)
     self.Meandist.setMaximum(10000)
     self.Meandist.setValue(20)
     meandistLabel = qt.QLabel('Mean Distance Stop (/10000)')
-    advFrameLayout.addRow( meandistLabel, self.Meandist)
+    ICPGroupBoxLayout.addRow( meandistLabel, self.Meandist)
     self.landmarksNb = qt.QSpinBox()
     self.landmarksNb.setMinimum(0)
     self.landmarksNb.setMaximum(10000)
     self.landmarksNb.setValue(1000)
     landmarksNbLabel = qt.QLabel('LandMarksNb')
-    advFrameLayout.addRow( landmarksNbLabel, self.landmarksNb)
+    ICPGroupBoxLayout.addRow( landmarksNbLabel, self.landmarksNb)
     
+    ###Segmentation settings groupbox
+    SegGroupBox = qt.QGroupBox()
+    SegGroupBox.setTitle( 'Segmentation Settings' )
+    advFrameLayout.addRow( SegGroupBox )
+    SegGroupBoxLayout = qt.QFormLayout( SegGroupBox )
     
+    ###Segmentation Settings
+    self.medianFilterRadioButton = qt.QRadioButton('Median Filter')
+    self.fourierFilterRadioButton =  qt.QRadioButton('LowPass filter in frequency domain')
+    self.medianFilterRadioButton.setChecked(1)
+    SegGroupBoxLayout.addRow(self.fourierFilterRadioButton)
+    SegGroupBoxLayout.addRow(self.medianFilterRadioButton)
+    self.thresholdFilteredOnImage = qt.QSpinBox()
+    self.thresholdFilteredOnImage.setMinimum(0)
+    self.thresholdFilteredOnImage.setMaximum(100)
+    self.thresholdFilteredOnImage.setValue(20)
+    thresholdFilteredOnImageLabel = qt.QLabel('Threshold Max Median Filter')
+    SegGroupBoxLayout.addRow( thresholdFilteredOnImageLabel, self.thresholdFilteredOnImage)
+    self.cutOffLowPassFilter = qt.QSpinBox()
+    self.cutOffLowPassFilter.setMinimum(0)
+    self.cutOffLowPassFilter.setMaximum(10000)
+    self.cutOffLowPassFilter.setValue(30)
+    self.cutOffLowPassFilter.toolTip = "Bigger the value, bigger the Model (default 30)"
+    cutOffLowPassFilterLabel = qt.QLabel('Cut Off Low Pass Fourier Filter (/1000)')
+    SegGroupBoxLayout.addRow( cutOffLowPassFilterLabel, self.cutOffLowPassFilter)
     
+    ### Add button to Basic Frame
+    basicFrameLayout.addRow(threshLabel, self.__threshRange)
+    basicFrameLayout.addRow(make3DModelButton)
+    basicFrameLayout.addRow(autoSegmentationButton)
+    basicFrameLayout.addRow(self.ICPRegistrationButton)
+    basicFrameLayout.addRow(fLabel,self.pushObturatorValueButton)
+    
+    ###Buttons Full Auto Seg + Reg and Restore Registration
+    widget = qt.QWidget()
+    hlay = qt.QHBoxLayout(widget)
+    hlay.addWidget(IFeelLuckyButton)
+    hlay.addWidget(backToInitialRegistrationButton)
+    
+    ###Processing Status
+    self.__layout.addRow(self.__registrationStatus)
+    
+    ### Add 'I Feel Lucky' and 'Restore Initial Registration Button'
+    self.__layout.addRow( widget )
+    
+    ### Basic Frame
+    self.__layout.addRow(basicFrame)
+    
+    ###Add Editor and Advanced Settings for segmentation
+    self.__layout.addRow(editorFrame)
+    self.__layout.addRow(advancedFrame)
 
   def pushObturator(self):
     
@@ -254,9 +310,10 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       modelFromImageNode = modelFromImageNodeAuto
     else:
       modelFromImageNode = modelFromImageNodeManu
-    if modelFromImageNode != None: 
+    if modelFromImageNode != None:
+          
       self.__registrationStatus.setText('Please Wait ...')
-      self.__secondReg.setEnabled(0)
+      self.ICPRegistrationButton.setEnabled(0)
       scene = slicer.mrmlScene
       pNode= self.parameterNode()
 
@@ -340,21 +397,22 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       self.transform.SetAndObserveMatrixTransformToParent(FinalMatrix)
 
       self.processRegistrationCompletion()
-    else:
+    elif self.fullAutoRegOn == 0:
       messageBox = qt.QMessageBox.warning( self, 'Error','Please make a model named "obturator"')
-      self.__secondReg.setChecked(0)
-      self.__secondReg.text = "ICP Registration " + str(self.regIter + 1) + "?"
+      self.ICPRegistrationButton.setChecked(0)
+      self.ICPRegistrationButton.text = "3/ ICP Registration"
   def processRegistrationCompletion(self):
     
-    self.__registrationStatus.setText('Done')
+    self.__registrationStatus.setText('ICP Registration Completed')
     self.updateROItemplate()
-    self.__secondReg.setEnabled(1)
-    self.__secondReg.setChecked(0)
+    self.ICPRegistrationButton.setEnabled(1)
+    self.ICPRegistrationButton.setChecked(0)
     Helper.SetLabelVolume('None')
     # self.obturatorDisplayModel.SetVisibility(0)
     # self.templateDisplayModel.SetVisibility(0)
     pNode =self.parameterNode()
     Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
+    
     
 
   
@@ -372,9 +430,9 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       self.regIter += 1
     # else:
       # self.stopICP()
-      # self.__secondReg.text = "ICP Registration"
+      # self.ICPRegistrationButton.text = "ICP Registration"
       
-  def startICP(self):          
+  def startICP(self, node=None, event=None):          
     # if self.timer:
       # self.stop()
     # self.timer = qt.QTimer()
@@ -428,7 +486,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     # self.__modelNode = slicer.mrmlScene.CreateNodeByClass('vtkMRMLModelNode')
     roiSegmentationNode.SetAndObserveImageData(thresh.GetOutput())
     Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
-    self.__secondReg.setEnabled(1)
+    self.ICPRegistrationButton.setEnabled(1)
 
     # set up the model maker node 
     parameters = {} 
@@ -468,7 +526,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     parameters["ModelSceneFile"] = self.segmentationModel 
     modelMaker = slicer.modules.modelmaker 
     self.__cliNode = None
-    self.__cliNode = slicer.cli.run(modelMaker, self.__cliNode, parameters) 
+    self.__cliNode = slicer.cli.run(modelMaker, self.__cliNode, parameters)
+    self.__registrationStatus.setText('Template Segmented...')    
         
   def onThresholdChanged(self): 
     pNode = self.parameterNode()
@@ -542,7 +601,9 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       self.__roiSegmentationNode.GetDisplayNode().SetAndObserveColorNodeID(labelsColorNode)
       Helper.SetLabelVolume(self.__roiSegmentationNode.GetID())
       self.onThresholdChanged()
+      self.saveInitialRegistration()
       pNode.SetParameter('currentStep', self.stepid)
+      
     
   def updateWidgetFromParameters(self, pNode):
   
@@ -783,116 +844,43 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     outputVolume = slicer.mrmlScene.GetNodeByID(cropVolumeNode.GetOutputVolumeNodeID())
     outputVolume.SetName("obturatorROI")
     
-    
-    # self.outputMedianVolume = slicer.mrmlScene.CreateNodeByClass('vtkMRMLScalarVolumeNode')
-    # self.outputMedianVolume.SetName('Median Filter Output')
-    # slicer.mrmlScene.AddNode(self.outputMedianVolume)
-    # #median filter processing
-    # parameters = {}
-    # parameters["inputVolume"] = outputVolume
-    # parameters["outputVolume"] = self.outputMedianVolume
-    # parameters["neighborhood"] = 3,8,1
-    # medianfiltercli = slicer.modules.medianimagefilter
-    # __cliNode = None
-    # __cliNode = slicer.cli.run(medianfiltercli, __cliNode, parameters)
-    
-    # self.__cliObserverTag = __cliNode.AddObserver('ModifiedEvent', self.thresholdObturator)
-    # # self.__registrationStatus.setText('Wait ...')
-    
-    imagefiltered = self.outputLowPassFilter(outputVolume.GetID())
-
-    self.thresholdObturator(imagefiltered) 
-
-   
-  def thresholdObturator0(self, node, event):
-    pNode = self.parameterNode()
-    status = node.GetStatusString()
-    # self.__registrationStatus.setText('Hough Transforn '+status)
-    if status == 'Completed':
-      vl = slicer.modules.volumes.logic()
-      roiSegmentation = vl.CreateLabelVolume(slicer.mrmlScene, self.outputMedianVolume, 'obturator_segmentation')
-      # roiRange = outputVolume.GetImageData().GetScalarRange()
-      # default threshold is half-way of the range
-      # thresholdParameter = str(0)+','+str(roiRange[1])
-      
-      labelsColorNode = slicer.modules.colors.logic().GetColorTableNodeID(10)
-      roiSegmentation.GetDisplayNode().SetAndObserveColorNodeID(labelsColorNode)
-      
-      thresh = vtk.vtkImageThreshold()
-      thresh.SetInput(self.outputMedianVolume.GetImageData())
-      thresh.ThresholdBetween(0, 20)
-      thresh.SetInValue(30)
-      thresh.SetOutValue(0)
-      thresh.ReplaceOutOn()
-      thresh.ReplaceInOn()
-      thresh.Update()
-      roiSegmentation.SetAndObserveImageData(thresh.GetOutput())
-  
-      Helper.SetLabelVolume(roiSegmentation.GetID())   
-
-      editUtil = EditorLib.EditUtil.EditUtil()
-      parameterNode = editUtil.getParameterNode()
-      sliceLogic = editUtil.getSliceLogic()
-      lm = slicer.app.layoutManager()
-      sliceWidget = lm.sliceWidget('Red')
-      islandsEffect = EditorLib.IdentifyIslandsEffectOptions()
-      islandsEffect.setMRMLDefaults()
-      islandsEffect.__del__()
-      
-      islandTool = EditorLib.IdentifyIslandsEffectLogic(sliceLogic)
-      parameterNode.SetParameter("IslandEffect,minimumSize",'100000')
-      islandTool.removeIslands()
-      
-      
-      #make model from segmented labelmap
-     # set up the model maker node 
-      parameters = {} 
-      parameters['Name'] = 'modelobturator'
-      parameters["InputVolume"] = roiSegmentation.GetID() 
-      parameters['FilterType'] = "Sinc" 
-      # build only the currently selected model. 
-      parameters['Labels'] = 1
-      parameters["StartLabel"] = -1 
-      parameters["EndLabel"] = -1 
-      parameters['GenerateAll'] = False 
-      parameters["JointSmoothing"] = False 
-      parameters["SplitNormals"] = True 
-      parameters["PointNormals"] = True 
-      parameters["SkipUnNamed"] = True 
-      parameters["Decimate"] = 0.25 
-      parameters["Smooth"] = 10 
-      # output 
-      # - make a new hierarchy node if needed 
-      #
-      Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
-   
-      numNodes = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLModelHierarchyNode" ) 
-      segmentationModel = None 
-      for n in xrange(numNodes): 
-        node = slicer.mrmlScene.GetNthNodeByClass( n, "vtkMRMLModelHierarchyNode" ) 
-        if node.GetName() == "Obturator Segmentation Model": 
-          segmentationModel = node 
-          break  
-      if not segmentationModel: 
-        segmentationModel = slicer.vtkMRMLModelHierarchyNode() 
-        segmentationModel.SetScene( slicer.mrmlScene ) 
-        segmentationModel.SetName( "Obturator Segmentation Model" ) 
-        slicer.mrmlScene.AddNode( segmentationModel )
-           
-      parameters["ModelSceneFile"] = segmentationModel 
-      modelMaker = slicer.modules.modelmaker 
+    if self.medianFilterRadioButton.checked :
+      self.__registrationStatus.setText('Median Filter Running...')
+      self.imagefiltered = slicer.mrmlScene.CreateNodeByClass('vtkMRMLScalarVolumeNode')
+      self.imagefiltered.SetName('Median Filter Output')
+      slicer.mrmlScene.AddNode(self.imagefiltered)
+      #median filter processing
+      parameters = {}
+      parameters["inputVolume"] = outputVolume
+      parameters["outputVolume"] = self.imagefiltered
+      parameters["neighborhood"] = 3,8,1
+      medianfiltercli = slicer.modules.medianimagefilter
       __cliNode = None
-      __cliNode = slicer.cli.run(modelMaker, __cliNode, parameters) 
+      __cliNode = slicer.cli.run(medianfiltercli, __cliNode, parameters)
       
-      Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
+      self.__cliObserverTag = __cliNode.AddObserver('ModifiedEvent', self.medianFilterCompleted)
 
-  
+    
+    else:
+      self.__registrationStatus.setText('FFT and Low Pass filter running...')
+      self.imagefiltered = self.outputLowPassFilter(outputVolume.GetID())
+      self.thresholdObturator() 
 
-  def thresholdObturator(self, inputImageFiltered):
+   
+  def medianFilterCompleted(self, node, event):
+    
+    status = node.GetStatusString()
+
+    if status == 'Completed':
+      self.thresholdObturator()
+      self.__registrationStatus.setText('Median Filter Completed. Threshold Running...')
+
+
+  def thresholdObturator(self):
     pNode = self.parameterNode()
    
     vl = slicer.modules.volumes.logic()
-    roiSegmentation = vl.CreateLabelVolume(slicer.mrmlScene, inputImageFiltered, 'obturator_segmentation')
+    roiSegmentation = vl.CreateLabelVolume(slicer.mrmlScene, self.imagefiltered, 'obturator_segmentation')
     # roiRange = outputVolume.GetImageData().GetScalarRange()
     # default threshold is half-way of the range
     # thresholdParameter = str(0)+','+str(roiRange[1])
@@ -901,8 +889,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     roiSegmentation.GetDisplayNode().SetAndObserveColorNodeID(labelsColorNode)
     
     thresh = vtk.vtkImageThreshold()
-    thresh.SetInput(inputImageFiltered.GetImageData())
-    thresh.ThresholdBetween(0, 20)
+    thresh.SetInput(self.imagefiltered.GetImageData())
+    thresh.ThresholdBetween(0, self.thresholdFilteredOnImage.value)
     thresh.SetInValue(30)
     thresh.SetOutValue(0)
     thresh.ReplaceOutOn()
@@ -924,7 +912,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     islandTool = EditorLib.IdentifyIslandsEffectLogic(sliceLogic)
     parameterNode.SetParameter("IslandEffect,minimumSize",'100000')
     islandTool.removeIslands()
-    
+    self.__registrationStatus.setText('Threshold, island effect applied. Model Maker Running...')
     
     #make model from segmented labelmap
    # set up the model maker node 
@@ -953,23 +941,48 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     for n in xrange(numNodes): 
       node = slicer.mrmlScene.GetNthNodeByClass( n, "vtkMRMLModelHierarchyNode" ) 
       if node.GetName() == "Obturator Segmentation Model": 
-        segmentationModel = node 
+        segmentationModel = node
+        self.segmentationModelID = segmentationModel.GetID()         
         break  
     if not segmentationModel: 
-      segmentationModel = slicer.vtkMRMLModelHierarchyNode() 
-      segmentationModel.SetScene( slicer.mrmlScene ) 
-      segmentationModel.SetName( "Obturator Segmentation Model" ) 
+      segmentationModel = slicer.vtkMRMLModelHierarchyNode()  
       slicer.mrmlScene.AddNode( segmentationModel )
-         
+      self.segmentationModelID = segmentationModel.GetID() 
+    # if self.fullAutoRegOn == 1 :
+      # slicer.mrmlScene.AddObserver(8193,self.startICP)  
+      # print self.segmentationModelID
     parameters["ModelSceneFile"] = segmentationModel 
     modelMaker = slicer.modules.modelmaker 
     __cliNode = None
     __cliNode = slicer.cli.run(modelMaker, __cliNode, parameters) 
     
+    self.__cliObserverTag = __cliNode.AddObserver('ModifiedEvent', self.updateStatus)
+    
     Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
+    
 
 
-  
+  def updateStatus(self, node, event):
+    slicer.mrmlScene.Modified()
+    status = node.GetStatusString()
+    # self.__registrationStatus.setText('Hough Transforn '+status)
+    if status == 'Completed':
+      self.status = 'Segmentation Completed'
+      # segmentationModel = slicer.mrmlScene.GetNodeByID(self.segmentationModelID)
+      if self.fullAutoRegOn == 1 :
+        for i in range(100):
+          print 'wait...'
+
+        self.startICP()        
+      self.fullAutoRegOn = 0
+      # segmentationModel.RemoveAllObservers()  
+      
+
+        
+        
+      
+      
+      
   def updateROItemplate(self):
     x=  (46.1749-23.8251)/2+23.8251
     y = (65.1951-42.9222)/2+42.9222
@@ -1051,7 +1064,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     
     
   def outputLowPassFilter(self, inputImageID):
-  
+
+    self.__registrationStatus.setText('Low Pass Filter running...')
     inputImage = slicer.mrmlScene.GetNodeByID(inputImageID)
     fftFilter = vtk.vtkImageFFT()
     fftFilter.SetInput(inputImage.GetImageData())
@@ -1068,9 +1082,9 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
 
     lowPassFilter = vtk.vtkImageIdealLowPass()
     lowPassFilter.SetInputConnection(fftCastFilter.GetOutputPort())
-    lowPassFilter.SetXCutOff(0.03)
-    lowPassFilter.SetYCutOff(0.03)
-    lowPassFilter.SetZCutOff(0.03)
+    lowPassFilter.SetXCutOff(float(self.cutOffLowPassFilter.value)/1000)
+    lowPassFilter.SetYCutOff(float(self.cutOffLowPassFilter.value)/1000)
+    lowPassFilter.SetZCutOff(float(self.cutOffLowPassFilter.value)/1000)
     lowPassFilter.Update()
 
     rfftFilter = vtk.vtkImageRFFT()
@@ -1099,3 +1113,29 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
 
     slicer.mrmlScene.AddNode(imagefiltered)
     return imagefiltered
+    
+  def saveInitialRegistration(self):
+    
+    if self.initialTransformMatrix == None:
+      pNode=self.parameterNode()
+      transformID = pNode.GetParameter('followupTransformID')
+      transform = slicer.mrmlScene.GetNodeByID(transformID)
+      m = transform.GetMatrixTransformToParent()
+     
+      self.initialTransformMatrix = vtk.vtkMatrix4x4()
+      self.initialTransformMatrix.DeepCopy(m)
+      
+  def backToInitialRegistration(self):
+    if self.initialTransformMatrix != None:
+      pNode=self.parameterNode()
+      transformID = pNode.GetParameter('followupTransformID')
+      transform = slicer.mrmlScene.GetNodeByID(transformID)
+      transform.SetAndObserveMatrixTransformToParent(self.initialTransformMatrix)
+      
+  def IFeelLucky(self):
+    self.fullAutoRegOn = 1
+    self.applyModelMaker()
+    self.obturatorSegmentation()
+    
+     
+    
