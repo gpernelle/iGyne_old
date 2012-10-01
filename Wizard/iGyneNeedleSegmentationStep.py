@@ -144,7 +144,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.__filterFrame.text = "Filter Needles"
     self.__filterFrame.collapsed = 1
     filterFrame = qt.QFormLayout(self.__filterFrame)
-    self.__layout.addRow(self.__filterFrame)
+    
     # Filter spin box
     self.filterValueButton = qt.QSpinBox()
     self.filterValueButton.setMaximum(500)
@@ -273,7 +273,57 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     # self.__layout.addRow(contourValueLabel,self.contourValue5)
     
     
-  
+    # Bending parameters
+    self.__bendingFrame = ctk.ctkCollapsibleButton()
+    self.__bendingFrame.text = "Bending Needle Parameters"
+    self.__bendingFrame.collapsed = 1
+    bendingFrame = qt.QFormLayout(self.__bendingFrame)
+    
+    # nb points per line spin box
+    self.nbPointsPerLine = qt.QSpinBox()
+    self.nbPointsPerLine.setMaximum(2)
+    self.nbPointsPerLine.setMaximum(500)
+    self.nbPointsPerLine.setValue(20)
+    nbPointsPerLineLabel = qt.QLabel("Number of points per line: ")
+    bendingFrame.addRow( nbPointsPerLineLabel, self.nbPointsPerLine)
+    
+    # nb radius iteration spin box
+    self.nbRadiusIterations = qt.QSpinBox()
+    self.nbRadiusIterations.setMaximum(2)
+    self.nbRadiusIterations.setMaximum(50)
+    self.nbRadiusIterations.setValue(4)
+    nbRadiusIterationsLabel = qt.QLabel("Number of distance iterations: ")
+    bendingFrame.addRow( nbRadiusIterationsLabel, self.nbRadiusIterations)
+    
+    # distance max spin box
+    self.distanceMax = qt.QSpinBox()
+    self.distanceMax.setMaximum(0)
+    self.distanceMax.setMaximum(50)
+    self.distanceMax.setValue(10)
+    distanceMaxLabel = qt.QLabel("Distance max. from straight line: ")
+    bendingFrame.addRow( distanceMaxLabel, self.distanceMax)
+    
+    # nb rotating iterations spin box
+    self.nbRotatingIterations = qt.QSpinBox()
+    self.nbRotatingIterations.setMaximum(2)
+    self.nbRotatingIterations.setMaximum(500)
+    self.nbRotatingIterations.setValue(15)
+    nbRotatingIterationsLabel = qt.QLabel("Number of rotating iterations: ")
+    bendingFrame.addRow( nbRotatingIterationsLabel, self.nbRotatingIterations)
+    
+    # nb heights per needle spin box
+    self.numberOfPointsPerNeedle = qt.QSpinBox()
+    self.numberOfPointsPerNeedle.setMaximum(1)
+    self.numberOfPointsPerNeedle.setMaximum(50)
+    self.numberOfPointsPerNeedle.setValue(3)
+    numberOfPointsPerNeedleLabel = qt.QLabel("Number of heights per line: ")
+    bendingFrame.addRow( numberOfPointsPerNeedleLabel, self.numberOfPointsPerNeedle)
+    
+    self.__layout.addRow(self.__filterFrame)
+    self.__layout.addRow(self.__bendingFrame)
+    
+    
+    
   def drawIsoSurfaces0( self ):
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
        
@@ -618,6 +668,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
                 self.displaynode[i].SetVisibility(0)
                 self.displaynode[i].SliceIntersectionVisibilityOff()
                 slicer.mrmlScene.RemoveNode(self.needlenode[i][1])
+                slicer.mrmlScene.RemoveNode(self.bentNeedleNode[i][1])
                 
     self.removeDuplicatesButton.setEnabled(0)
     self.removeDuplicatesButton.setChecked(1)
@@ -736,6 +787,12 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     parameters['inputLabel'] = inputLabelID
     parameters['outputVtk'] = outputID
     parameters['outputFolderName'] = self.foldername
+    parameters['nbPointsPerLine'] = self.nbPointsPerLine.value
+    parameters['nbRadiusIterations'] = self.nbRadiusIterations.value
+    parameters['distanceMax'] = self.distanceMax.value
+    parameters['numberOfPointsPerNeedle'] = self.numberOfPointsPerNeedle.value
+    parameters['nbRotatingIterations'] = self.nbRotatingIterations.value
+    
     module = slicer.modules.mainlabelneedletrackingcli 
     self.__cliNode = None
     self.__cliNode = slicer.cli.run(module, None, parameters, wait_for_completion=True)
@@ -755,26 +812,31 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.base = [[0 for j in range(3)] for j in range(63)]
     self.tip = [[0 for j in range(3)] for j in range(63)]
     self.needlenode = [[0 for j in range(2)] for j in range(63)]
+    self.bentNeedleNode = [[0 for j in range(2)] for j in range(63)]
     # self.contourNode = [[0 for j in range(2)] for j in range(63)]
     self.displaynode = [0 for j in range(63)]
+    self.displaynodeB = [0 for j in range(63)]
     # self.displayContourNode = [0 for j in range(63)]
     self.fiducialnode = [0 for j in range(63)]
-
+    k=0
     for i in xrange(63):
 
       pathneedle = self.foldername+'/'+str(i)+'.vtp'
-      
+      pathBentNeedle =  self.foldername+'/'+str(i)+'_bent.vtp'
       self.needlenode[i] = slicer.util.loadModel(pathneedle, True)
-      # self.contourNode[i] = slicer.util.loadModel(pathcontour, True)
+      self.bentNeedleNode[i] = slicer.util.loadModel(pathBentNeedle, True)
+
 
       if self.needlenode[i][0] == True and self.needlenode[i][1] != None:
         self.displaynode[i] = self.needlenode[i][1].GetDisplayNode()
-        # self.displayContourNode[i] = self.contourNode[i][1].GetDisplayNode()
+        self.displaynodeB[i] = self.bentNeedleNode[i][1].GetDisplayNode()
+
          
         polydata = self.needlenode[i][1].GetPolyData()
         polydata.GetPoint(0,self.base[i])        
       
         self.displaynode[i].SliceIntersectionVisibilityOn()
+        self.displaynodeB[i].SliceIntersectionVisibilityOn()
         bestmatch = None
         mindist = None
         for j in xrange(63):
@@ -782,28 +844,20 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
           if delta < mindist or mindist == None:
             bestmatch = j
             mindist = delta
-
-        # self.showOneNeedle(i,0)
-        # self.AddRadiation(bestmatch,self.needlenode[i][1].GetID())
+        if self.transform ==None :
+          bestmatch = k
+          k +=1
         self.displaynode[i].SetColor(self.color[bestmatch])
-        # self.displayContourNode[i].SetColor(self.color[bestmatch])
+        self.displaynodeB[i].SetColor(self.color[bestmatch])
         self.needlenode[i][1].SetName(self.option[bestmatch]+"_segmented")
-        # self.contourNode[i][1].SetName(self.option[bestmatch]+"_segmented_contour")
+        self.bentNeedleNode[i][1].SetName(self.option[bestmatch]+"_optimized")
         self.needlenode[i][1].SetAttribute("segmented","1")
+        self.bentNeedleNode[i][1].SetAttribute("optimized","1")
         self.needlenode[i][1].SetAttribute("nth",str(bestmatch))
+        self.bentNeedleNode[i][1].SetAttribute("nth",str(bestmatch))
         self.needlenode[i][1].SetAttribute("needleID",self.needlenode[i][1].GetID())
-        # self.contourNode[i][1].SetAttribute("contour","1")
-        # self.contourNode[i][1].SetAttribute("nth",str(bestmatch))
-        # self.contourNode[i][1].SetAttribute("needleID",self.needlenode[i][1].GetID())
-        
-        # self.displayContourNode[i].SetSliceIntersectionVisibility(0)
-        # self.displayContourNode[i].SetScalarVisibility(1)
-        # self.displayContourNode[i].SetActiveScalarName('scalars')
-        # self.displayContourNode[i].SetScalarRange(0,230)
-        # self.displayContourNode[i].SetOpacity(0.06)
-        # self.displayContourNode[i].SetAndObserveColorNodeID('vtkMRMLColorTableNodeFileHotToColdRainbow.txt')
-        # self.displayContourNode[i].SetBackfaceCulling(0)
-        # self.displayContourNode[i].SetVisibility(0)
+        self.bentNeedleNode[i][1].SetAttribute("needleID",self.bentNeedleNode[i][1].GetID())
+ 
         
     
     if self.removeDuplicates.isChecked():
@@ -831,28 +885,47 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       if modelNode.GetAttribute("segmented") == "1":
         i = int(modelNode.GetAttribute("nth"))
         buttonDisplay = qt.QPushButton("Hide "+self.option[i])
+        buttonBentDisplay = qt.QPushButton("Hide Bent "+self.option[i])
         # buttonDisplayContour = qt.QPushButton("Distance "+self.option[i])
         buttonDisplay.checkable = True
+        buttonBentDisplay.checkable = True
         # buttonDisplayContour.checkable = True
         if modelNode.GetDisplayVisibility() ==0:
           buttonDisplay.setChecked(1)
           # buttonDisplayContour.setChecked(1)
         buttonDisplay.connect("clicked()", lambda who=i: self.displayNeedle(who))
+        buttonBentDisplay.connect("clicked()", lambda who=i: self.displayBentNeedle(who))
         # buttonDisplayContour.connect("clicked()", functools.partial(self.displayContour,i,buttonDisplayContour.checked))
         buttonReformat = qt.QPushButton("Reformat "+self.option[i])
         buttonReformat.connect("clicked()", lambda who=i: self.reformatNeedle(who))
         widget = qt.QWidget()
         hlay = qt.QHBoxLayout(widget)
         hlay.addWidget(buttonDisplay)
+        hlay.addWidget(buttonBentDisplay)
         # hlay.addWidget(buttonDisplayContour)
         hlay.addWidget(buttonReformat)
         self.buttonsGroupBoxLayout.addRow(widget)
-         
+  
+
+  def displayBentNeedle(self,i):
+    modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
+    for modelNode in modelNodes.values():
+      if modelNode.GetAttribute("nth")==str(i) and modelNode.GetAttribute("optimized")=='1' :
+        displayNode = modelNode.GetModelDisplayNode()
+        nVisibility = displayNode.GetVisibility()
+        # print nVisibility
+        if nVisibility:
+          displayNode.SliceIntersectionVisibilityOff()
+          displayNode.SetVisibility(0)
+        else:
+          displayNode.SliceIntersectionVisibilityOn()
+          displayNode.SetVisibility(1)
+  
    
   def displayNeedle(self,i):
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
     for modelNode in modelNodes.values():
-      if modelNode.GetAttribute("nth")==str(i):
+      if modelNode.GetAttribute("nth")==str(i) and modelNode.GetAttribute("segmented")=='1' :
         displayNode = modelNode.GetModelDisplayNode()
         nVisibility = displayNode.GetVisibility()
         # print nVisibility
@@ -1691,4 +1764,4 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     # pNode.SetParameter(fileName,modelNode.GetID())
     # mrmlScene.AddNode(modelNode)
     
-    
+
