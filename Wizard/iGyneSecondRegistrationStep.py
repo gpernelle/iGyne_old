@@ -64,6 +64,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.ICP = 0
     self.previousmodelID = None
     self.lastModelNode = None
+    self.stringRMS = ""
+    self.processingTime = "not calculated"
     
 
   def createUserInterface( self ):
@@ -88,6 +90,12 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     advancedFrame.text = "Advanced settings"
     advancedFrame.collapsed = 1
     advFrameLayout = qt.QFormLayout(advancedFrame)
+    
+    ###Evaluation Settings Frame
+    evaluationFrame = ctk.ctkCollapsibleButton()
+    evaluationFrame.text = "Evaluation settings"
+    evaluationFrame.collapsed = 1
+    evalFrameLayout = qt.QFormLayout(evaluationFrame)
     
     ### Editor Frame
     editorFrame = ctk.ctkCollapsibleButton()
@@ -141,6 +149,14 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.ICPRegistrationButton.setEnabled(0)
     self.ICPRegistrationButton.checkable = True 
     
+    ###Start ICP reg button with no template
+    self.ICPRegistrationButton2 = qt.QPushButton('3/ ICP Registration w/o obturator')
+    string = 'Register Template and Model'
+    self.__registrationStatus = qt.QLabel(string)
+    self.ICPRegistrationButton2.connect('toggled(bool)', self.onICPButtonToggled2)
+    self.ICPRegistrationButton2.setEnabled(0)
+    self.ICPRegistrationButton2.checkable = True 
+    
     ###I Feel Lucky Button
     IFeelLuckyButton = qt.QPushButton('I am Feeling Lucky')
     IFeelLuckyButton.connect('clicked()',self.IFeelLucky)
@@ -163,6 +179,44 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     ICPGroupBox.setTitle( 'ICP Registration Settings' )
     advFrameLayout.addRow( ICPGroupBox )
     ICPGroupBoxLayout = qt.QFormLayout( ICPGroupBox )
+    
+    
+    ###Evaluation settings 4,5,7
+    pNode = self.parameterNode()
+    transformNodeID = pNode.GetParameter('followupTransformID')
+    print("transfo id:" , transformNodeID)
+    self.templateIDButton = qt.QSpinBox()
+    self.templateIDButton.setMinimum(0)
+    self.templateIDButton.setMaximum(1000)
+    self.templateIDButton.setValue(4)
+    templateIDButtonLabel = qt.QLabel('Template ID')
+    evalFrameLayout.addRow( templateIDButtonLabel, self.templateIDButton)
+    self.obturatorIDButton = qt.QSpinBox()
+    self.obturatorIDButton.setMinimum(0)
+    self.obturatorIDButton.setMaximum(1000)
+    self.obturatorIDButton.setValue(5)
+    obturatorIDButtonLabel = qt.QLabel('Obturator ID')
+    evalFrameLayout.addRow( obturatorIDButtonLabel, self.obturatorIDButton)
+    self.t1IDButton = qt.QSpinBox()
+    self.t1IDButton.setMinimum(0)
+    self.t1IDButton.setMaximum(1000)
+    self.t1IDButton.setValue(6)
+    t1IDButton = qt.QLabel('Transformation ID')
+    evalFrameLayout.addRow( t1IDButton, self.t1IDButton)
+    self.t2IDButton = qt.QSpinBox()
+    self.t2IDButton.setMinimum(0)
+    self.t2IDButton.setMaximum(1000)
+    self.t2IDButton.setValue(7)
+    t2IDButtonLabel = qt.QLabel('Optimal transformation ID')
+    evalFrameLayout.addRow( t2IDButtonLabel, self.t2IDButton)
+    self.result = qt.QLabel(self.stringRMS)
+    evalFrameLayout.addRow(self.result)
+    chronoButton = qt.QPushButton('Start chrono')
+    chronoButton.connect('clicked()',self.chrono)
+    evaluationButton = qt.QPushButton('Evaluation')
+    evaluationButton.connect('clicked()',self.RMS)
+    evalFrameLayout.addRow( chronoButton)
+    evalFrameLayout.addRow( evaluationButton)
     
     ###CP Registration Settings -> Advanced Settings group
     self.nbIterButton = qt.QSpinBox()
@@ -221,6 +275,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     basicFrameLayout.addRow(make3DModelButton)
     basicFrameLayout.addRow(autoSegmentationButton)
     basicFrameLayout.addRow(self.ICPRegistrationButton)
+    basicFrameLayout.addRow(self.ICPRegistrationButton2)
     basicFrameLayout.addRow(fLabel,self.pullObturatorValueButton)
     
     ###Buttons Full Auto Seg + Reg and Restore Registration
@@ -241,6 +296,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     ###Add Editor and Advanced Settings for segmentation
     self.__layout.addRow(editorFrame)
     self.__layout.addRow(advancedFrame)
+    self.__layout.addRow(evaluationFrame)
 
   def pullObturator(self):
     '''
@@ -423,10 +479,133 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     
     ### In case the user try the ICP without having a manually segmented obturator named 'obturator' 
     ### or an auto segmented obturator named 'modelobturator'
+    
+      ### evaluates processing time
+      self.processingTime = time.clock()-self.t0
+      
     elif self.fullAutoRegOn == 0:
       messageBox = qt.QMessageBox.warning( self, 'Error','Please make a model named "obturator"')
       self.ICPRegistrationButton.setChecked(0)
       self.ICPRegistrationButton.text = "3/ ICP Registration"
+      
+  def ICPRegistration2(self):
+    '''
+    ICP Registration based on vtk.vtkIterativeClosestPointTransform()
+    '''
+    ### Initialisation
+    segmentationModel = None 
+    modelFromImageNode = None
+    modelFromImageNodeManu = None
+    modelFromImageNodeAuto = None
+    
+    ### Scroll all the model nodes. Keep the CAD template and CAD Obturator
+    numNodes = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLModelNode" ) 
+    for n in xrange(numNodes): 
+      node = slicer.mrmlScene.GetNthNodeByClass( n, "vtkMRMLModelNode" ) 
+      if node.GetName() == "templateSegmentedModel": 
+        segmentationModel = node 
+
+    self.__registrationStatus.setText('Please Wait ...')
+    ###Block the ICP Registration button to avoid user to click during the process
+    self.ICPRegistrationButton.setEnabled(0)
+    scene = slicer.mrmlScene
+    pNode= self.parameterNode()
+    
+    ### Get the transformation matrix
+    self.vtkMatInitial = self.transform.GetMatrixTransformToParent()
+    
+    ### Set a list of known points from template CAD Model
+    self.setPointData(50,28.019)
+    self.setPointData(40.209,24.456)
+    self.setPointData(35,14)
+    self.setPointData(24.647,15.363)
+    self.setPointData(15,19.359)
+    self.setPointData(15,88.641)
+    self.setPointData(24.647,92.637)
+    self.setPointData(35,94)
+    self.setPointData(45.353,92.637)
+    self.setPointData(55,88.641)
+    self.setPointData(55,19.359)
+    self.setPointData(45.353,15.363)
+    self.setPointData(30.642,4.19)
+    self.setPointData(22.059,5.704)
+    self.setPointData(22.059,102.296)
+    self.setPointData(30.642,103.81)
+    self.setPointData(39.358,103.81)
+    self.setPointData(47.941,102.296)
+    self.setPointData(47.941,5.704)
+    self.setPointData(39.358,4.19)
+
+    self.glyphInputData.SetPoints(self.glyphPoints)
+    self.glyphInputData.Update()
+
+    self.glyphBalls.SetRadius(0.05)
+    self.glyphBalls.SetThetaResolution(6)
+    self.glyphBalls.SetPhiResolution(10)
+
+    self.glyphPoints3D.SetInput(self.glyphInputData)
+    self.glyphPoints3D.SetSource(self.glyphBalls.GetOutput())
+    self.glyphPoints3D.Update()  
+    
+    ### Get CAD Template 
+    template = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('templateID'))
+    inputSurface = template
+    
+    ### Get Segmented Template
+    targetSurface = segmentationModel
+    self.templateDisplayModel = segmentationModel.GetDisplayNode()
+    
+    
+    ### Define target : segmented obturator (modelFromImageNode) + segmented template (targetSurface)
+    addTarget = vtk.vtkAppendPolyData()
+    addTarget.AddInput(targetSurface.GetPolyData())
+    addTarget.Update()
+    
+    obturatorID = pNode.GetParameter('obturatorID')    
+    ObutratorNode = slicer.mrmlScene.GetNodeByID(obturatorID)
+    if ObutratorNode!=None:   
+      self.m_poly = vtk.vtkPolyData()  
+      self.m_poly.DeepCopy(ObutratorNode.GetPolyData())
+    TransformPolyDataFilter = vtk.vtkTransformPolyDataFilter()
+    Transform = vtk.vtkTransform()
+    TransformPolyDataFilter.SetInput(self.m_poly)
+    Transform.SetMatrix(self.vtkMatInitial)
+    TransformPolyDataFilter.SetTransform(Transform)
+    TransformPolyDataFilter.Update()
+    
+    ### Define source: list of known points on the CAD template (the holes) + polydata filter on the CAD obturator
+    addSource = vtk.vtkAppendPolyData()
+    addSource.AddInput( self.glyphInputData)
+    addSource.Update()
+    
+    ### Set parameters to the ICP transformation
+    icpTransform = vtk.vtkIterativeClosestPointTransform()
+    icpTransform.SetSource(addSource.GetOutput())
+    icpTransform.SetTarget(addTarget.GetOutput())
+    icpTransform.SetCheckMeanDistance(self.checkMeandist.value)
+    icpTransform.SetMaximumMeanDistance(self.Meandist.value/10000)
+    icpTransform.SetMaximumNumberOfIterations(300)
+    icpTransform.SetMaximumNumberOfLandmarks(self.landmarksNb.value)
+    icpTransform.SetMeanDistanceModeToRMS()
+    icpTransform.GetLandmarkTransform().SetModeToRigidBody()
+    icpTransform.Update()
+    self.nIterations = icpTransform.GetNumberOfIterations()
+    FinalMatrix = vtk.vtkMatrix4x4()
+    
+    ### Apply the transformation: Multiply the transformation matrix
+    FinalMatrix.Multiply4x4(icpTransform.GetMatrix(),self.vtkMatInitial,FinalMatrix)
+    ### Update the linear transform with the computed transformation matrix  
+    self.transform.SetAndObserveMatrixTransformToParent(FinalMatrix)
+
+    ### post registration stuffs
+    self.processRegistrationCompletion()
+  
+    ### In case the user try the ICP without having a manually segmented obturator named 'obturator' 
+    ### or an auto segmented obturator named 'modelobturator'
+    ### evaluates processing time
+    self.processingTime = time.clock()-self.t0
+      
+      
   def processRegistrationCompletion(self):
     '''
     Once the ICP is completed, display a message telling so, uncheck the ICP button, restore default view
@@ -453,7 +632,15 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     # else:
       # self.stopICP()
       # self.ICPRegistrationButton.text = "ICP Registration"
-      
+  
+  def onICPButtonToggled2(self,checked):
+    '''
+    Run ICP reg when ICP button is toogled
+    Possibility to watch the registration evolving but takes more time, so commented
+    '''
+    if checked:  
+      self.ICPRegistration2()
+          
   def startICP(self, node=None, event=None):          
     # if self.timer:
       # self.stop()
@@ -556,7 +743,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.__registrationStatus.setText('Template Segmented...')  
 
     ### We have a segmented templated, we can allow the user to start an ICP registration
-    self.ICPRegistrationButton.setEnabled(1)    
+    self.ICPRegistrationButton.setEnabled(1)   
+    self.ICPRegistrationButton2.setEnabled(1)     
         
   def onThresholdChanged(self):
     '''
@@ -632,6 +820,9 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       self.onThresholdChanged()
       self.saveInitialRegistration()
       pNode.SetParameter('currentStep', self.stepid)
+      
+      ###chrono start
+      self.t0 = time.clock()
       
     
   def updateWidgetFromParameters(self, pNode):
@@ -1147,9 +1338,83 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       transform.SetAndObserveMatrixTransformToParent(self.initialTransformMatrix)
       
   def IFeelLucky(self):
+    ###chrono start
     self.fullAutoRegOn = 1
     self.applyModelMaker()
     self.obturatorSegmentation()
     
-     
+  def RMS(self):
+    templateID = 'vtkMRMLModelNode'+str(self.templateIDButton.value)
+    obturatorID = 'vtkMRMLModelNode'+str(self.obturatorIDButton.value)
+    t1ID = 'vtkMRMLLinearTransformNode'+str(self.t1IDButton.value)
+    t2ID = 'vtkMRMLLinearTransformNode'+str(self.t2IDButton.value)
+    point = [0,0,0]
+    p1 = [0,0,0]
+    p2 = [0,0,0]
+    template = slicer.mrmlScene.GetNodeByID(templateID)
+    obturator = slicer.mrmlScene.GetNodeByID(obturatorID)
+    polyDataTemplate = template.GetPolyData()
+    polyDataObturator = obturator.GetPolyData()
+    transform1=slicer.mrmlScene.GetNodeByID(t1ID)
+    transform2=slicer.mrmlScene.GetNodeByID(t2ID)
+    m1 = transform1.GetMatrixTransformToParent()
+    m2 = transform2.GetMatrixTransformToParent()
+    nbTemplate = polyDataTemplate.GetNumberOfPoints()
+    nbObturator = polyDataObturator.GetNumberOfPoints()
+    distancesquare = 0
+    # for i in range(nbTemplate):
+      # polyDataTemplate.GetPoint(i,point)
+      # k = vtk.vtkMatrix4x4()
+      # o = vtk.vtkMatrix4x4()
+      # k.SetElement(0,3,point[0])
+      # k.SetElement(1,3,point[1])
+      # k.SetElement(2,3,point[2])
+      # k.Multiply4x4(m1,k,o)
+      # p1[0] = o.GetElement(0,3)
+      # p1[1] = o.GetElement(1,3)
+      # p1[2] = o.GetElement(2,3)
+      # k = vtk.vtkMatrix4x4()
+      # o = vtk.vtkMatrix4x4()
+      # k.SetElement(0,3,point[0])
+      # k.SetElement(1,3,point[1])
+      # k.SetElement(2,3,point[2])
+      # k.Multiply4x4(m2,k,o)
+      # p2[0] = o.GetElement(0,3)
+      # p2[1] = o.GetElement(1,3)
+      # p2[2] = o.GetElement(2,3)
+      # distancesquare += ((p1[0]-p2[0])**2+(p1[1]-p2[1])**2+(p1[2]-p2[2])**2)**0.5/nbTemplate 
+      
+    for i in range(nbObturator):
+      polyDataObturator.GetPoint(i,point)
+      k = vtk.vtkMatrix4x4()
+      o = vtk.vtkMatrix4x4()
+      k.SetElement(0,3,point[0])
+      k.SetElement(1,3,point[1])
+      k.SetElement(2,3,point[2])
+      k.Multiply4x4(m1,k,o)
+      p1[0] = o.GetElement(0,3)
+      p1[1] = o.GetElement(1,3)
+      p1[2] = o.GetElement(2,3)
+      k = vtk.vtkMatrix4x4()
+      o = vtk.vtkMatrix4x4()
+      k.SetElement(0,3,point[0])
+      k.SetElement(1,3,point[1])
+      k.SetElement(2,3,point[2])
+      k.Multiply4x4(m2,k,o)
+      p2[0] = o.GetElement(0,3)
+      p2[1] = o.GetElement(1,3)
+      p2[2] = o.GetElement(2,3)
+      distancesquare += ((p1[0]-p2[0])**2+(p1[1]-p2[1])**2+(p1[2]-p2[2])**2)**0.5/nbObturator
+    # distancesquare /=2
+    
+        
+    self.stringRMS = "RMS: " + str(distancesquare) + " - Processing time: "+ str(self.processingTime)
+    print(self.stringRMS)
+    self.result.setText(self.stringRMS)
+
+  def chrono(self):
+    
+    ###reset chrono and  start
+    self.t0 = time.clock()
+
     

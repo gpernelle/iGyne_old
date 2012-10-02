@@ -1,0 +1,7 @@
+if(BUILD_TESTING)
+  set(Launcher_Command ${Slicer_LAUNCH_COMMAND})
+endif()
+
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR} DESTINATION ${CMAKE_BINARY_DIR}/${Slicer_QTSCRIPTEDMODULES_LIB_DIR}/iGynePyTemplate)
+
+
