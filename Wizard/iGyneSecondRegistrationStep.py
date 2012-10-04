@@ -24,7 +24,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.styleObserverTags = []
     self.volume = None
     self.__threshold = [ -1, -1 ]
-    self.pointId = 0
     self.vtkMatInitial = vtk.vtkMatrix4x4()
     self.glyphPoints = vtk.vtkPoints()
     self.glyphInputData= vtk.vtkPolyData()
@@ -174,6 +173,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.pullObturatorValueButton.connect('valueChanged(int)', self.pullObturator)
     
     
+    
     ###ICP registration settings groupbox
     ICPGroupBox = qt.QGroupBox()
     ICPGroupBox.setTitle( 'ICP Registration Settings' )
@@ -216,7 +216,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     evaluationButton = qt.QPushButton('Evaluation')
     evaluationButton.connect('clicked()',self.RMS)
     evalFrameLayout.addRow( chronoButton)
-    evalFrameLayout.addRow( evaluationButton)
+    #evalFrameLayout.addRow( evaluationButton)
     
     ###CP Registration Settings -> Advanced Settings group
     self.nbIterButton = qt.QSpinBox()
@@ -269,6 +269,27 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.cutOffLowPassFilter.toolTip = "Bigger the value, bigger the Model (default 30)"
     cutOffLowPassFilterLabel = qt.QLabel('Cut Off Low Pass Fourier Filter (/1000)')
     SegGroupBoxLayout.addRow( cutOffLowPassFilterLabel, self.cutOffLowPassFilter)
+    self.xRoi = qt.QSpinBox()
+    self.xRoi.setMinimum(0)
+    self.xRoi.setMaximum(30)
+    self.xRoi.setValue(3)
+    self.xRoi.toolTip = "x median"
+    xRoiLabel = qt.QLabel('x median filter')
+    SegGroupBoxLayout.addRow( xRoiLabel, self.xRoi)
+    self.yRoi = qt.QSpinBox()
+    self.yRoi.setMinimum(0)
+    self.yRoi.setMaximum(30)
+    self.yRoi.setValue(8)
+    self.yRoi.toolTip = "y median"
+    yRoiLabel = qt.QLabel('y median filter value')
+    SegGroupBoxLayout.addRow( yRoiLabel, self.yRoi)
+    self.zRoi = qt.QSpinBox()
+    self.zRoi.setMinimum(0)
+    self.zRoi.setMaximum(30)
+    self.zRoi.setValue(1)
+    self.zRoi.toolTip = "z median"
+    zRoiLabel = qt.QLabel('y median filter value')
+    SegGroupBoxLayout.addRow( zRoiLabel, self.zRoi)
     
     ### Add button to Basic Frame
     basicFrameLayout.addRow(threshLabel, self.__threshRange)
@@ -277,6 +298,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     basicFrameLayout.addRow(self.ICPRegistrationButton)
     basicFrameLayout.addRow(self.ICPRegistrationButton2)
     basicFrameLayout.addRow(fLabel,self.pullObturatorValueButton)
+    basicFrameLayout.addRow(evaluationButton)
+    
     
     ###Buttons Full Auto Seg + Reg and Restore Registration
     widget = qt.QWidget()
@@ -326,7 +349,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     triangles=vtk.vtkTriangleFilter()
     triangles.SetInput(self.TransformPolyDataFilter.GetOutput())
     self.ObturatorNode.SetAndObservePolyData(triangles.GetOutput())
-    self.pos0 = self.pullObturatorValueButton.value   
+    self.pos0 = self.pullObturatorValueButton.value
  
   def setPointData(self,fHoleOriginX,fHoleOriginY):
     '''
@@ -344,7 +367,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
 
         self.glyphPoints.InsertPoint(self.pointId, fTipPointTrans[0], fTipPointTrans[1],fTipPointTrans[2])
         self.pointId += 1
-      
   
   def ICPRegistration(self):
     '''
@@ -355,7 +377,11 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     modelFromImageNode = None
     modelFromImageNodeManu = None
     modelFromImageNodeAuto = None
-    
+    self.glyphPoints = vtk.vtkPoints()
+    self.glyphInputData= vtk.vtkPolyData()
+    self.glyphBalls = vtk.vtkSphereSource()
+    self.glyphPoints3D = vtk.vtkGlyph3D()
+    self.pointId=0
     ### Scroll all the model nodes. Keep the CAD template and CAD Obturator
     numNodes = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLModelNode" ) 
     for n in xrange(numNodes): 
@@ -387,6 +413,9 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       pNode= self.parameterNode()
       
       ### Get the transformation matrix
+      pNode=self.parameterNode()
+      transformNodeID = pNode.GetParameter('followupTransformID')
+      self.transform = Helper.getNodeByID(transformNodeID)
       self.vtkMatInitial = self.transform.GetMatrixTransformToParent()
       
       ### Set a list of known points from template CAD Model
@@ -497,6 +526,11 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     modelFromImageNode = None
     modelFromImageNodeManu = None
     modelFromImageNodeAuto = None
+    self.glyphPoints = vtk.vtkPoints()
+    self.glyphInputData= vtk.vtkPolyData()
+    self.glyphBalls = vtk.vtkSphereSource()
+    self.glyphPoints3D = vtk.vtkGlyph3D()
+    self.pointId=0
     
     ### Scroll all the model nodes. Keep the CAD template and CAD Obturator
     numNodes = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLModelNode" ) 
@@ -1007,7 +1041,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
   def obturatorSegmentation(self):
     x=  (46.1749-23.8251)/2+23.8251
     y = (65.1951-42.9222)/2+42.9222
-    z = 150/2-120
+    z = 150/2-110
     pNode = self.parameterNode()
     volume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
@@ -1037,7 +1071,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     obturator.SetAndObserveTransformNodeID(t.GetID())
     bounds = [0,0,0,0,0,0]
     obturator.GetRASBounds(bounds)
-    roi.SetRadiusXYZ(abs(bounds[0]-bounds[1])*1.2,abs(bounds[2]-bounds[3])*1.2,abs(bounds[4]-bounds[5])/3)
+    roi.SetRadiusXYZ(abs(bounds[0]-bounds[1])*float(105)/100,abs(bounds[2]-bounds[3])*float(105)/100,abs(bounds[4]-bounds[5])*float(30)/100)
     # move again obturator in previous position (after first registration)
     obturator.SetAndObserveTransformNodeID(transform.GetID())
     m.DeepCopy(M)
@@ -1049,6 +1083,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     t.SetAndObserveMatrixTransformToParent(m)
     roi.SetAndObserveTransformNodeID(t.GetID())
     roi.SetLocked(1)
+    
     roi.SetXYZ([0,0,-50+self.pullObturatorValueButton.value])
     #crop volume
     cropVolumeNode =slicer.mrmlScene.CreateNodeByClass('vtkMRMLCropVolumeParametersNode')
@@ -1073,7 +1108,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       parameters = {}
       parameters["inputVolume"] = outputVolume
       parameters["outputVolume"] = self.imagefiltered
-      parameters["neighborhood"] = 3,8,1
+      parameters["neighborhood"] = self.xRoi.value,self.yRoi.value,self.zRoi.value
       medianfiltercli = slicer.modules.medianimagefilter
       __cliNode = None
       __cliNode = slicer.cli.run(medianfiltercli, __cliNode, parameters)
@@ -1342,7 +1377,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.fullAutoRegOn = 1
     self.applyModelMaker()
     self.obturatorSegmentation()
-    
+  
+  
   def RMS(self):
     templateID = 'vtkMRMLModelNode'+str(self.templateIDButton.value)
     obturatorID = 'vtkMRMLModelNode'+str(self.obturatorIDButton.value)
@@ -1362,6 +1398,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     nbTemplate = polyDataTemplate.GetNumberOfPoints()
     nbObturator = polyDataObturator.GetNumberOfPoints()
     distancesquare = 0
+    distanceaverage = 0
     # for i in range(nbTemplate):
       # polyDataTemplate.GetPoint(i,point)
       # k = vtk.vtkMatrix4x4()
@@ -1390,7 +1427,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       o = vtk.vtkMatrix4x4()
       k.SetElement(0,3,point[0])
       k.SetElement(1,3,point[1])
-      k.SetElement(2,3,point[2])
+      k.SetElement(2,3,point[2]+self.pullObturatorValueButton.value)
       k.Multiply4x4(m1,k,o)
       p1[0] = o.GetElement(0,3)
       p1[1] = o.GetElement(1,3)
@@ -1404,11 +1441,12 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       p2[0] = o.GetElement(0,3)
       p2[1] = o.GetElement(1,3)
       p2[2] = o.GetElement(2,3)
-      distancesquare += ((p1[0]-p2[0])**2+(p1[1]-p2[1])**2+(p1[2]-p2[2])**2)**0.5/nbObturator
-    # distancesquare /=2
-    
+      distancesquare +=      (p1[0]-p2[0])**2  +   (p1[1]-p2[1])**2  +   (p1[2]-p2[2])**2 
+      distanceaverage +=  (  (p1[0]-p2[0])**2  +   (p1[1]-p2[1])**2  +   (p1[2]-p2[2])**2 )**0.5
+    distancesquare= (distancesquare/nbObturator)**0.5
+    distanceaverage = distanceaverage/nbObturator
         
-    self.stringRMS = "RMS: " + str(distancesquare) + " - Processing time: "+ str(self.processingTime)
+    self.stringRMS = "RMS: " + str(distancesquare) + " - Processing time: "+ str(self.processingTime) + " - d.av.: "+ str(distanceaverage)
     print(self.stringRMS)
     self.result.setText(self.stringRMS)
 
