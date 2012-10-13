@@ -17,7 +17,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
   def __init__( self, stepid ):
     self.skip = 1
     self.initialize( stepid )
-    self.setName( '6. Needle Segmentation' )
+    self.setName( '7. Needle Segmentation' )
     self.setDescription( 'Segment the needles' )
     self.__parent = super( iGyneNeedleSegmentationStep, self )
     self.analysisGroupBox = None
@@ -321,7 +321,21 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     
     self.__layout.addRow(self.__filterFrame)
     self.__layout.addRow(self.__bendingFrame)
+    # reset module
     
+    resetButton = qt.QPushButton( 'Reset Module' )
+    resetButton.connect( 'clicked()', self.onResetButton )
+    self.__layout.addRow(resetButton)
+  
+  def onResetButton( self ):
+    '''
+    '''
+    
+    self.workflow().goBackward() # 5
+    self.workflow().goBackward() # 4
+    self.workflow().goBackward() # 3
+    self.workflow().goBackward() # 2
+    self.workflow().goBackward() # 1
     
     
   def drawIsoSurfaces0( self ):
@@ -444,6 +458,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       self.analysisGroupBox.deleteLater()
       self.analysisGroupBox = None
     self.analysisGroupBox = qt.QGroupBox()
+    self.analysisGroupBox.setFixedHeight(600)
     self.analysisGroupBox.setTitle( 'Segmentation Report' )
     self.__layout.addRow( self.analysisGroupBox )
     self.analysisGroupBoxLayout = qt.QFormLayout( self.analysisGroupBox )
@@ -496,6 +511,18 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       imageData = volumeNode.GetImageData()
       indice=0
       
+      # model and view for stats table
+      self.keys = ("Label", "Intensity Average","Angle Deviation")
+      self.view = qt.QTableView()
+      self.view.setMinimumHeight(300)
+      self.labelStats = {}
+      self.labelStats['Labels'] = []
+      self.view.sortingEnabled = True
+      self.items = []
+      self.model = qt.QStandardItemModel()
+      self.view.setModel(self.model)
+      self.view.verticalHeader().visible = False
+      row = 0
       modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
       for modelNode in modelNodes.values():
         displayNode = modelNode.GetDisplayNode()
@@ -533,10 +560,40 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
           psi = math.degrees(math.acos((tip[0]-base[0])/((tip[0]-base[0])**2+(tip[2]-base[2])**2)**0.5))
           angleDeviation = (phi1-phi)**2+(theta1-theta)**2+(psi1-psi)**2
         
-          result = "Needle " + self.option[int(modelNode.GetAttribute("nth"))] + ": Angle Deviation from ref: " + str(angleDeviation)+" Intensity average :" + str(indice) 
-          analysisLine = qt.QLabel(result)
-          self.analysisGroupBoxLayout.addRow(analysisLine)
-        
+          # result = "Needle " + self.option[int(modelNode.GetAttribute("nth"))] + ": Angle Deviation from ref: " + str(angleDeviation)+" Intensity average :" + str(indice) 
+          # analysisLine = qt.QLabel(result)
+          # self.analysisGroupBoxLayout.addRow(analysisLine)
+          
+          self.labelStats["Labels"].append(int(modelNode.GetAttribute("nth")))
+          self.labelStats[int(modelNode.GetAttribute("nth")),"Label"] = self.option[int(modelNode.GetAttribute("nth"))]
+          self.labelStats[int(modelNode.GetAttribute("nth")),"Intensity Average"] = indice
+          self.labelStats[int(modelNode.GetAttribute("nth")),"Angle Deviation"] = angleDeviation 
+                
+      for i in self.labelStats["Labels"]:
+        color = qt.QColor()
+        color.setRgb(self.color255[i][0],self.color255[i][1],self.color255[i][2])
+        item = qt.QStandardItem()
+        item.setData(color,1)
+        self.model.setItem(row,0,item)
+        self.items.append(item)
+        col = 1
+        for k in self.keys:
+          item = qt.QStandardItem()
+          item.setText(self.labelStats[i,k])
+          self.model.setItem(row,col,item)
+          self.items.append(item)
+          col += 1
+        row += 1
+
+      self.view.setColumnWidth(0,30)
+      self.model.setHeaderData(0,1," ")
+      col = 1
+      for k in self.keys:
+        self.view.setColumnWidth(col,15*len(k))
+        self.model.setHeaderData(col,1,k)
+        col += 1    
+      self.analysisGroupBoxLayout.addRow(self.view)
+      
     else:
     
       m = vtk.vtkMatrix4x4()
@@ -544,6 +601,19 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       volumeNode.GetIJKToRASMatrix(m)
       m.Invert()
       imageData = volumeNode.GetImageData()
+     
+      # model and view for stats table
+      self.keys = ("Label", "Intensity Average")
+      self.view = qt.QTableView()
+      self.view.setMinimumHeight(300)
+      self.labelStats = {}
+      self.labelStats['Labels'] = []
+      self.view.sortingEnabled = True
+      self.items = []
+      self.model = qt.QStandardItemModel()
+      self.view.setModel(self.model)
+      self.view.verticalHeader().visible = False
+      row = 0
       
       modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
       for modelNode in modelNodes.values():
@@ -582,9 +652,41 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
           psi = math.degrees(math.acos((tip[0]-base[0])/((tip[0]-base[0])**2+(tip[2]-base[2])**2)**0.5))
           # print tip[0]-base[0],tip[1]-base[1],tip[2]-base[2]
           
-          result = "Needle " + self.option[int(modelNode.GetAttribute("nth"))]  +" Intensity average :" + str(indice)
-          analysisLine = qt.QLabel(result)
-          self.analysisGroupBoxLayout.addRow(analysisLine)
+          # result = "Needle " + self.option[int(modelNode.GetAttribute("nth"))]  +" Intensity average :" + str(indice)
+          # analysisLine = qt.QLabel(result)
+          # self.analysisGroupBoxLayout.addRow(analysisLine)
+          
+          # add an entry to the LabelStats list
+          self.labelStats["Labels"].append(int(modelNode.GetAttribute("nth")))
+          self.labelStats[int(modelNode.GetAttribute("nth")),"Label"] = self.option[int(modelNode.GetAttribute("nth"))]
+          self.labelStats[int(modelNode.GetAttribute("nth")),"Intensity Average"] = str(indice) 
+      
+      for i in self.labelStats["Labels"]:
+        color = qt.QColor()
+        color.setRgb(self.color255[i][0],self.color255[i][1],self.color255[i][2])
+        item = qt.QStandardItem()
+        item.setData(color,1)
+        self.model.setItem(row,0,item)
+        self.items.append(item)
+        col = 1
+        for k in self.keys:
+          item = qt.QStandardItem()
+          item.setText(self.labelStats[i,k])
+          self.model.setItem(row,col,item)
+          self.items.append(item)
+          col += 1
+        row += 1
+
+      self.view.setColumnWidth(0,30)
+      self.model.setHeaderData(0,1," ")
+      col = 1
+      for k in self.keys:
+        self.view.setColumnWidth(col,15*len(k))
+        self.model.setHeaderData(col,1,k)
+        col += 1 
+      
+      self.analysisGroupBoxLayout.addRow(self.view)
+
         
   def angleDeviationEvaluation(self, modelNode):
     if self.transform !=None :
@@ -1049,8 +1151,8 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     Update GUI and visualization
     '''
     super(iGyneNeedleSegmentationStep, self).onEntry(comingFrom, transitionType)
-    if self.skip == 0:
-      pNode = self.parameterNode()
+    pNode = self.parameterNode()
+    if pNode.GetParameter('skip') != '1':
       self.updateWidgetFromParameters(pNode)
       Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
       obturator = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('obturatorID'))
@@ -1060,7 +1162,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       dTemplate = template.GetDisplayNode()
       dTemplate.SetVisibility(0)
 
-      pNode.SetParameter('currentStep', self.stepid)
+    pNode.SetParameter('currentStep', self.stepid)
       
   def updateWidgetFromParameters(self, pNode):
   
@@ -1212,7 +1314,8 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         self.p[1][i] = vtkmat.GetElement(1,3)
                  
   def colorLabel(self):
-    self.color= [[0,0,0] for i in range(310)] 
+    self.color= [[0,0,0] for i in range(310)]
+    self.color255= [[0,0,0] for i in range(310)]    
     self.color[0]=[221,108,158]
     self.color[1]=[128,174,128]
     self.color[2]=[241,214,145]
@@ -1420,6 +1523,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.color[204]=[205,205,100]
     for i in range(310):
       for j in range(3):
+        self.color255[i][j] = self.color[i][j]
         self.color[i][j] = self.color[i][j]/float(255)
 
   def computerPolydataAndMatrix(self):

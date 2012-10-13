@@ -14,7 +14,6 @@ class iGyneLoadModelStep( iGyneStep ) :
     self.setDescription( 'Load the template. From this template, auto-crop and registration functions will be processed.' )
     self.__parent = super( iGyneLoadModelStep, self )
     self.loadTemplateButton = None
-    self.skip = 1
     
     # initialize the dicom infrastructure
     settings = qt.QSettings()
@@ -43,7 +42,6 @@ class iGyneLoadModelStep( iGyneStep ) :
     self.dicomModelTypes = ('Root', 'Patient', 'Study', 'Series', 'Image')
 
   def createUserInterface( self ):
-    self.skip = 0
     self.__layout = self.__parent.createUserInterface()
    
     baselineScanLabel = qt.QLabel( 'CT or MR scan:' )
@@ -67,7 +65,7 @@ class iGyneLoadModelStep( iGyneStep ) :
 
 	#Load Scan Button
     self.__fileFrame = ctk.ctkCollapsibleButton()
-    self.__fileFrame.text = "File Input"
+    self.__fileFrame.text = "NRRD File Input"
     self.__fileFrame.collapsed = 1
     fileFrame = qt.QFormLayout(self.__fileFrame)
     self.__layout.addRow(self.__fileFrame)
@@ -167,12 +165,18 @@ class iGyneLoadModelStep( iGyneStep ) :
   def validate( self, desiredBranchId ):
     '''
     '''
-    if self.skip == 0:
+    pNode = self.parameterNode()
+    if pNode.GetParameter('skip') != '1':
       self.__parent.validate( desiredBranchId )
       # check here that the selectors are not empty
       baseline = self.__baselineVolumeSelector.currentNode()
-      template = slicer.mrmlScene.GetNodeByID("vtkMRMLModelNode4")
-      obturator = slicer.mrmlScene.GetNodeByID("vtkMRMLModelNode5")
+      modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
+      for modelNode in modelNodes.values():
+        if modelNode.GetName()=='Template' :
+          template=modelNode
+        if modelNode.GetName()=='Obturator_reg' :
+          obturator=modelNode
+      
       df = template.GetDisplayNode()
       do = obturator.GetDisplayNode()
       df.SetSliceIntersectionVisibility(0)
@@ -198,22 +202,27 @@ class iGyneLoadModelStep( iGyneStep ) :
     else:
       self.__parent.validate( desiredBranchId )
       self.__parent.validationSucceeded(desiredBranchId)
+  
+  
   def onEntry(self,comingFrom,transitionType):
   
     super(iGyneLoadModelStep, self).onEntry(comingFrom, transitionType)
     # setup the interface
     pNode = self.parameterNode()
-    pNode.SetParameter('currentStep', self.stepid) 
-    applicator  = pNode.GetParameter('Template')
-    if applicator == "4points":
-      self.loadTemplate(4)
-    if applicator == "3points":
-      self.loadTemplate(3)      
-    if self.skip == 0:
-      self.updateWidgetFromParameters(self.parameterNode())
-   
+    pNode.SetParameter('currentStep', self.stepid)
+    if pNode.GetParameter('skip') != '1':
+      applicator  = pNode.GetParameter('Template')
+      if applicator == "4points":
+        self.loadTemplate(4)
+      if applicator == "3points":
+        self.loadTemplate(3)
+    elif pNode.GetParameter('skip')=='1':
+      self.workflow().goForward() # 4      
+      
   def onExit(self, goingTo, transitionType):
-    if self.skip == 0:
+   
+    pNode= self.parameterNode()
+    if pNode.GetParameter('skip') != '1':
       self.doStepProcessing()
     #error checking
     if goingTo.id() != 'SelectApplicator' and goingTo.id() != 'FirstRegistration':
@@ -228,8 +237,7 @@ class iGyneLoadModelStep( iGyneStep ) :
 
      
   def doStepProcessing(self):
-  
-  
+
     # calculate the transform to align the ROI in the next step with the
     # baseline volume
     pNode = self.parameterNode()

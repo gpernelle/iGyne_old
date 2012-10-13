@@ -4,6 +4,7 @@ from iGyneStep import *
 from Helper import *
 from EditorLib import *
 import math
+import Queue, threading
 
 import string
 
@@ -15,7 +16,6 @@ TODO:
 class iGyneSecondRegistrationStep( iGyneStep ) :
 
   def __init__( self, stepid ):
-    self.skip = 1
     self.initialize( stepid )
     self.setName( '5. Second Registration' )
     self.setDescription( 'Register the template based on the volume segmentation' )
@@ -75,7 +75,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     - frame with the embedded editor modules
     - frame with parameters for segmentation/registration
     '''
-    self.skip = 0
     self.__layout = self.__parent.createUserInterface()
     
     ###Basic Settings Frame
@@ -103,7 +102,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     editorFrameLayout = qt.QFormLayout(editorFrame)
     
     ###Threshold slider for template segmentation
-    threshLabel = qt.QLabel('1/ Make the holes visible:')
+    threshLabel = qt.QLabel('Make the holes visible:')
     self.__threshRange = slicer.qMRMLRangeWidget()
     self.__threshRange.decimals = 0
     self.__threshRange.singleStep = 1
@@ -126,13 +125,17 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.__roiLabelSelector.setMRMLScene(slicer.mrmlScene)
     
     ###Make a 3D Model Button 
-    make3DModelButton = qt.QPushButton('2/ Make a 3D Model')
+    make3DModelButton = qt.QPushButton('Make a 3D Model')
     make3DModelButton.connect('clicked()', self.applyModelMaker)
      
     ###Auto Segmentation of Obturator Button     
     autoSegmentationButton = qt.QPushButton('Automatic Obturator Segmentation')
     autoSegmentationButton.connect('clicked()', self.obturatorSegmentation)
     
+    ### Line separator
+    line = qt.QFrame()
+    line.setFrameShape(qt.QFrame.HLine)
+    line.setFrameShape(qt.QFrame.Sunken)
     
     ###Editor Widget
     groupbox = qt.QGroupBox()
@@ -141,7 +144,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     editorFrameLayout.addRow(groupbox)
     
     ###Start ICP reg button
-    self.ICPRegistrationButton = qt.QPushButton('3/ ICP Registration')
+    self.ICPRegistrationButton = qt.QPushButton('ICP Registration')
     string = 'Register Template and Model'
     self.__registrationStatus = qt.QLabel(string)
     self.ICPRegistrationButton.connect('toggled(bool)', self.onICPButtonToggled)
@@ -149,7 +152,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.ICPRegistrationButton.checkable = True 
     
     ###Start ICP reg button with no template
-    self.ICPRegistrationButton2 = qt.QPushButton('3/ ICP Registration w/o obturator')
+    self.ICPRegistrationButton2 = qt.QPushButton('ICP Registration w/o obturator')
     string = 'Register Template and Model'
     self.__registrationStatus = qt.QLabel(string)
     self.ICPRegistrationButton2.connect('toggled(bool)', self.onICPButtonToggled2)
@@ -179,6 +182,30 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     ICPGroupBox.setTitle( 'ICP Registration Settings' )
     advFrameLayout.addRow( ICPGroupBox )
     ICPGroupBoxLayout = qt.QFormLayout( ICPGroupBox )
+    
+    ###Segment Template groupbox
+    segTemplateGroupBox = qt.QGroupBox()
+    segTemplateGroupBox.setTitle( '1. Segmentation of the template' )
+    basicFrameLayout.addRow( segTemplateGroupBox )
+    segTemplateGroupBoxLayout = qt.QFormLayout( segTemplateGroupBox )
+    
+    ###Segment Obturator groupbox
+    segObturatorGroupBox = qt.QGroupBox()
+    segObturatorGroupBox.setTitle( '2. Segmentation of the Obturator' )
+    basicFrameLayout.addRow( segObturatorGroupBox )
+    segObturatorGroupBoxLayout = qt.QFormLayout( segObturatorGroupBox )
+    
+    ###Registration groupbox
+    registrationGroupBox = qt.QGroupBox()
+    registrationGroupBox.setTitle( '3. Registration: Choose one of the following registration methods' )
+    basicFrameLayout.addRow( registrationGroupBox )
+    registrationGroupBoxLayout = qt.QFormLayout( registrationGroupBox )
+    
+    ###Evaluation groupbox
+    evaluationGroupBox = qt.QGroupBox()
+    evaluationGroupBox.setTitle( '4. Evaluation' )
+    basicFrameLayout.addRow( evaluationGroupBox )
+    evaluationGroupBoxLayout = qt.QFormLayout( evaluationGroupBox )
     
     
     ###Evaluation settings 4,5,7
@@ -210,7 +237,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     t2IDButtonLabel = qt.QLabel('Optimal transformation ID')
     evalFrameLayout.addRow( t2IDButtonLabel, self.t2IDButton)
     self.result = qt.QLabel(self.stringRMS)
-    evalFrameLayout.addRow(self.result)
     chronoButton = qt.QPushButton('Start chrono')
     chronoButton.connect('clicked()',self.chrono)
     evaluationButton = qt.QPushButton('Evaluation')
@@ -292,13 +318,15 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     SegGroupBoxLayout.addRow( zRoiLabel, self.zRoi)
     
     ### Add button to Basic Frame
-    basicFrameLayout.addRow(threshLabel, self.__threshRange)
-    basicFrameLayout.addRow(make3DModelButton)
-    basicFrameLayout.addRow(autoSegmentationButton)
-    basicFrameLayout.addRow(self.ICPRegistrationButton)
-    basicFrameLayout.addRow(self.ICPRegistrationButton2)
-    basicFrameLayout.addRow(fLabel,self.pullObturatorValueButton)
-    basicFrameLayout.addRow(evaluationButton)
+    segTemplateGroupBoxLayout.addRow(threshLabel, self.__threshRange)
+    segTemplateGroupBoxLayout.addRow(make3DModelButton)
+    segObturatorGroupBoxLayout.addRow(autoSegmentationButton)
+    segObturatorGroupBoxLayout.addRow(editorFrame)
+    registrationGroupBoxLayout.addRow(self.ICPRegistrationButton)
+    registrationGroupBoxLayout.addRow(self.ICPRegistrationButton2)
+    evaluationGroupBoxLayout.addRow(fLabel,self.pullObturatorValueButton)
+    evaluationGroupBoxLayout.addRow(evaluationButton)
+    evaluationGroupBoxLayout.addRow(self.result)
     
     
     ###Buttons Full Auto Seg + Reg and Restore Registration
@@ -317,9 +345,24 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.__layout.addRow(basicFrame)
     
     ###Add Editor and Advanced Settings for segmentation
-    self.__layout.addRow(editorFrame)
+    
     self.__layout.addRow(advancedFrame)
     self.__layout.addRow(evaluationFrame)
+    
+    # reset module
+    
+    resetButton = qt.QPushButton( 'Reset Module' )
+    resetButton.connect( 'clicked()', self.onResetButton )
+    self.__layout.addRow(resetButton)
+  
+  def onResetButton( self ):
+    '''
+    '''
+    
+    self.workflow().goBackward() # 4
+    self.workflow().goBackward() # 3
+    self.workflow().goBackward() # 2
+    self.workflow().goBackward() # 1
 
   def pullObturator(self):
     '''
@@ -373,6 +416,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     ICP Registration based on vtk.vtkIterativeClosestPointTransform()
     '''
     ### Initialisation
+    self.__registrationStatus.setText('ICP registration running...')
     segmentationModel = None 
     modelFromImageNode = None
     modelFromImageNodeManu = None
@@ -522,6 +566,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     ICP Registration based on vtk.vtkIterativeClosestPointTransform()
     '''
     ### Initialisation
+    
     segmentationModel = None 
     modelFromImageNode = None
     modelFromImageNodeManu = None
@@ -811,17 +856,20 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.__parent.validationSucceeded(desiredBranchId)
 
   def onExit(self, goingTo, transitionType):
-    if self.skip == 0:
-      if goingTo.id() != 'FirstRegistration' and goingTo.id() != 'NeedlePlanning':
-        return
-
-      pNode = self.parameterNode()
+    pNode = self.parameterNode()
+    if pNode.GetParameter('skip') != '1':
       pNode.SetParameter('thresholdRange', str(self.__threshRange.minimumValue)+','+str(self.__threshRange.maximumValue))
       if self.segmentationModel:
         self.segmentationModel.RemoveAllChildrenNodes()
         slicer.mrmlScene.RemoveNode(self.segmentationModel)
-    self.obturatorDisplayModel.SetVisibility(0)
-    self.templateDisplayModel.SetVisibility(0)    
+      self.obturatorDisplayModel.SetVisibility(0)
+      self.templateDisplayModel.SetVisibility(0)
+      numNodes = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLAnnotationROINode" ) 
+      for n in xrange(numNodes):
+        node = slicer.mrmlScene.GetNthNodeByClass( n, "vtkMRMLAnnotationROINode" )     
+        slicer.mrmlScene.RemoveNode(node)
+    if goingTo.id() != 'FirstRegistration' and goingTo.id() != 'NeedlePlanning':
+      return      
     super(iGyneSecondRegistrationStep, self).onExit(goingTo, transitionType)
     
 
@@ -830,7 +878,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     Update GUI and visualization
     '''
     super(iGyneSecondRegistrationStep, self).onEntry(comingFrom, transitionType)
-    if self.skip == 0:
+    pNode = self.parameterNode()
+    if pNode.GetParameter('skip') != '1':
     # setup the interface
       lm = slicer.app.layoutManager()
       lm.setLayout(3)
@@ -857,7 +906,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       
       ###chrono start
       self.t0 = time.clock()
-      
+    else:
+      self.workflow().goForward() # 3      
     
   def updateWidgetFromParameters(self, pNode):
   
@@ -1220,12 +1270,15 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     slicer.mrmlScene.Modified()
     status = node.GetStatusString()
     if status == 'Completed':
+      self.__registrationStatus.setText('Segmented obturator model built.')
       self.status = 'Segmentation Completed'
 
       if self.fullAutoRegOn == 1 :
-        for i in range(100):
-          print 'wait...'
-
+        slicer.mrmlScene.Modified()
+        time.sleep(1)
+        slicer.mrmlScene.Modified()
+        self.updatedNbModelNodes = slicer.mrmlScene.GetNumberOfNodesByClass('vtkMRMLModelNode')
+        
         self.startICP()        
       self.fullAutoRegOn = 0
   
@@ -1373,10 +1426,29 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       transform.SetAndObserveMatrixTransformToParent(self.initialTransformMatrix)
       
   def IFeelLucky(self):
-    ###chrono start
-    self.fullAutoRegOn = 1
+    
+    self.nbModelNodes = slicer.mrmlScene.GetNumberOfNodesByClass('vtkMRMLModelNode')
     self.applyModelMaker()
+    ###chrono start
     self.obturatorSegmentation()
+    self.updatedNbModelNodes = 0
+
+    
+    # self.startICP()
+    
+    
+    # while queue.empty()!= True:
+      # #grabs host from queue
+      # host = queue.get()
+      # if host == 1:
+        # self.obturatorSegmentation()
+      # if host ==2:
+        # self.startICP()
+    
+    # queue.join()
+    self.fullAutoRegOn = 1
+    
+    # self.obturatorSegmentation()
   
   
   def RMS(self):

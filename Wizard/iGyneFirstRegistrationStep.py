@@ -5,11 +5,11 @@ from Helper import *
 import PythonQt
 import string
 import json
+import time
 
 class iGyneFirstRegistrationStep( iGyneStep ) :
 
   def __init__( self, stepid ):
-    self.skip = 1
     self.initialize( stepid )
     self.setName( '4. Register the template' )
     self.setDescription( 'Register the template based on 3 fiducial points. Choose the points counterclockwise, starting from the one in the middle.' )
@@ -40,7 +40,6 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
   def createUserInterface( self ):
     '''
     '''
-    self.skip = 0
     self.__layout = self.__parent.createUserInterface()
      
     self.fiducialButton = qt.QPushButton('Choose Fiducial Points')
@@ -66,7 +65,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     self.__roiSelector.toolTip = "ROI defining the structure of interest"
     self.__roiSelector.setMRMLScene(slicer.mrmlScene)
     self.__roiSelector.addEnabled = 1
-    self.__layout.addRow( roiLabel, self.__roiSelector )
+    # self.__layout.addRow( roiLabel, self.__roiSelector )
     self.__roiSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onROIChanged)
 
     
@@ -74,7 +73,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     self.__advancedFrame.text = "VOI Parameters"
     self.__advancedFrame.collapsed = 1
     advFrameLayout = qt.QFormLayout(self.__advancedFrame)
-    self.__layout.addRow(self.__advancedFrame)
+    # self.__layout.addRow(self.__advancedFrame)
     
     # the VOI parameters
     voiGroupBox = qt.QGroupBox()
@@ -82,8 +81,23 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     advFrameLayout.addRow( voiGroupBox )
     voiGroupBoxLayout = qt.QFormLayout( voiGroupBox )
     self.__roiWidget = PythonQt.qSlicerAnnotationsModuleWidgets.qMRMLAnnotationROIWidget()
-    voiGroupBoxLayout.addRow( self.__roiWidget )
+    # voiGroupBoxLayout.addRow( self.__roiWidget )
     
+    # reset module
+    
+    resetButton = qt.QPushButton( 'Reset Module' )
+    resetButton.connect( 'clicked()', self.onResetButton )
+    self.__layout.addWidget( resetButton )
+
+  def onResetButton( self ):
+    '''
+    '''
+    self.workflow().goBackward() # 3
+    self.workflow().goBackward() # 2
+    self.workflow().goBackward() # 1
+
+    
+
   def automaticRegistration(self):
   
     outputVolume = slicer.mrmlScene.CreateNodeByClass('vtkMRMLScalarVolumeNode')
@@ -456,6 +470,8 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
           fiducial.SetName("right")
           self.click = 0
           self.fiducialButton.setEnabled(0)
+          time.sleep(0.5)
+          slicer.mrmlScene.Modified()
           self.firstRegistration()
           self.stop()
       
@@ -490,8 +506,8 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
 
   def onEntry(self,comingFrom,transitionType):
     super(iGyneFirstRegistrationStep, self).onEntry(comingFrom, transitionType)
-    
-    if self.skip == 0:
+    pNode = self.parameterNode()
+    if pNode.GetParameter('skip') != '1':
       # setup the interface
       lm = slicer.app.layoutManager()
       lm.setLayout(slicer.vtkMRMLLayoutNode.SlicerLayoutOneUpRedSliceView)
@@ -518,12 +534,18 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
         self.__roi.VisibleOn()
       self.__roi.SetRadiusXYZ(abs(bounds[0]-bounds[1])/2,abs(bounds[2]-bounds[3])/2,abs(bounds[4]-bounds[5])/2)
       pNode.SetParameter('currentStep', self.stepid)
-
+      
+      if pNode.GetParameter('Template')=='3points':
+        self.automaticRegistrationButton.setEnabled(0)
+      elif pNode.GetParameter('Template')=='4points':
+        self.automaticRegistrationButton.setEnabled(1)
+    else:
+      self.workflow().goForward() # 5
+      
   def onExit(self, goingTo, transitionType):
-    if self.skip == 0:
-      if goingTo.id() != 'LoadModel' and goingTo.id() != 'SecondRegistration':
-        return
-        
+    pNode = self.parameterNode()
+    if pNode.GetParameter('skip') != '1':
+              
       if self.__roi != None:
         self.__roi.RemoveObserver(self.__roiObserverTag)
         self.__roi.VisibleOff()
@@ -538,7 +560,9 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       for fiducialNode in fiducialNodes.values():
         dfid = fiducialNode.GetDisplayNode()
         dfid.SetVisibility(0)
-
+        
+    if goingTo.id() != 'LoadModel' and goingTo.id() != 'SecondRegistration':
+      return
     super(iGyneFirstRegistrationStep, self).onExit(goingTo, transitionType)
 
   def updateWidgetFromParameterNode(self, parameterNode):

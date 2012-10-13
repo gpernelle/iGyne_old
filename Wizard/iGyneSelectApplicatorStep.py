@@ -11,18 +11,18 @@ class iGyneSelectApplicatorStep( iGyneStep ) :
     self.setName( '2. Choose Applicator' )
     self.setDescription( 'Choose the applicator you are using. It will load the right template.' )
     self.__parent = super( iGyneSelectApplicatorStep, self )
-    self.checkBox1 = qt.QCheckBox("Neblett Template and Obturator")
+    
     # qt.QTimer.singleShot(0, self.killButton)
 
   def createUserInterface( self ):
   
     self.__layout = self.__parent.createUserInterface()
-    self.checkBox1 = qt.QCheckBox("Neblett Template and Obturator 4 points")
+    self.checkBox1 = qt.QRadioButton("Neblett Template and Obturator 4 points")
     self.checkBox1.setChecked(0)
     
     # checkBox2 = qt.QCheckBox("Obturator")
     # checkBox2.setEnabled(0)
-    self.checkBox3 = qt.QCheckBox("Neblett Template and Obturator 3 points")
+    self.checkBox3 = qt.QRadioButton("Neblett Template and Obturator 3 points")
     self.checkBox3.setChecked(1)
     # checkBox3 = qt.QCheckBox("Intrauterine Tandem")
     # checkBox3.setCheckable(0)
@@ -52,20 +52,21 @@ class iGyneSelectApplicatorStep( iGyneStep ) :
     super(iGyneSelectApplicatorStep, self).onEntry(comingFrom, transitionType)
     # setup the interface
     pNode = self.parameterNode()
-    pNode.SetParameter('currentStep', self.stepid)    
-    # self.updateWidgetFromParameterNode(pNode)
-    # qt.QTimer.singleShot(0, self.killButton)
+    pNode.SetParameter('currentStep', self.stepid)
+    if pNode.GetParameter('skip')=='1':
+      self.workflow().goForward() # 3       
+
 
   def onExit(self, goingTo, transitionType):
-    if self.checkBox1.isChecked():
-      pNode = self.parameterNode()
-      pNode.SetParameter('Template', "4points")
-    if self.checkBox3.isChecked():
-      pNode = self.parameterNode()
-      pNode.SetParameter('Template', "3points")       
+    pNode = self.parameterNode()
+    if pNode.GetParameter('skip')!='1':
+      if self.checkBox1.isChecked():
+        pNode.SetParameter('Template', "4points")
+      if self.checkBox3.isChecked():
+        pNode = self.parameterNode()
+        pNode.SetParameter('Template', "3points")       
     if goingTo.id() != 'SelectProcedure' and goingTo.id() != 'LoadModel':
       return
-   
 
     super(iGyneSelectApplicatorStep, self).onExit(goingTo, transitionType)
 

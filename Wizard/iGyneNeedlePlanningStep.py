@@ -16,9 +16,8 @@ TODO:
 class iGyneNeedlePlanningStep( iGyneStep ) :
 
   def __init__( self, stepid ):
-    self.skip = 1
     self.initialize( stepid )
-    self.setName( '5. Needle position Planning' )
+    self.setName( '6. Needle position Planning' )
     self.setDescription( 'Position, color, resize needles as you like' )
     self.__parent = super( iGyneNeedlePlanningStep, self )
 
@@ -91,7 +90,6 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     '''
     '''
     pNode = self.parameterNode()
-    self.skip = 0
     self.__layout = self.__parent.createUserInterface()
     TemplateSheetWidget = qt.QWidget()
     TemplateSheetWidget.resize(552, 682)
@@ -1480,9 +1478,7 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     TemplateSheetWidget.visible = True
     
     self.__layout.addWidget(TemplateSheetWidget)
-    
-    
- 
+     
   def refreshSegmented(self):
     self.segmented = [0 for i in range(63)]
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
@@ -1527,14 +1523,16 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     Update GUI and visualization
     '''
     super(iGyneNeedlePlanningStep, self).onEntry(comingFrom, transitionType)
-    if self.skip == 0:
-      pNode = self.parameterNode()
+    pNode = self.parameterNode()
+    if pNode.GetParameter('skip') != '1':
       self.updateWidgetFromParameters(pNode)
       Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
 
       pNode.SetParameter('currentStep', self.stepid)
       self.loadNeedles()
       self.refreshSegmented()
+    else:
+      self.workflow().goForward() # 6  
 
   def updateWidgetFromParameters(self, pNode):
   
