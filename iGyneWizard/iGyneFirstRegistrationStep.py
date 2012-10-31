@@ -19,23 +19,17 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     self.volume = None
     self.fixedLandmarks = None
     self.movingLandmarks = None
-    self.__vrDisplayNode = None
     self.__roiTransformNode = None
     self.__baselineVolume = None
     self.__roi = None
     self.__roiObserverTag = None
     self.RMS = 0
     self.OutputMessage =""
-    self.__vrDisplayNode = None
     self.__threshold = [ -1, -1 ]  
-    # initialize VR stuff
     self.__roiSegmentationNode = None
     self.__roiVolume = None
     self.click = 0
     self.register = 0
-    
-    
-    
 
   def createUserInterface( self ):
     '''
@@ -99,6 +93,11 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     
 
   def automaticRegistration(self):
+    '''
+    Detect the brigh circles in the MR volume, corresponding to the Vitamin E
+    capsules positioned at the corners of the obturator
+    Use Hough transform CLI module
+    '''
   
     outputVolume = slicer.mrmlScene.CreateNodeByClass('vtkMRMLScalarVolumeNode')
     slicer.mrmlScene.AddNode(outputVolume)
@@ -135,6 +134,10 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
 
 
   def processDataHoughTransform(self, node, event):
+    '''
+    Filter ans sort the detected circles found by the Hough transform.
+    The order must correspond to the order of the landmarks
+    '''
     status = node.GetStatusString()
     self.__registrationStatus.setText('Hough Transforn '+status)
     if status == 'Completed':
@@ -218,8 +221,6 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       sorted2[1]=sorted[0]
       sorted2[3]=sorted[2]
       
-      
-      
       ijkToRAS = vtk.vtkMatrix4x4()
       
       print sorted2
@@ -230,9 +231,6 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
           Matrix.SetElement(i,3,spherecenters[sorted2[l]][i])
           ijkToRAS.Multiply4x4(ijkToRAS,Matrix,  Matrix)
           sortedConverted[l][i]=Matrix.GetElement(i,3)
-      
-     
-
       print sortedConverted  
         
       
@@ -265,7 +263,6 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
 
   def onROIChanged(self):
     roi = self.__roiSelector.currentNode()
-
     if roi != None:
     
       pNode = self.parameterNode()
@@ -336,7 +333,6 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     uThresh = intRange[1]
 
     # finally, update the focal point to be the center of ROI
-    # Don't do this actually -- this breaks volume rendering
     camera = slicer.mrmlScene.GetNodeByID('vtkMRMLCameraNode1')
     camera.SetFocalPoint(roiCenter)
     
@@ -349,10 +345,9 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       self.fiducialButton.text = "Choose Fiducial Points"
 
   def firstRegistration(self):
-
-    # rigidly register followup to baseline
-    # TODO: do this in a separate step and allow manual adjustment?
-    # TODO: add progress reporting (BRAINSfit does not report progress though)
+    '''
+    landmark registration (fiducial registration CLI Module)
+    '''
     pNode = self.parameterNode()
     baselineVolumeID = pNode.GetParameter('baselineVolumeID')
     templateID = pNode.GetParameter('templateID')
@@ -365,8 +360,6 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       if sliceNode.GetName() == "Fiducial List_moved":
         sliceNode.GetAssociatedChildrenNodes(self.movingLandmarks)
     
-    
-
     parameters = {}
     parameters["fixedLandmarks"] = slicer.mrmlScene.GetNodeByID("vtkMRMLAnnotationHierarchyNode4")
     parameters["movingLandmarks"] = slicer.mrmlScene.GetNodeByID("vtkMRMLAnnotationHierarchyNode2")
@@ -378,8 +371,6 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     fidreg = slicer.modules.fiducialregistration
     self.__cliNode = None
     self.__cliNode = slicer.cli.run(fidreg, self.__cliNode, parameters)
-
-    
     self.__cliObserverTag = self.__cliNode.AddObserver('ModifiedEvent', self.processRegistrationCompletion)
     self.__registrationStatus.setText('Wait ...')
     self.firstRegButton.setEnabled(0)
@@ -441,31 +432,31 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     self.sliceWidgetsPerStyle = {}
 	
   def processEvent(self,observee,event=None):
+    '''
+    get the mouse clicks and create a fiducial node at this position. Used later for the fiducial registration
+    '''
     if self.fixedLandmarks == None :
       self.fixedLandmarks = vtk.vtkCollection()
 
     if self.sliceWidgetsPerStyle.has_key(observee) and event == "LeftButtonPressEvent":
-   #   if slicer.app.repositoryRevision<= 21022:
-   #     sliceWidget = self.sliceWidgetsPerStyle[observee]
-   #   else:
-   #     sliceWidget = slicer.qMRMLSliceWidget().sliceView()
-   #   style = sliceWidget.sliceView().interactorStyle()          
+      if slicer.app.repositoryRevision<= 21022:
+        sliceWidget = self.sliceWidgetsPerStyle[observee]
+        style = sliceWidget.sliceView().interactorStyle()          
+        xy = style.GetInteractor().GetEventPosition()
+        xyz = sliceWidget.convertDeviceToXYZ(xy)
+        ras = sliceWidget.convertXYZToRAS(xyz)
+      else:
+        sliceWidget = self.sliceWidgetsPerStyle[observee]
+        sliceLogic = sliceWidget.sliceLogic()
+        sliceNode = sliceWidget.mrmlSliceNode()
+        interactor = observee.GetInteractor()
+        xy = interactor.GetEventPosition()
+        xyz = sliceWidget.sliceView().convertDeviceToXYZ(xy);
+        ras = sliceWidget.sliceView().convertXYZToRAS(xyz)
       
-   
-      sliceWidget = self.sliceWidgetsPerStyle[observee]
-      sliceLogic = sliceWidget.sliceLogic()
-      sliceNode = sliceWidget.mrmlSliceNode()
-      interactor = observee.GetInteractor()
-      xy = interactor.GetEventPosition()
-      xyz = sliceWidget.sliceView().convertDeviceToXYZ(xy);
-         
-      #xy = style.GetInteractor().GetEventPosition()
-      #xyz = sliceWidget.sliceView().convertDeviceToXYZ(xy)
-      ras = sliceWidget.sliceView().convertXYZToRAS(xyz)
-      
-      print 'xy is:', xy
-      print 'xyz is:', xyz
-      print 'ras is:', ras
+      # print 'xy is:', xy
+      # print 'xyz is:', xyz
+      # print 'ras is:', ras
       logic = slicer.modules.annotations.logic()
       logic.SetActiveHierarchyNodeID("vtkMRMLAnnotationHierarchyNode4")
       fiducial = slicer.mrmlScene.CreateNodeByClass('vtkMRMLAnnotationFiducialNode')

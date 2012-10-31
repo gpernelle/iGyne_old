@@ -11,7 +11,7 @@ class iGyneLoadModelStep( iGyneStep ) :
   def __init__( self, stepid ):
     self.initialize( stepid )
     self.setName( '3. Load the template' )
-    self.setDescription( 'Load the template. From this template, auto-crop and registration functions will be processed.' )
+    self.setDescription( 'Load the template. From this template, auto-crop, segmentation and registration functions will be processed.' )
     self.__parent = super( iGyneLoadModelStep, self )
     self.loadTemplateButton = None
     
@@ -145,19 +145,7 @@ class iGyneLoadModelStep( iGyneStep ) :
     self.sendButton = slicer.util.findChildren(self.dicomApp, text='Send')[0]
     self.sendButton.enabled = False
     self.sendButton.connect('clicked()', self.onSendClicked)
-    
-    
-    # dicom = DICOMLib.DICOMWidgets.DICOMDetailsPopup(self.__roiWidget)
-    # voiGroupBoxLayout.addRow(dicom.create())
-    
-    
-    
-    # self.loadButton = qt.QPushButton('Load Selection to Slicer')
-    # self.loadButton.enabled = False 
-    # voiGroupBoxLayout.addWidget(self.loadButton)
-    
     self.updateWidgetFromParameters(self.parameterNode())
-
 
   def loadData(self):
     slicer.util.openAddDataDialog()
@@ -203,7 +191,6 @@ class iGyneLoadModelStep( iGyneStep ) :
       self.__parent.validate( desiredBranchId )
       self.__parent.validationSucceeded(desiredBranchId)
   
-  
   def onEntry(self,comingFrom,transitionType):
   
     super(iGyneLoadModelStep, self).onEntry(comingFrom, transitionType)
@@ -229,13 +216,11 @@ class iGyneLoadModelStep( iGyneStep ) :
       return
     super(iGyneLoadModelStep, self).onExit(goingTo, transitionType) 
 
-
   def updateWidgetFromParameters(self, parameterNode):
     baselineVolumeID = parameterNode.GetParameter('baselineVolumeID')
     if baselineVolumeID != None:
       self.__baselineVolumeSelector.setCurrentNode(Helper.getNodeByID(baselineVolumeID))
 
-     
   def doStepProcessing(self):
 
     # calculate the transform to align the ROI in the next step with the
@@ -268,8 +253,10 @@ class iGyneLoadModelStep( iGyneStep ) :
     dm.SetElement(2,2,abs(dm.GetElement(2,2)))
     roiTransformNode.SetAndObserveMatrixTransformToParent(dm)     
 
-
   def loadTemplate(self,nb):
+    '''
+    Load scene with template, obturator and landmarks
+    '''
     pNode = self.parameterNode()
     alreadyloaded = pNode.GetParameter("Template-loaded")
     if alreadyloaded != "1":
@@ -282,8 +269,10 @@ class iGyneLoadModelStep( iGyneStep ) :
       self.loadTemplateButton.setEnabled(0)
       pNode.SetParameter("Template-loaded","1")
       
-      
-      
+  #--------------------------------------------#
+  '''
+  DICOM functions
+  '''
       
   def onDatabaseDirectoryChanged(self,databaseDirectory):
     if not hasattr(slicer, 'dicomDatabase') or not slicer.dicomDatabase:
@@ -355,7 +344,6 @@ class iGyneLoadModelStep( iGyneStep ) :
         self.dicomApp.resumeModel()
     elif action == self.exportAction:
       self.onExportClicked()
-
 
   def onLoadButton(self):
     self.progress = qt.QProgressDialog(slicer.util.mainWindow())
@@ -463,7 +451,6 @@ class iGyneLoadModelStep( iGyneStep ) :
     self.detailsPopup.setModality(not onOff)
     self.browserPersistent = onOff
 
-
   def onToggleListener(self):
     if hasattr(slicer, 'dicomListener'):
       slicer.dicomListener.stop()
@@ -492,14 +479,12 @@ class iGyneLoadModelStep( iGyneStep ) :
     if newState == 2:
       slicer.util.showStatusMessage("DICOM Listener running")
 
-
   def onListenerToAddFile(self):
     """ Called when the indexer is about to add a file to the database.
     Works around issue where ctkDICOMModel has open queries that keep the
     database locked.
     """
     self.dicomApp.suspendModel()
-
 
   def onListenerAddedFile(self):
     """Called after the listener has added a file.
