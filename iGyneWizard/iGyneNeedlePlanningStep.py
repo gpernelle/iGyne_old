@@ -1799,7 +1799,7 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
         displayNode.SetVisibility(1)    
         displayNode.SetOpacity(0.9)
         # print PolyData
-        polyData = displayNode.GetPolyData()
+        polyData = displayNode.GetInputPolyData()
         polyData.Update()
         nb = int(polyData.GetNumberOfPoints()-1)
         coord = [0,0,0]
@@ -1877,7 +1877,7 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
       
       if fiducialNode!=None:
         displayNode =NeedleNode.GetModelDisplayNode()
-        polyData = displayNode.GetPolyData()
+        polyData = displayNode.GetInputPolyData()
         polyData.Update()
         nb = int(polyData.GetNumberOfPoints()-1)
         coord = [0,0,0]
@@ -1995,15 +1995,15 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     pNode = self.parameterNode()
     alreadyloaded = pNode.GetParameter("Needles-loaded")
     obturatorID = pNode.GetParameter('obturatorID')    
-    ObutratorNode = slicer.mrmlScene.GetNodeByID(obturatorID)
+    ObturatorNode = slicer.mrmlScene.GetNodeByID(obturatorID)
 
-    if ObutratorNode!=None:
+    if ObturatorNode!=None:
       print("obturator loaded")
       self.setNeedleCoordinates()
       self.computerPolydataAndMatrix()    
       
       self.m_poly = vtk.vtkPolyData()  
-      self.m_poly.DeepCopy(ObutratorNode.GetPolyData())
+      self.m_poly.DeepCopy(ObturatorNode.GetPolyData())
       
       
   def AddModel(self,i):
