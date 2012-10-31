@@ -263,6 +263,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.Meandist.setValue(20)
     meandistLabel = qt.QLabel('Mean Distance Stop (/10000)')
     ICPGroupBoxLayout.addRow( meandistLabel, self.Meandist)
+    self.L2 = qt.QCheckBox('L2 error (if unchecked, L1 is used)')
+    ICPGroupBoxLayout.addRow(self.L2)
     self.landmarksNb = qt.QSpinBox()
     self.landmarksNb.setMinimum(0)
     self.landmarksNb.setMaximum(10000)
@@ -536,7 +538,11 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       icpTransform.SetMaximumMeanDistance(self.Meandist.value/10000)
       icpTransform.SetMaximumNumberOfIterations(self.nbIterButton.value)
       icpTransform.SetMaximumNumberOfLandmarks(self.landmarksNb.value)
-      icpTransform.SetMeanDistanceModeToRMS()
+      if self.L2.isChecked():
+        icpTransform.SetMeanDistanceModeToRMS()
+      else:
+        icpTransform.SetMeanDistanceModeToAbsoluteValue()
+      print "l2? ", self.L2.isChecked()
       icpTransform.GetLandmarkTransform().SetModeToRigidBody()
       icpTransform.Update()
       self.nIterations = icpTransform.GetNumberOfIterations()

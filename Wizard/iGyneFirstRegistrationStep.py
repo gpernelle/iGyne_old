@@ -445,9 +445,14 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       self.fixedLandmarks = vtk.vtkCollection()
 
     if self.sliceWidgetsPerStyle.has_key(observee) and event == "LeftButtonPressEvent":
-      sliceWidget = self.sliceWidgetsPerStyle[observee]
+      if slicer.app.repositoryRevision<= 21022:
+        sliceWidget = self.sliceWidgetsPerStyle[observee]
+      else:
+        sliceWidget = slicer.qMRMLSliceWidget().sliceView()
+      
       style = sliceWidget.sliceView().interactorStyle()          
       xy = style.GetInteractor().GetEventPosition()
+      
       xyz = sliceWidget.convertDeviceToXYZ(xy)
       ras = sliceWidget.convertXYZToRAS(xyz)
       logic = slicer.modules.annotations.logic()
