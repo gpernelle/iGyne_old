@@ -5,13 +5,8 @@ from Helper import *
 from EditorLib import *
 import math
 import functools
-
 import string
 
-'''
-TODO:
-  add advanced option to specify segmentation
-'''
 
 class iGyneNeedlePlanningStep( iGyneStep ) :
 
@@ -84,7 +79,6 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
        60:'Ff',
        61:'Fg',
        62:'Fh'}
-    
     
   def createUserInterface( self ):
     '''
@@ -1443,7 +1437,6 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
        
       # #-------------------------------------------------------------------    
       
-
       for i in range(63):
         popupbutton = "popup"+self.option[i]
         # spinbox = "self.popupSpinbox"+self.option[i]
@@ -1480,6 +1473,9 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     self.__layout.addWidget(TemplateSheetWidget)
      
   def refreshSegmented(self):
+    '''
+    show the label of the detected needles from the following step
+    '''    
     self.segmented = [0 for i in range(63)]
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
     print 'refresh'
@@ -1759,8 +1755,7 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
 
     Restru2WorldMatrix.Multiply4x4(RestruMatrix,WorldMatrix,self.m_vtkmat)
   
-  ##-----------------------------------------------------------------------------
-  def pushObNeedle(self):
+  def pushObturator(self):
 
     nDepth = self.popupSpinboxOb.value
     mrmlScene=slicer.mrmlScene  
@@ -1782,7 +1777,6 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     triangles.SetInput(TransformPolyDataFilter.GetOutput())
     self.ObturatorNode.SetAndObservePolyData(triangles.GetOutput())    
 
-  ##-----------------------------------------------------------------------------
   def showOneNeedle(self,i):
     fidname = "fid"+self.option[i]
     pNode = self.parameterNode()
@@ -1818,33 +1812,31 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
           fidTN = fiducialNode.GetAnnotationTextDisplayNode()
           fidTN.SetTextScale(3)
           fidTN.SetColor(NeedleNode.GetDisplayNode().GetColor())
-          fiducialNode.SetVisible(0)
+          fiducialNode.SetDisplayVisibility(0)
           pNode.SetParameter(fidname,fiducialNode.GetID())
           sColor = "background-color: rgb(" + str(self.color255[i][0]) +","+ str(self.color255[i][1]) +"," + str(self.color255[i][2]) + ");"
           colorButtonName = "self." + self.option[i] + "ColorPushButton"
           if self.segmented[i]==0:
             eval(colorButtonName).setStyleSheet(sColor)
-          fiducialNode.SetVisible(1)
+          fiducialNode.SetDisplayVisibility(1)
 
       if nVisibility ==1:
         displayNode.SetVisibility(0)
         displayNode.SetSliceIntersectionVisibility(0)
         if fiducialNode!=None:
-          fiducialNode.SetVisible(0)
+          fiducialNode.SetDisplayVisibility(0)
 
       else:
         displayNode.SetVisibility(1)
         displayNode.SetSliceIntersectionVisibility(1)
         if fiducialNode!=None:
-          fiducialNode.SetVisible(1)
+          fiducialNode.SetDisplayVisibility(1)
 
     else:      
       self.AddModel(i)
       self.showOneNeedle(i)
       self.showOneNeedle(i)
     
-  ##-----------------------------------------------------------------------------
-
   def pushOneNeedle(self,i,nDepth):
     print i, nDepth
     pNode = self.parameterNode()
@@ -1885,18 +1877,6 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
           polyData.GetPoint(nb,coord)    
           fiducialNode.SetFiducialCoordinates(coord) 
       
-    # vtkmat.SetElement(2,3,self.m_vtkmat.GetElement(2,3)+20-nDepth)
-    # TransformPolyDataFilter=vtk.vtkTransformPolyDataFilter()
-    # Transform=vtk.vtkTransform()
-    # TransformPolyDataFilter.SetInput(self.m_polyRadiation)
-    # Transform.SetMatrix(vtkmat)
-    # TransformPolyDataFilter.SetTransform(Transform)
-    # TransformPolyDataFilter.Update()
-
-    # if RadNode !=None:
-      # RadNode.SetAndObservePolyData(TransformPolyDataFilter.GetOutput())
-      
-  ##-----------------------------------------------------------------------------
   def setOneNeedleColor(self,i):
 
     color = qt.QColorDialog.getColor(qt.QColor('green'), self)
@@ -1926,7 +1906,6 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
           fidTN = fiducialNode.GetAnnotationTextDisplayNode()
           fidTN.SetColor(displayNode.GetColor())
        
-
   def selectNeedles(self):
 
     mrmlScene=slicer.mrmlScene
@@ -1987,9 +1966,6 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
           else:           
             displayNode.SetVisibility(0)
             displayNode.SetSliceIntersectionVisibility(0)
-            # self.setRadioButton(i,False)
-          
-  #-----------------------------------------------------------------------------
 
   def loadNeedles(self):
     pNode = self.parameterNode()
@@ -2001,10 +1977,8 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
       print("obturator loaded")
       self.setNeedleCoordinates()
       self.computerPolydataAndMatrix()    
-      
       self.m_poly = vtk.vtkPolyData()  
       self.m_poly.DeepCopy(ObturatorNode.GetPolyData())
-      
       
   def AddModel(self,i):
   
@@ -2056,7 +2030,6 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     pNode.SetParameter(fileName,modelNode.GetID())
     mrmlScene.AddNode(modelNode)
     displayNode.SetVisibility(1)
-    # self.AddRadiation(i,modelNode.GetID())
     
   def AddRadiation(self,i,needleID):
   
