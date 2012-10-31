@@ -24,7 +24,6 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     self.__roi = None
     self.__roiObserverTag = None
     self.RMS = 0
-    self.OutputMessage =""
     self.__threshold = [ -1, -1 ]  
     self.__roiSegmentationNode = None
     self.__roiVolume = None
@@ -90,8 +89,6 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     self.workflow().goBackward() # 2
     self.workflow().goBackward() # 1
 
-    
-
   def automaticRegistration(self):
     '''
     Detect the brigh circles in the MR volume, corresponding to the Vitamin E
@@ -102,6 +99,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     outputVolume = slicer.mrmlScene.CreateNodeByClass('vtkMRMLScalarVolumeNode')
     slicer.mrmlScene.AddNode(outputVolume)
     
+    # Hough transform parameters
     parameters = {}
     parameters["inputVolume"] = self.__baselineVolume
     parameters["outputVolume"] = outputVolume
@@ -118,20 +116,14 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     parameters["nbOfThreads"] = 12
     parameters["samplingRatio"] = 1
     
-     
     houghtransformcli = slicer.modules.houghtransformcli
     self.__cliNode = None
     self.__cliNode = slicer.cli.run(houghtransformcli, self.__cliNode, parameters)
-
-    
     self.__cliObserverTag = self.__cliNode.AddObserver('ModifiedEvent', self.processRegistrationCompletion)
     self.__registrationStatus.setText('Wait ...')
-    
-    
     self.__cliObserverTag = self.__cliNode.AddObserver('ModifiedEvent', self.processDataHoughTransform)
     self.__registrationStatus.setText('Wait ...')
     self.firstRegButton.setEnabled(0)
-
 
   def processDataHoughTransform(self, node, event):
     '''
@@ -144,28 +136,28 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       self.firstRegButton.setEnabled(1)
 
       file = open("/output.txt", "r").readlines()
-      spherecenters = [[0,0,0] for i in range(9)]
+      sphereCenters = [[0,0,0] for i in range(9)]
       nbLine = 0
       for line in file:
         if len(line) >= 10:
-          spherecenters[nbLine] = json.loads(line)
+          sphereCenters[nbLine] = json.loads(line)
         nbLine += 1
       for i in range(nbLine+1):
         for j in range(nbLine+1): 
-          if i != j and spherecenters[i]!=[0,0,0]:
-            d2 = (spherecenters[i][0]-spherecenters[j][0])**2+(spherecenters[i][1]-spherecenters[j][1])**2+(spherecenters[i][2]-spherecenters[j][2])**2
+          if i != j and sphereCenters[i]!=[0,0,0]:
+            d2 = (sphereCenters[i][0]-sphereCenters[j][0])**2+(sphereCenters[i][1]-sphereCenters[j][1])**2+(sphereCenters[i][2]-sphereCenters[j][2])**2
             d = d2**0.5
-            # print spherecenters[i],spherecenters[j]
+            # print sphereCenters[i],sphereCenters[j]
             # print d
        
       point = [0]
       for i in range(nbLine+1):
         U,V,W = 0,0,0
         for j in range(nbLine+1): 
-          if i != j and spherecenters[i]!=[0,0,0]:
-            d2 = (spherecenters[i][0]-spherecenters[j][0])**2+(spherecenters[i][1]-spherecenters[j][1])**2+(spherecenters[i][2]-spherecenters[j][2])**2
+          if i != j and sphereCenters[i]!=[0,0,0]:
+            d2 = (sphereCenters[i][0]-sphereCenters[j][0])**2+(sphereCenters[i][1]-sphereCenters[j][1])**2+(sphereCenters[i][2]-sphereCenters[j][2])**2
             d = d2**0.5
-            # print spherecenters[i],spherecenters[j]
+            # print sphereCenters[i],sphereCenters[j]
             # print d
             if d >=75 and d<=80:
               U += 1
@@ -175,7 +167,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
               W +=1 
         # print U,V,W      
         if U+V+W>=3:
-          print spherecenters[i]
+          print sphereCenters[i]
           point.extend([i])
 
       point.remove(0)
@@ -187,27 +179,27 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       sortedConverted = [[0,0,0] for l in range(4)]
       for i in range(2):  
         for k in point:
-          if spherecenters[k][0]<= minX[0] or minX[0] == -1:
-            minX[0] = spherecenters[k][0]
+          if sphereCenters[k][0]<= minX[0] or minX[0] == -1:
+            minX[0] = sphereCenters[k][0]
             minX[1] = k
-          elif spherecenters[k][0]<= minX[2] or minX[2] == -1:
-            minX[2] = spherecenters[k][0]
+          elif sphereCenters[k][0]<= minX[2] or minX[2] == -1:
+            minX[2] = sphereCenters[k][0]
             minX[3] = k
-          if spherecenters[k][0]>= maxX[0] or maxX[0] == -1:
-            maxX[0] = spherecenters[k][0]
+          if sphereCenters[k][0]>= maxX[0] or maxX[0] == -1:
+            maxX[0] = sphereCenters[k][0]
             maxX[1] = k
-          elif spherecenters[k][0]>= maxX[2] or maxX[2] == -1:
-            maxX[2] = spherecenters[k][0]
+          elif sphereCenters[k][0]>= maxX[2] or maxX[2] == -1:
+            maxX[2] = sphereCenters[k][0]
             maxX[3] = k    
 
-      if spherecenters[minX[1]][1] < spherecenters[minX[3]][1]:
+      if sphereCenters[minX[1]][1] < sphereCenters[minX[3]][1]:
         sorted[0] = minX[1]
         sorted[1] = minX[3]
       else:
         sorted[0] = minX[3]
         sorted[1] = minX[1]      
         
-      if spherecenters[maxX[1]][1]>spherecenters[maxX[3]][1]:
+      if sphereCenters[maxX[1]][1]>sphereCenters[maxX[3]][1]:
         sorted[2] = maxX[1]
         sorted[3] = maxX[3]
       else:
@@ -228,7 +220,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       for l in range(4):
         Matrix = vtk.vtkMatrix4x4()      
         for i in range(3):
-          Matrix.SetElement(i,3,spherecenters[sorted2[l]][i])
+          Matrix.SetElement(i,3,sphereCenters[sorted2[l]][i])
           ijkToRAS.Multiply4x4(ijkToRAS,Matrix,  Matrix)
           sortedConverted[l][i]=Matrix.GetElement(i,3)
       print sortedConverted  
@@ -258,8 +250,6 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       sRed.Modified()
     
     self.firstRegistration()
-    # self.stop()
-
 
   def onROIChanged(self):
     roi = self.__roiSelector.currentNode()
@@ -360,6 +350,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       if sliceNode.GetName() == "Fiducial List_moved":
         sliceNode.GetAssociatedChildrenNodes(self.movingLandmarks)
     
+    self.OutputMessage = ""
     parameters = {}
     parameters["fixedLandmarks"] = slicer.mrmlScene.GetNodeByID("vtkMRMLAnnotationHierarchyNode4")
     parameters["movingLandmarks"] = slicer.mrmlScene.GetNodeByID("vtkMRMLAnnotationHierarchyNode2")
@@ -374,7 +365,6 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     self.__cliObserverTag = self.__cliNode.AddObserver('ModifiedEvent', self.processRegistrationCompletion)
     self.__registrationStatus.setText('Wait ...')
     self.firstRegButton.setEnabled(0)
-
 
   def processRegistrationCompletion(self, node, event):
     status = node.GetStatusString()
@@ -400,7 +390,6 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
 
       pNode.SetParameter('followupTransformID', self.__followupTransform.GetID())
       self.registered = 1
-    
 
   def start(self):    
     self.removeObservers()
@@ -419,18 +408,18 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
         for event in events:
           tag = style.AddObserver(event, self.processEvent)   
           self.styleObserverTags.append([style,tag])
-		  
+
   def stop(self):
     print("here")
     self.removeObservers() 
-	
+
   def removeObservers(self):
     # remove observers and reset
     for observee,tag in self.styleObserverTags:
       observee.RemoveObserver(tag)
     self.styleObserverTags = []
     self.sliceWidgetsPerStyle = {}
-	
+
   def processEvent(self,observee,event=None):
     '''
     get the mouse clicks and create a fiducial node at this position. Used later for the fiducial registration
@@ -501,9 +490,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
           self.stop()
         
       fiducial.Initialize(slicer.mrmlScene)
-      # adding to hierarchy is handled by the Reporting logic
       self.fixedLandmarks.AddItem(fiducial)
-
       
   def validate( self, desiredBranchId ):
     '''

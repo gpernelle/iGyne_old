@@ -5,12 +5,12 @@ from Helper import *
 from EditorLib import *
 import math
 import Queue, threading
-
 import string
 
 '''
 TODO:
   add advanced option to specify segmentation
+  Add a queue to start ICP reg after obturator segmentation
 '''
 
 class iGyneSecondRegistrationStep( iGyneStep ) :
@@ -66,7 +66,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.stringRMS = ""
     self.processingTime = "not calculated"
     
-
   def createUserInterface( self ):
     '''
     The user interface is composed from:
@@ -155,7 +154,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.ICPRegistrationButton2 = qt.QPushButton('ICP Registration w/o obturator')
     string = 'Register Template and Model'
     self.__registrationStatus = qt.QLabel(string)
-    self.ICPRegistrationButton2.connect('toggled(bool)', self.onICPButtonToggled2)
+    self.ICPRegistrationButton2.connect('toggled(bool)', self.onICPTemplateOnlyButtonToggled)
     self.ICPRegistrationButton2.setEnabled(0)
     self.ICPRegistrationButton2.checkable = True 
     
@@ -358,7 +357,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
   def onResetButton( self ):
     '''
     '''
-    
     self.workflow().goBackward() # 4
     self.workflow().goBackward() # 3
     self.workflow().goBackward() # 2
@@ -561,7 +559,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       self.ICPRegistrationButton.setChecked(0)
       self.ICPRegistrationButton.text = "3/ ICP Registration"
       
-  def ICPRegistration2(self):
+  def ICPRegistrationTemplateOnly(self):
     '''
     ICP Registration based on vtk.vtkIterativeClosestPointTransform()
     '''
@@ -684,7 +682,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     ### evaluates processing time
     self.processingTime = time.clock()-self.t0
       
-      
   def processRegistrationCompletion(self):
     '''
     Once the ICP is completed, display a message telling so, uncheck the ICP button, restore default view
@@ -699,7 +696,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     ### restore the default view
     Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
     
-    
   def onICPButtonToggled(self,checked):
     '''
     Run ICP reg when ICP button is toogled
@@ -712,13 +708,13 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       # self.stopICP()
       # self.ICPRegistrationButton.text = "ICP Registration"
   
-  def onICPButtonToggled2(self,checked):
+  def onICPTemplateOnlyButtonToggled(self,checked):
     '''
     Run ICP reg when ICP button is toogled
     Possibility to watch the registration evolving but takes more time, so commented
     '''
     if checked:  
-      self.ICPRegistration2()
+      self.ICPRegistrationTemplateOnly()
           
   def startICP(self, node=None, event=None):          
     # if self.timer:
@@ -728,7 +724,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     # self.timer.connect('timeout()', self.ICPRegistration)
     # self.timer.start()
     self.ICPRegistration()
-    
   # def stopICP(self):
     # if self.timer:
       # self.timer.stop()
@@ -737,8 +732,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
   def stop(self):
     self.removeObservers()
 
-
-     
   def onThresholdsCheckChanged(self):
     if self.__useThresholdsCheck.isChecked():
       self.__roiLabelSelector.setEnabled(0)
@@ -875,7 +868,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       return      
     super(iGyneSecondRegistrationStep, self).onExit(goingTo, transitionType)
     
-
   def onEntry(self,comingFrom,transitionType):
     '''
     Update GUI and visualization
@@ -944,7 +936,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     transformNodeID = pNode.GetParameter('followupTransformID')
     self.transform = Helper.getNodeByID(transformNodeID)
 
- 
   def start(self):    
     self.removeObservers()
     # get new slice nodes
@@ -962,17 +953,17 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
         for event in events:
           tag = style.AddObserver(event, self.processEvent)   
           self.styleObserverTags.append([style,tag])
-		  
+ 
   def stop(self):
     self.removeObservers() 
-	
+
   def removeObservers(self):
     # remove observers and reset
     for observee,tag in self.styleObserverTags:
       observee.RemoveObserver(tag)
     self.styleObserverTags = []
     self.sliceWidgetsPerStyle = {}
-	
+
   def processEvent(self,observee,event=None):
 
     ######################################  transformation  ##########################
@@ -1078,7 +1069,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
           self.translate(self.tx0+tx,self.ty0+ty,self.tz0+tz)          
           self.before += 1
 
-  
   def removeObservers(self):
     # remove observers and reset
     for observee,tag in self.styleObserverTags:
@@ -1174,7 +1164,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       self.imagefiltered = self.outputLowPassFilter(outputVolume.GetID())
       self.thresholdObturator() 
 
-   
   def medianFilterCompleted(self, node, event):
     
     status = node.GetStatusString()
@@ -1182,7 +1171,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     if status == 'Completed':
       self.thresholdObturator()
       self.__registrationStatus.setText('Median Filter Completed. Threshold Running...')
-
 
   def thresholdObturator(self):
     pNode = self.parameterNode()
@@ -1268,7 +1256,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     
     Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
     
-
   def updateStatus(self, node, event):
     slicer.mrmlScene.Modified()
     status = node.GetStatusString()
@@ -1285,7 +1272,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
         self.startICP()        
       self.fullAutoRegOn = 0
   
-      
   def updateROItemplate(self):
     x=  (46.1749-23.8251)/2+23.8251
     y = (65.1951-42.9222)/2+42.9222
@@ -1364,7 +1350,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.onThresholdChanged()
     
     Helper.SetBgFgVolumes(pNode.GetParameter('BaselineVolumeID'),'')
-    
     
   def outputLowPassFilter(self, inputImageID):
 
@@ -1451,9 +1436,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     # queue.join()
     self.fullAutoRegOn = 1
     
-    # self.obturatorSegmentation()
-  
-  
   def RMS(self):
     templateID = 'vtkMRMLModelNode'+str(self.templateIDButton.value)
     obturatorID = 'vtkMRMLModelNode'+str(self.obturatorIDButton.value)
