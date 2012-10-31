@@ -280,7 +280,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       roi.SetInteractiveMode(1)
 
       self.__roiWidget.setMRMLAnnotationROINode(roi)
-      self.__roi.VisibleOn()
+      self.__roi.SetROIAnnotationVisibility(1)
      
   def processROIEvents(self,node,event):
     # get the range of intensities inside the ROI
@@ -445,16 +445,27 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       self.fixedLandmarks = vtk.vtkCollection()
 
     if self.sliceWidgetsPerStyle.has_key(observee) and event == "LeftButtonPressEvent":
-      if slicer.app.repositoryRevision<= 21022:
-        sliceWidget = self.sliceWidgetsPerStyle[observee]
-      else:
-        sliceWidget = slicer.qMRMLSliceWidget().sliceView()
+   #   if slicer.app.repositoryRevision<= 21022:
+   #     sliceWidget = self.sliceWidgetsPerStyle[observee]
+   #   else:
+   #     sliceWidget = slicer.qMRMLSliceWidget().sliceView()
+   #   style = sliceWidget.sliceView().interactorStyle()          
       
-      style = sliceWidget.sliceView().interactorStyle()          
-      xy = style.GetInteractor().GetEventPosition()
+   
+      sliceWidget = self.sliceWidgetsPerStyle[observee]
+      sliceLogic = sliceWidget.sliceLogic()
+      sliceNode = sliceWidget.mrmlSliceNode()
+      interactor = observee.GetInteractor()
+      xy = interactor.GetEventPosition()
+      xyz = sliceWidget.sliceView().convertDeviceToXYZ(xy);
+         
+      #xy = style.GetInteractor().GetEventPosition()
+      #xyz = sliceWidget.sliceView().convertDeviceToXYZ(xy)
+      ras = sliceWidget.sliceView().convertXYZToRAS(xyz)
       
-      xyz = sliceWidget.convertDeviceToXYZ(xy)
-      ras = sliceWidget.convertXYZToRAS(xyz)
+      print 'xy is:', xy
+      print 'xyz is:', xyz
+      print 'ras is:', ras
       logic = slicer.modules.annotations.logic()
       logic.SetActiveHierarchyNodeID("vtkMRMLAnnotationHierarchyNode4")
       fiducial = slicer.mrmlScene.CreateNodeByClass('vtkMRMLAnnotationFiducialNode')
@@ -536,7 +547,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       self.__template.GetRASBounds(bounds)
       #print(bounds)
       if self.__roi != None:
-        self.__roi.VisibleOn()
+        self.__roi.SetROIAnnotationVisibility(1)
       self.__roi.SetRadiusXYZ(abs(bounds[0]-bounds[1])/2,abs(bounds[2]-bounds[3])/2,abs(bounds[4]-bounds[5])/2)
       pNode.SetParameter('currentStep', self.stepid)
       
@@ -553,7 +564,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
               
       if self.__roi != None:
         self.__roi.RemoveObserver(self.__roiObserverTag)
-        self.__roi.VisibleOff()
+        self.__roi.SetROIAnnotationVisibility(0)
       
       pNode = self.parameterNode()
       pNode.SetParameter('roiNodeID', self.__roiSelector.currentNode().GetID())

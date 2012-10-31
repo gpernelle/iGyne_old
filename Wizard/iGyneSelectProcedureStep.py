@@ -9,7 +9,7 @@ class iGyneSelectProcedureStep( iGyneStep ) :
     self.skip = 1
     self.initialize( stepid )
     self.setName( '1. Select the Procedure' )
-    file = slicer.app.slicerHome + "//lib\Slicer-4.1\qt-scripted-modules\iGynePy.py"
+    file = slicer.modules.igynepy.path
     builddate = time.gmtime(os.path.getmtime(file))
     creationdate = int(12*365.25 + 188)# 07/07/2012
     todaydate = int((builddate.tm_year - 2000)*365.25+builddate.tm_yday)

@@ -1798,6 +1798,7 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
       if fiducialNode == None:
         displayNode.SetVisibility(1)    
         displayNode.SetOpacity(0.9)
+        # print PolyData
         polyData = displayNode.GetPolyData()
         polyData.Update()
         nb = int(polyData.GetNumberOfPoints()-1)
@@ -2047,7 +2048,7 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     modelNode.SetAndObserveDisplayNodeID(displayNode.GetID())
     
     modelNode.SetAndObserveTransformNodeID(self.transform.GetID())
-    displayNode.SetPolyData(modelNode.GetPolyData())
+    displayNode.SetInputPolyData(modelNode.GetPolyData())
     self.colorLabel()
     displayNode.SetColor(self.color[i])
     displayNode.SetSliceIntersectionVisibility(0)
@@ -2097,7 +2098,7 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     modelNode.SetAndObserveDisplayNodeID(displayNode.GetID())
     
     modelNode.SetAndObserveTransformNodeID(self.transform.GetID())
-    displayNode.SetPolyData(modelNode.GetPolyData())
+    displayNode.SetInputPolyData(modelNode.GetPolyData())
 
     displayNode.SetSliceIntersectionVisibility(1)
     displayNode.SetScalarVisibility(1)

@@ -244,6 +244,9 @@ class iGyneLoadModelStep( iGyneStep ) :
 
     baselineVolume = Helper.getNodeByID(pNode.GetParameter('baselineVolumeID'))
     template = Helper.getNodeByID(pNode.GetParameter('templateID'))
+    #print pNode.GetParameter('templateID')
+    #print template
+   
     roiTransformID = pNode.GetParameter('roiTransformID')
     roiTransformNode = None
     
@@ -274,7 +277,8 @@ class iGyneLoadModelStep( iGyneStep ) :
         pathToScene = slicer.modules.igynepy.path.replace("iGynePy.py","iGynePyTemplate/Template/3points/Template.mrml")
       elif nb ==4:
         pathToScene = slicer.modules.igynepy.path.replace("iGynePy.py","iGynePyTemplate/Template/4points/Template.mrml")
-      slicer.util.loadScene( pathToScene, True)
+#      slicer.util.loadScene( pathToScene, True)
+      slicer.util.loadScene( pathToScene)
       self.loadTemplateButton.setEnabled(0)
       pNode.SetParameter("Template-loaded","1")
       
