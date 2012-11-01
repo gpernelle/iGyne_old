@@ -10,8 +10,8 @@ class iGyneLoadModelStep( iGyneStep ) :
 
   def __init__( self, stepid ):
     self.initialize( stepid )
-    self.setName( '3. Load the template' )
-    self.setDescription( 'Load the template. From this template, auto-crop, segmentation and registration functions will be processed.' )
+    self.setName( '3. Load the CAD Model of the applicator' )
+    self.setDescription( 'Load the CAD Models.' )
     self.__parent = super( iGyneLoadModelStep, self )
     self.loadTemplateButton = None
     

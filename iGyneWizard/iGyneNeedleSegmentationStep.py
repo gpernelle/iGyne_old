@@ -841,11 +841,11 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         if angleDeviation >= self.filterValueButton.value :
           displayNode.SetVisibility(0)
           if i !=None and self.fiducialnode[int(i)]!=0:
-            self.fiducialnode[int(i)].SetVisible(0)
+            self.fiducialnode[int(i)].SetDisplayVisibility(0)
         else:
           displayNode.SetVisibility(1)
           if i !=None and self.fiducialnode[int(i)]!=0:
-            self.fiducialnode[int(i)].SetVisible(1)
+            self.fiducialnode[int(i)].SetDisplayVisibility(1)
       
       # display/hide label+needle
       nVisibility = displayNode.GetVisibility()
@@ -1118,11 +1118,11 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
               fidTN.SetTextScale(3)
               fidTN.SetColor(modelNode.GetDisplayNode().GetColor())
               
-              self.fiducialnode[i].SetVisible(modelNode.GetDisplayNode().GetVisibility())
+              self.fiducialnode[i].SetDisplayVisibility(modelNode.GetDisplayNode().GetVisibility())
           else:    
             if modelNode.GetDisplayNode().GetVisibility():
-               self.fiducialnode[i].SetVisible(abs(self.fiducialnode[i].GetVisible()-1))
-            if self.fiducialnode[i].GetVisible()==1:
+               self.fiducialnode[i].SetDisplayVisibility(abs(self.fiducialnode[i].GetDisplayVisibility()-1))
+            if self.fiducialnode[i].GetDisplayVisibility()==1:
               self.displayFiducialButton.text = "Hide Labels on Needles"
             else:
               self.displayFiducialButton.text = "Display Labels on Needles"
@@ -1636,23 +1636,23 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
           fidTN = fiducialNode.GetAnnotationTextDisplayNode()
           fidTN.SetTextScale(3)
           fidTN.SetColor(NeedleNode.GetDisplayNode().GetColor())
-          fiducialNode.SetVisible(0)
+          fiducialNode.SetDisplayVisibility(0)
           pNode.SetParameter(fidname,fiducialNode.GetID())
-          fiducialNode.SetVisible(1)
+          fiducialNode.SetDisplayVisibility(1)
 
       if visibility ==0:
 
         displayNode.SetVisibility(0)
         displayNode.SetSliceIntersectionVisibility(0)
         if fiducialNode!=None:
-          fiducialNode.SetVisible(0)
+          fiducialNode.SetDisplayVisibility(0)
 
       else:
 
         displayNode.SetVisibility(1)
         displayNode.SetSliceIntersectionVisibility(1)
         if fiducialNode!=None:
-          fiducialNode.SetVisible(1)
+          fiducialNode.SetDisplayVisibility(1)
 
     else:
       vtkmat = vtk.vtkMatrix4x4()
