@@ -1527,6 +1527,9 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
       pNode.SetParameter('currentStep', self.stepid)
       self.loadNeedles()
       self.refreshSegmented()
+      hierarchyNodes = slicer.util.getNodes('vtkMRMLAnnotationROI*')
+      for hierarchyNode in hierarchyNodes.values():
+        hierarchyNode.SetDisplayVisibility(0)
     else:
       self.workflow().goForward() # 6  
 

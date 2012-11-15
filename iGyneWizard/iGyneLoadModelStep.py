@@ -36,10 +36,15 @@ class iGyneLoadModelStep( iGyneStep ) :
                 print ('Problem trying to start DICOMListener:\n %s' % message)
     else:
       slicer.dicomDatabase = None
-      
+
+    # TODO: are these wrapped so we can avoid magic numbers?
     self.dicomModelUIDRole = 32
     self.dicomModelTypeRole = self.dicomModelUIDRole + 1
     self.dicomModelTypes = ('Root', 'Patient', 'Study', 'Series', 'Image')
+
+    # state management for compressing events
+    self.resumeModelRequested = False
+    self.updateRecentActivityRequested = False
 
   def createUserInterface( self ):
     self.__layout = self.__parent.createUserInterface()
@@ -111,8 +116,12 @@ class iGyneLoadModelStep( iGyneStep ) :
     self.showBrowser = qt.QPushButton('Show DICOM Browser')
     dicomFrame.addRow(self.showBrowser)
     self.showBrowser.connect('clicked()', self.detailsPopup.open)
+
+    # the recent activity frame
     
-    self.__layout.addRow( baselineScanLabel, self.__baselineVolumeSelector )
+    self.recentActivity = DICOMLib.DICOMRecentActivityWidget(self.__DICOMFrame,detailsPopup=self.detailsPopup)
+    self.__DICOMFrame.layout().addWidget(self.recentActivity.widget)
+    self.requestUpdateRecentActivity()
     
     if not slicer.dicomDatabase:
       self.promptForDatabaseDirectory()
@@ -130,7 +139,6 @@ class iGyneLoadModelStep( iGyneStep ) :
     self.contextMenu.addAction(self.deleteAction)
     self.contextMenu.connect('triggered(QAction*)', self.onContextMenuTriggered)
     
-    
     self.dicomApp.connect('databaseDirectoryChanged(QString)', self.onDatabaseDirectoryChanged)
     selectionModel = self.tree.selectionModel()
     # TODO: can't use this because QList<QModelIndex> is not visible in PythonQt
@@ -146,6 +154,8 @@ class iGyneLoadModelStep( iGyneStep ) :
     self.sendButton.enabled = False
     self.sendButton.connect('clicked()', self.onSendClicked)
     self.updateWidgetFromParameters(self.parameterNode())
+
+    self.__layout.addRow( baselineScanLabel, self.__baselineVolumeSelector )
 
   def loadData(self):
     slicer.util.openAddDataDialog()
@@ -242,16 +252,17 @@ class iGyneLoadModelStep( iGyneStep ) :
       slicer.mrmlScene.AddNode(roiTransformNode)
       pNode.SetParameter('roiTransformID', roiTransformNode.GetID())
 
-    dm = vtk.vtkMatrix4x4()
-    bounds = [0,0,0,0,0,0]
-    template.GetRASBounds(bounds)
-    dm.SetElement(0,3,(bounds[0]+bounds[1])/float(2))
-    dm.SetElement(1,3,(bounds[2]+bounds[3])/float(2))
-    dm.SetElement(2,3,(bounds[4]+bounds[5])/float(2))
-    dm.SetElement(0,0,abs(dm.GetElement(0,0)))
-    dm.SetElement(1,1,abs(dm.GetElement(1,1)))
-    dm.SetElement(2,2,abs(dm.GetElement(2,2)))
-    roiTransformNode.SetAndObserveMatrixTransformToParent(dm)     
+    if template != None:
+      dm = vtk.vtkMatrix4x4()
+      bounds = [0,0,0,0,0,0]
+      template.GetRASBounds(bounds)
+      dm.SetElement(0,3,(bounds[0]+bounds[1])/float(2))
+      dm.SetElement(1,3,(bounds[2]+bounds[3])/float(2))
+      dm.SetElement(2,3,(bounds[4]+bounds[5])/float(2))
+      dm.SetElement(0,0,abs(dm.GetElement(0,0)))
+      dm.SetElement(1,1,abs(dm.GetElement(1,1)))
+      dm.SetElement(2,2,abs(dm.GetElement(2,2)))
+      roiTransformNode.SetAndObserveMatrixTransformToParent(dm)     
 
   def loadTemplate(self,nb):
     '''
@@ -274,28 +285,106 @@ class iGyneLoadModelStep( iGyneStep ) :
   DICOM functions
   '''
       
+  def onDatabaseChanged(self):
+    """Use this because to update the view in response to things
+    like database inserts.  Ideally the model would do this
+    directly based on signals from the SQLite database, but
+    that is not currently available.
+    https://bugreports.qt-project.org/browse/QTBUG-10775
+    """
+    self.dicomApp.suspendModel()
+    self.requestResumeModel()
+    self.requestUpdateRecentActivity()
+
+  def requestUpdateRecentActivity(self):
+    """This method serves to compress the requests for updating
+    the recent activity widget since it is time consuming and there can be
+    many of them coming in a rapid sequence when the 
+    database is active"""
+    if self.updateRecentActivityRequested:
+      return
+    self.updateRecentActivityRequested = True
+    qt.QTimer.singleShot(500, self.onUpateRecentActivityRequestTimeout)
+
+  def onUpateRecentActivityRequestTimeout(self):
+    self.recentActivity.update()
+    self.updateRecentActivityRequested = False
+
+  def requestResumeModel(self):
+    """This method serves to compress the requests for resuming
+    the dicom model since it is time consuming and there can be
+    many of them coming in a rapid sequence when the 
+    database is active"""
+    if self.resumeModelRequested:
+      return
+    self.resumeModelRequested = True
+    qt.QTimer.singleShot(500, self.onResumeModelRequestTimeout)
+
+  def onResumeModelRequestTimeout(self):
+    self.dicomApp.resumeModel()
+    self.resumeModelRequested = False
+
   def onDatabaseDirectoryChanged(self,databaseDirectory):
     if not hasattr(slicer, 'dicomDatabase') or not slicer.dicomDatabase:
       slicer.dicomDatabase = ctk.ctkDICOMDatabase()
+      self.setDatabasePrecacheTags()
     databaseFilepath = databaseDirectory + "/ctkDICOM.sql"
     if not (os.access(databaseDirectory, os.W_OK) and os.access(databaseDirectory, os.R_OK)):
       self.messageBox('The database file path "%s" cannot be opened.' % databaseFilepath)
-      return
-    slicer.dicomDatabase.openDatabase(databaseDirectory + "/ctkDICOM.sql", "SLICER")
-    if not slicer.dicomDatabase.isOpen:
-      self.messageBox('The database file path "%s" cannot be opened.' % databaseFilepath)
-    if self.dicomApp.databaseDirectory != databaseDirectory:
-      self.dicomApp.databaseDirectory = databaseDirectory
+    else:
+      slicer.dicomDatabase.openDatabase(databaseDirectory + "/ctkDICOM.sql", "SLICER")
+      if not slicer.dicomDatabase.isOpen:
+        self.messageBox('The database file path "%s" cannot be opened.' % databaseFilepath)
+        self.dicomDatabase = None
+      else:
+        if self.dicomApp:
+          if self.dicomApp.databaseDirectory != databaseDirectory:
+            self.dicomApp.databaseDirectory = databaseDirectory
+        else:
+          settings = qt.QSettings()
+          settings.setValue('DatabaseDirectory', databaseDirectory)
+          settings.sync()
+    if slicer.dicomDatabase:
+      slicer.app.setDICOMDatabase(slicer.dicomDatabase)
+
+  def setDatabasePrecacheTags(self):
+    """query each plugin for tags that should be cached on import
+       and set them for the dicom app widget and slicer"""
+    tagsToPrecache = list(slicer.dicomDatabase.tagsToPrecache)
+    for pluginClass in slicer.modules.dicomPlugins:
+      plugin = slicer.modules.dicomPlugins[pluginClass]()
+      tagsToPrecache += plugin.tags.values()
+    tagsToPrecache = list(set(tagsToPrecache))  # remove duplicates
+    tagsToPrecache.sort()
+    if hasattr(slicer, 'dicomDatabase'):
+      slicer.dicomDatabase.tagsToPrecache = tagsToPrecache
+    if self.dicomApp:
+      self.dicomApp.tagsToPrecache = tagsToPrecache
 
   def promptForDatabaseDirectory(self):
-    fileDialog = ctk.ctkFileDialog(slicer.util.mainWindow())
-    fileDialog.setWindowModality(1)
-    fileDialog.setWindowTitle("Select DICOM Database Directory")
-    fileDialog.setFileMode(2) # prompt for directory
-    fileDialog.connect('fileSelected(QString)', self.onDatabaseDirectoryChanged)
-    label = qt.QLabel("<p><p>The Slicer DICOM module stores a local database with an index to all datasets that are <br>pushed to slicer, retrieved from remote dicom servers, or imported.<p>Please select a location for this database where you can store the amounts of data you require.<p>Be sure you have write access to the selected directory.", fileDialog)
-    fileDialog.setBottomWidget(label)
-    fileDialog.open()
+    """Ask the user to pick a database directory.
+    But, if the application is in testing mode, just pick
+    a temp directory
+    """
+    commandOptions = slicer.app.commandOptions()
+    if commandOptions.testingEnabled:
+      databaseDirectory = slicer.app.temporaryPath + '/tempDICOMDatbase'
+      qt.QDir().mkpath(databaseDirectory)
+      self.onDatabaseDirectoryChanged(databaseDirectory)
+    else:
+      settings = qt.QSettings()
+      databaseDirectory = settings.value('DatabaseDirectory')
+      if databaseDirectory:
+        self.onDatabaseDirectoryChanged(databaseDirectory)
+      else:
+        fileDialog = ctk.ctkFileDialog(slicer.util.mainWindow())
+        fileDialog.setWindowModality(1)
+        fileDialog.setWindowTitle("Select DICOM Database Directory")
+        fileDialog.setFileMode(2) # prompt for directory
+        fileDialog.connect('fileSelected(QString)', self.onDatabaseDirectoryChanged)
+        label = qt.QLabel("<p><p>The Slicer DICOM module stores a local database with an index to all datasets that are <br>pushed to slicer, retrieved from remote dicom servers, or imported.<p>Please select a location for this database where you can store the amounts of data you require.<p>Be sure you have write access to the selected directory.", fileDialog)
+        fileDialog.setBottomWidget(label)
+        fileDialog.exec_()
 
   def onTreeClicked(self,index):
     self.model = index.model()
@@ -303,18 +392,13 @@ class iGyneLoadModelStep( iGyneStep ) :
     self.selection = index.sibling(index.row(), 0)
     typeRole = self.selection.data(self.dicomModelTypeRole)
     if typeRole > 0:
-      self.loadButton.text = 'Load Selected %s to Slicer' % self.dicomModelTypes[typeRole]
-      self.loadButton.enabled = True
       self.sendButton.enabled = True
     else:
-      self.loadButton.text = 'Load to Slicer'
-      self.loadButton.enabled = False 
       self.sendButton.enabled = False
     if typeRole:
       self.exportAction.enabled = self.dicomModelTypes[typeRole] == "Study"
     else:
       self.exportAction.enabled = False
-    self.previewLabel.text = "Selection: " + self.dicomModelTypes[typeRole]
     self.detailsPopup.open()
     uid = self.selection.data(self.dicomModelUIDRole)
     role = self.dicomModelTypes[self.selection.data(self.dicomModelTypeRole)]
@@ -345,28 +429,6 @@ class iGyneLoadModelStep( iGyneStep ) :
     elif action == self.exportAction:
       self.onExportClicked()
 
-  def onLoadButton(self):
-    self.progress = qt.QProgressDialog(slicer.util.mainWindow())
-    self.progress.minimumDuration = 0
-    self.progress.show()
-    self.progress.setValue(0)
-    self.progress.setMaximum(100)
-    uid = self.selection.data(self.dicomModelUIDRole)
-    role = self.dicomModelTypes[self.selection.data(self.dicomModelTypeRole)]
-    toLoad = {}
-    if role == "Patient":
-      self.progress.show()
-      self.loadPatient(uid)
-    elif role == "Study":
-      self.progress.show()
-      self.loadStudy(uid)
-    elif role == "Series":
-      self.loadSeries(uid)
-    elif role == "Image":
-      pass
-    self.progress.close()
-    self.progress = None
-
   def onExportClicked(self):
     """Associate a slicer volume as a series in the selected dicom study"""
     uid = self.selection.data(self.dicomModelUIDRole)
@@ -375,8 +437,7 @@ class iGyneLoadModelStep( iGyneStep ) :
     exportDialog.open()
 
   def onExportFinished(self):
-    self.dicomApp.resumeModel()
-    self.dicomApp.resetModel()
+    self.requestResumeModel()
 
   def onSendClicked(self):
     """Perform a dicom store of slicer data to a peer"""
@@ -400,52 +461,6 @@ class iGyneLoadModelStep( iGyneStep ) :
       files += slicer.dicomDatabase.filesForSeries(serie)
     sendDialog = DICOMLib.DICOMSendDialog(files)
     sendDialog.open()
-
-  def loadPatient(self,patientUID):
-    studies = slicer.dicomDatabase.studiesForPatient(patientUID)
-    s = 1
-    self.progress.setLabelText("Loading Studies")
-    self.progress.setValue(1)
-    slicer.app.processEvents()
-    for study in studies:
-      self.progress.setLabelText("Loading Study %d of %d" % (s, len(studies)))
-      slicer.app.processEvents()
-      s += 1
-      self.loadStudy(study)
-      if self.progress.wasCanceled:
-        break
-
-  def loadStudy(self,studyUID):
-    series = slicer.dicomDatabase.seriesForStudy(studyUID)
-    s = 1
-    origText = self.progress.labelText
-    for serie in series:
-      self.progress.setLabelText(origText + "\nLoading Series %d of %d" % (s, len(series)))
-      slicer.app.processEvents()
-      s += 1
-      self.progress.setValue(100.*s/len(series))
-      self.loadSeries(serie)
-      if self.progress.wasCanceled:
-        break
-
-  def loadSeries(self,seriesUID):
-    files = slicer.dicomDatabase.filesForSeries(seriesUID)
-    slicer.dicomDatabase.loadFileHeader(files[0])
-    seriesDescription = "0008,103e"
-    d = slicer.dicomDatabase.headerValue(seriesDescription)
-    try:
-      name = d[d.index('[')+1:d.index(']')]
-    except ValueError:
-      name = "Unknown"
-    self.progress.labelText += '\nLoading %s' % name
-    slicer.app.processEvents()
-    self.loadFiles(slicer.dicomDatabase.filesForSeries(seriesUID), name)
-
-  def loadFiles(self, files, name):
-    loader = DICOMLib.DICOMLoader(files,name)
-    if not loader.volumeNode:
-      qt.QMessageBox.warning(slicer.util.mainWindow(), 'Load', 'Could not load volume for: %s' % name)
-      print('Tried to load volume as %s using: ' % name, files)
 
   def setBrowserPersistence(self,onOff):
     self.detailsPopup.setModality(not onOff)
@@ -493,8 +508,7 @@ class iGyneLoadModelStep( iGyneStep ) :
     newFile = slicer.dicomListener.lastFileAdded
     if newFile:
       slicer.util.showStatusMessage("Loaded: %s" % newFile, 1000)
-    self.dicomApp.resumeModel()
-    self.dicomApp.resetModel()
+    self.requestResumeModel()
 
   def onToggleServer(self):
     if self.testingServer and self.testingServer.qrRunning():
@@ -541,7 +555,7 @@ class iGyneLoadModelStep( iGyneStep ) :
     self.mb.setWindowTitle(title)
     self.mb.setText(text)
     self.mb.setWindowModality(1)
-    self.mb.open()
+    self.mb.exec_()
     return
 
   def question(self,text,title='DICOM'):
@@ -549,6 +563,3 @@ class iGyneLoadModelStep( iGyneStep ) :
 
   def okayCancel(self,text,title='DICOM'):
     return qt.QMessageBox.question(slicer.util.mainWindow(), title, text, 0x400400) == 0x400
-    
-      
-   

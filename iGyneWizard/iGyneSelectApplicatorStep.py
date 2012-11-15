@@ -11,19 +11,24 @@ class iGyneSelectApplicatorStep( iGyneStep ) :
     self.setName( '2. Choose Applicator' )
     self.setDescription( 'Choose the applicator you are using. It will load the right template.' )
     self.__parent = super( iGyneSelectApplicatorStep, self )
-    
+    self.checkBox1 = qt.QRadioButton('')
+    self.checkBox3 = qt.QRadioButton('')
+    self.ptcorners3 = qt.QRadioButton('')
     # qt.QTimer.singleShot(0, self.killButton)
 
   def createUserInterface( self ):
   
     self.__layout = self.__parent.createUserInterface()
-    self.checkBox1 = qt.QRadioButton("Neblett Template and Obturator 4 points")
-    self.checkBox1.setChecked(0)
+    self.checkBox1 = qt.QRadioButton("Syed-Neblett Template and Obturator 4 points")
+    self.checkBox1.setChecked(1)
     
     # checkBox2 = qt.QCheckBox("Obturator")
     # checkBox2.setEnabled(0)
-    self.checkBox3 = qt.QRadioButton("Neblett Template and Obturator 3 points")
-    self.checkBox3.setChecked(1)
+    self.checkBox3 = qt.QRadioButton("Syed-Neblett Template and Obturator 3 points")
+    self.checkBox3.setChecked(0)
+
+    self.ptcorners3 = qt.QRadioButton("Syed-Neblett Template 3 points in corners")
+
     # checkBox3 = qt.QCheckBox("Intrauterine Tandem")
     # checkBox3.setCheckable(0)
     checkBox4 = qt.QCheckBox("Intravaginal Ovoids")
@@ -39,6 +44,7 @@ class iGyneSelectApplicatorStep( iGyneStep ) :
     self.__layout.addRow(self.checkBox1)
     # self.__layout.addRow(checkBox2)
     self.__layout.addRow(self.checkBox3)
+    self.__layout.addRow(self.ptcorners3)
     self.__layout.addRow(checkBox4)
     self.__layout.addRow(checkBox5)
     self.__layout.addRow(checkBox6)
@@ -64,7 +70,10 @@ class iGyneSelectApplicatorStep( iGyneStep ) :
         pNode.SetParameter('Template', "4points")
       if self.checkBox3.isChecked():
         pNode = self.parameterNode()
-        pNode.SetParameter('Template', "3points")       
+        pNode.SetParameter('Template', "3points") 
+      if self.ptcorners3.isChecked():
+        pNode = self.parameterNode()
+        pNode.SetParameter('Template', "3pointsCorners")       
     if goingTo.id() != 'SelectProcedure' and goingTo.id() != 'LoadModel':
       return
 

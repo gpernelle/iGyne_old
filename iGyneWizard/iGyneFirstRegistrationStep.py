@@ -12,7 +12,9 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
   def __init__( self, stepid ):
     self.initialize( stepid )
     self.setName( '4. Register the template' )
-    self.setDescription( 'Register the template based on 3 fiducial points. Choose the points counterclockwise, starting from the one in the middle.' )
+    self.setDescription( 'Register the template based on 3 or 4 fiducial points. \
+    If you previously chose 3pts, choose them counterclockwise, starting from the one in the middle.\
+      Otherwise, start from the top left corner' )
     self.__parent = super( iGyneFirstRegistrationStep, self )
     self.interactorObserverTags = []    
     self.styleObserverTags = []
@@ -46,41 +48,55 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     self.firstRegButton.checkable = False
     self.__layout.addRow(self.firstRegButton)
     self.firstRegButton.connect('clicked()', self.firstRegistration)
+
+    # option for horizontal template
+    self.horizontalTemplate=qt.QCheckBox('Horizontal Template?')
+    self.__layout.addRow(self.horizontalTemplate)
     
     self.automaticRegistrationButton = qt.QPushButton('Automatic Registration')
     self.automaticRegistrationButton.connect('clicked()', self.automaticRegistration)
     self.__layout.addRow(self.automaticRegistrationButton)
     
-     #VOI
-    roiLabel = qt.QLabel( 'Select ROI:' )
-    self.__roiSelector = slicer.qMRMLNodeComboBox()
-    self.__roiSelector.nodeTypes = ['vtkMRMLAnnotationROINode']
-    self.__roiSelector.toolTip = "ROI defining the structure of interest"
-    self.__roiSelector.setMRMLScene(slicer.mrmlScene)
-    self.__roiSelector.addEnabled = 1
-    # self.__layout.addRow( roiLabel, self.__roiSelector )
-    self.__roiSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onROIChanged)
+    # Hough parameters - Cropping box: used to limit the volume where to find the circles
+    self.__houghFrame = ctk.ctkCollapsibleButton()
+    self.__houghFrame.text = "Hough Transform Parameters"
+    self.__houghFrame.collapsed = 1
+    houghFrame = qt.QFormLayout(self.__houghFrame)
+    
+    # Auto-value option
+    self.autoValue = qt.QCheckBox('Automatic values?')
+    self.autoValue.checked = True
+    houghFrame.addRow(self.autoValue)
 
+    # Ratio height
+    self.ratioHeightCroppedVolume = qt.QSpinBox()
+    self.ratioHeightCroppedVolume.setMinimum(1)
+    self.ratioHeightCroppedVolume.setMaximum(15)
+    self.ratioHeightCroppedVolume.setValue(2)
+    ratioHeightCroppedVolumeLabel = qt.QLabel("Divide the height by: ")
+    houghFrame.addRow(ratioHeightCroppedVolumeLabel, self.ratioHeightCroppedVolume)
+    # Ratio width
+    self.ratioWidthCroppedVolume = qt.QSpinBox()
+    self.ratioWidthCroppedVolume.setMinimum(1)
+    self.ratioWidthCroppedVolume.setMaximum(15)
+    self.ratioWidthCroppedVolume.setValue(6)
+    ratioWidthCroppedVolumeLabel = qt.QLabel("Divide the width by: ")
+    houghFrame.addRow(ratioWidthCroppedVolumeLabel, self.ratioWidthCroppedVolume)
+    # Ratio length
+    self.ratioLengthCroppedVolume = qt.QSpinBox()
+    self.ratioLengthCroppedVolume.setMinimum(1)
+    self.ratioLengthCroppedVolume.setMaximum(15)
+    self.ratioLengthCroppedVolume.setValue(6)
+    ratioLengthCroppedVolumeLabel = qt.QLabel("Divide the length by: ")
+    houghFrame.addRow(ratioLengthCroppedVolumeLabel, self.ratioLengthCroppedVolume)
     
-    self.__advancedFrame = ctk.ctkCollapsibleButton()
-    self.__advancedFrame.text = "VOI Parameters"
-    self.__advancedFrame.collapsed = 1
-    advFrameLayout = qt.QFormLayout(self.__advancedFrame)
-    # self.__layout.addRow(self.__advancedFrame)
-    
-    # the VOI parameters
-    voiGroupBox = qt.QGroupBox()
-    voiGroupBox.setTitle( 'Define VOI' )
-    advFrameLayout.addRow( voiGroupBox )
-    voiGroupBoxLayout = qt.QFormLayout( voiGroupBox )
-    self.__roiWidget = PythonQt.qSlicerAnnotationsModuleWidgets.qMRMLAnnotationROIWidget()
-    # voiGroupBoxLayout.addRow( self.__roiWidget )
-    
+    self.__layout.addRow(self.__houghFrame)
+
     # reset module
     
-    resetButton = qt.QPushButton( 'Reset Module' )
-    resetButton.connect( 'clicked()', self.onResetButton )
-    self.__layout.addWidget( resetButton )
+    # resetButton = qt.QPushButton( 'Reset Module' )
+    # resetButton.connect( 'clicked()', self.onResetButton )
+    # self.__layout.addWidget( resetButton )
 
   def onResetButton( self ):
     '''
@@ -89,31 +105,80 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     self.workflow().goBackward() # 2
     self.workflow().goBackward() # 1
 
+  def ijk2ras(self,A,volumeNode):
+    m=vtk.vtkMatrix4x4()
+    # volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+    volumeNode.GetIJKToRASMatrix(m)
+    imageData = volumeNode.GetImageData()
+    ras=[0,0,0]
+    k = vtk.vtkMatrix4x4()
+    o = vtk.vtkMatrix4x4()
+    k.SetElement(0,3,A[0])
+    k.SetElement(1,3,A[1])
+    k.SetElement(2,3,A[2])
+    k.Multiply4x4(m,k,o)
+    ras[0] = o.GetElement(0,3)
+    ras[1] = o.GetElement(1,3)
+    ras[2] = o.GetElement(2,3)
+    return ras
+
+  def cropTemplateArea(self):
+    volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+    imageData = volumeNode.GetImageData()
+    imageDimensions = imageData.GetDimensions()
+    m = vtk.vtkMatrix4x4()
+    volumeNode.GetIJKToRASMatrix(m)
+    
+    if self.autoValue.isChecked():
+      hValue = round(m.GetElement(2,2)*imageDimensions[2]/float(25))
+      self.ratioHeightCroppedVolume.setValue(hValue)
+    # create ROI
+    roi = slicer.mrmlScene.CreateNodeByClass('vtkMRMLAnnotationROINode')
+    slicer.mrmlScene.AddNode(roi)
+    roi.SetROIAnnotationVisibility(1)
+    roi.SetRadiusXYZ(imageDimensions[0]/self.ratioLengthCroppedVolume.value,imageDimensions[1]/self.ratioWidthCroppedVolume.value,imageDimensions[2]/self.ratioHeightCroppedVolume.value)
+    roi.SetXYZ(0,0,m.GetElement(2,3)+imageDimensions[2]/self.ratioHeightCroppedVolume.value)
+    roi.SetLocked(1)
+
+    #crop volume
+    cropVolumeNode =slicer.mrmlScene.CreateNodeByClass('vtkMRMLCropVolumeParametersNode')
+    cropVolumeNode.SetScene(slicer.mrmlScene)
+    cropVolumeNode.SetName('obturator_CropVolume_node')
+    cropVolumeNode.SetIsotropicResampling(False)
+    slicer.mrmlScene.AddNode(cropVolumeNode)
+    cropVolumeNode.SetInputVolumeNodeID(volumeNode.GetID())
+    cropVolumeNode.SetROINodeID(roi.GetID())
+    cropVolumeLogic = slicer.modules.cropvolume.logic()
+    cropVolumeLogic.Apply(cropVolumeNode)
+    roiVolume = slicer.mrmlScene.GetNodeByID(cropVolumeNode.GetOutputVolumeNodeID())
+    roiVolume.SetName("template-area-ROI")
+    return roiVolume
+
   def automaticRegistration(self):
     '''
     Detect the brigh circles in the MR volume, corresponding to the Vitamin E
     capsules positioned at the corners of the obturator
     Use Hough transform CLI module
     '''
-  
+    self.inputVolume = self.cropTemplateArea()
     outputVolume = slicer.mrmlScene.CreateNodeByClass('vtkMRMLScalarVolumeNode')
     slicer.mrmlScene.AddNode(outputVolume)
     
     # Hough transform parameters
     parameters = {}
-    parameters["inputVolume"] = self.__baselineVolume
+    parameters["inputVolume"] = self.inputVolume
     parameters["outputVolume"] = outputVolume
     parameters["numberOfSpheres"] = 8
     parameters["minRadius"] = 0
-    parameters["maxRadius"] = 6.3
-    parameters["sigmaGradient"] = 1
-    parameters["variance"] = 0.5
-    parameters["sphereRadiusRatio"] = 10
+    parameters["maxRadius"] = 8
+    parameters["sigmaGradient"] = 2000
+    parameters["variance"] = 0.7
+    parameters["sphereRadiusRatio"] = 12
     parameters["votingRadiusRatio"] = 10
-    parameters["threshold"] = 100
-    parameters["outputThreshold"] = 0.6
+    parameters["threshold"] = 80
+    parameters["outputThreshold"] = 0.1
     parameters["gradientThreshold"] = 100
-    parameters["nbOfThreads"] = 12
+    parameters["nbOfThreads"] = 8
     parameters["samplingRatio"] = 1
     
     houghtransformcli = slicer.modules.houghtransformcli
@@ -130,17 +195,24 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     Filter ans sort the detected circles found by the Hough transform.
     The order must correspond to the order of the landmarks
     '''
+    pNode=self.parameterNode()
     status = node.GetStatusString()
     self.__registrationStatus.setText('Hough Transforn '+status)
     if status == 'Completed':
       self.firstRegButton.setEnabled(1)
 
-      file = open("/output.txt", "r").readlines()
+      # first remove previously detected circle if some exist
+      fixedAnnotationList = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('fixedLandmarksListID'))
+      if fixedAnnotationList != None:
+        fixedAnnotationList.RemoveAllChildrenNodes()
+
+      # read the file where the output of the hough transform has been written
+      file = open("./output.txt", "r").readlines()
       sphereCenters = [[0,0,0] for i in range(9)]
       nbLine = 0
       for line in file:
         if len(line) >= 10:
-          sphereCenters[nbLine] = json.loads(line)
+          sphereCenters[nbLine] = self.ijk2ras(json.loads(line),self.inputVolume)
         nbLine += 1
       for i in range(nbLine+1):
         for j in range(nbLine+1): 
@@ -158,37 +230,38 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
             d2 = (sphereCenters[i][0]-sphereCenters[j][0])**2+(sphereCenters[i][1]-sphereCenters[j][1])**2+(sphereCenters[i][2]-sphereCenters[j][2])**2
             d = d2**0.5
             # print sphereCenters[i],sphereCenters[j]
-            # print d
-            if d >=75 and d<=80:
+            print d
+            if d >=45 and d<=53:
               U += 1
-            elif d >=70 and d<75:  
+            elif d >53 and d<60:  
               V +=1
-            elif d >=100 and d<112:  
+            elif d >=70 and d<80:  
               W +=1 
-        # print U,V,W      
+        print U,V,W      
         if U+V+W>=3:
           print sphereCenters[i]
           point.extend([i])
 
       point.remove(0)
-      minX = [-1,-1,-1,-1]
-      maxX = [-1,-1,-1,-1]
-
-
+      minX = [999,999,999,999]
+      maxX = [-999,-999,-999,-999]
+      
+      print point
+      print sphereCenters
       sorted = [[0,0,0] for l in range(4)]
       sortedConverted = [[0,0,0] for l in range(4)]
       for i in range(2):  
         for k in point:
-          if sphereCenters[k][0]<= minX[0] or minX[0] == -1:
+          if sphereCenters[k][0]<= minX[0]:
             minX[0] = sphereCenters[k][0]
             minX[1] = k
-          elif sphereCenters[k][0]<= minX[2] or minX[2] == -1:
+          elif sphereCenters[k][0]<= minX[2]:
             minX[2] = sphereCenters[k][0]
             minX[3] = k
-          if sphereCenters[k][0]>= maxX[0] or maxX[0] == -1:
+          if sphereCenters[k][0]>= maxX[0]:
             maxX[0] = sphereCenters[k][0]
             maxX[1] = k
-          elif sphereCenters[k][0]>= maxX[2] or maxX[2] == -1:
+          elif sphereCenters[k][0]>= maxX[2]:
             maxX[2] = sphereCenters[k][0]
             maxX[3] = k    
 
@@ -206,32 +279,31 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
         sorted[2] = maxX[3]
         sorted[3] = maxX[1]
       
-      
       sorted2 = [0,0,0,0]
-      sorted2[0]=sorted[3]
-      sorted2[2]=sorted[1]
-      sorted2[1]=sorted[0]
-      sorted2[3]=sorted[2]
+      print self.horizontalTemplate
+      if self.horizontalTemplate.isChecked():
+        sorted2[0]=sorted[2]
+        sorted2[2]=sorted[0]
+        sorted2[1]=sorted[3]
+        sorted2[3]=sorted[1]
+      else:
+        sorted2[0]=sorted[3]
+        sorted2[2]=sorted[1]
+        sorted2[1]=sorted[0]
+        sorted2[3]=sorted[2]
       
-      ijkToRAS = vtk.vtkMatrix4x4()
-      
-      print sorted2
-      self.__baselineVolume.GetIJKToRASMatrix(ijkToRAS)
-      for l in range(4):
-        Matrix = vtk.vtkMatrix4x4()      
-        for i in range(3):
-          Matrix.SetElement(i,3,sphereCenters[sorted2[l]][i])
-          ijkToRAS.Multiply4x4(ijkToRAS,Matrix,  Matrix)
-          sortedConverted[l][i]=Matrix.GetElement(i,3)
-      print sortedConverted  
-        
+      ijkToRAS = vtk.vtkMatrix4x4()  
       
       logic = slicer.modules.annotations.logic()
-      logic.SetActiveHierarchyNodeID("vtkMRMLAnnotationHierarchyNode4")    
-      for k in range(4) :  
+      logic.SetActiveHierarchyNodeID(pNode.GetParameter('fixedLandmarksListID'))
+      if pNode.GetParameter("Template")=='4points':
+        nbPoints=4
+      elif pNode.GetParameter("Template")=='3pointsCorners':
+        nbPoints=3
+      for k in range(nbPoints) :  
         fiducial = slicer.mrmlScene.CreateNodeByClass('vtkMRMLAnnotationFiducialNode')
         fiducial.SetReferenceCount(fiducial.GetReferenceCount()-1)
-        fiducial.SetFiducialCoordinates(sortedConverted[k])
+        fiducial.SetFiducialCoordinates(sphereCenters[sorted2[k]])
         fiducial.SetName(str(k)) 
         fiducial.Initialize(slicer.mrmlScene)
         # adding to hierarchy is handled by the Reporting logic
@@ -250,81 +322,6 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       sRed.Modified()
     
     self.firstRegistration()
-
-  def onROIChanged(self):
-    roi = self.__roiSelector.currentNode()
-    if roi != None:
-    
-      pNode = self.parameterNode()
-      roi.SetAndObserveTransformNodeID(self.__roiTransformNode.GetID())
-
-      if self.__roiObserverTag != None:
-        self.__roi.RemoveObserver(self.__roiObserverTag)
-
-      self.__roi = slicer.mrmlScene.GetNodeByID(roi.GetID())
-      self.__roiObserverTag = self.__roi.AddObserver('ModifiedEvent', self.processROIEvents)
-
-      roi.SetInteractiveMode(1)
-
-      self.__roiWidget.setMRMLAnnotationROINode(roi)
-      self.__roi.SetROIAnnotationVisibility(1)
-     
-  def processROIEvents(self,node,event):
-    # get the range of intensities inside the ROI
-
-    # get the IJK bounding box of the voxels inside ROI
-    roiCenter = [0,0,0]
-    roiRadius = [0,0,0]
-    self.__roi.GetXYZ(roiCenter)
-    self.__roi.GetRadiusXYZ(roiRadius)
-
-    roiCorner1 = [roiCenter[0]+roiRadius[0],roiCenter[1]+roiRadius[1],roiCenter[2]+roiRadius[2],1]
-    roiCorner2 = [roiCenter[0]+roiRadius[0],roiCenter[1]+roiRadius[1],roiCenter[2]-roiRadius[2],1]
-    roiCorner3 = [roiCenter[0]+roiRadius[0],roiCenter[1]-roiRadius[1],roiCenter[2]+roiRadius[2],1]
-    roiCorner4 = [roiCenter[0]+roiRadius[0],roiCenter[1]-roiRadius[1],roiCenter[2]-roiRadius[2],1]
-    roiCorner5 = [roiCenter[0]-roiRadius[0],roiCenter[1]+roiRadius[1],roiCenter[2]+roiRadius[2],1]
-    roiCorner6 = [roiCenter[0]-roiRadius[0],roiCenter[1]+roiRadius[1],roiCenter[2]-roiRadius[2],1]
-    roiCorner7 = [roiCenter[0]-roiRadius[0],roiCenter[1]-roiRadius[1],roiCenter[2]+roiRadius[2],1]
-    roiCorner8 = [roiCenter[0]-roiRadius[0],roiCenter[1]-roiRadius[1],roiCenter[2]-roiRadius[2],1]
-
-    ras2ijk = vtk.vtkMatrix4x4()
-    self.__baselineVolume.GetRASToIJKMatrix(ras2ijk)
-
-    roiCorner1ijk = ras2ijk.MultiplyPoint(roiCorner1)
-    roiCorner2ijk = ras2ijk.MultiplyPoint(roiCorner2)
-    roiCorner3ijk = ras2ijk.MultiplyPoint(roiCorner3)
-    roiCorner4ijk = ras2ijk.MultiplyPoint(roiCorner4)
-    roiCorner5ijk = ras2ijk.MultiplyPoint(roiCorner5)
-    roiCorner6ijk = ras2ijk.MultiplyPoint(roiCorner6)
-    roiCorner7ijk = ras2ijk.MultiplyPoint(roiCorner7)
-    roiCorner8ijk = ras2ijk.MultiplyPoint(roiCorner8)
-
-    lowerIJK = [0, 0, 0]
-    upperIJK = [0, 0, 0]
-
-    lowerIJK[0] = min(roiCorner1ijk[0],roiCorner2ijk[0],roiCorner3ijk[0],roiCorner4ijk[0],roiCorner5ijk[0],roiCorner6ijk[0],roiCorner7ijk[0],roiCorner8ijk[0])
-    lowerIJK[1] = min(roiCorner1ijk[1],roiCorner2ijk[1],roiCorner3ijk[1],roiCorner4ijk[1],roiCorner5ijk[1],roiCorner6ijk[1],roiCorner7ijk[1],roiCorner8ijk[1])
-    lowerIJK[2] = min(roiCorner1ijk[2],roiCorner2ijk[2],roiCorner3ijk[2],roiCorner4ijk[2],roiCorner5ijk[2],roiCorner6ijk[2],roiCorner7ijk[2],roiCorner8ijk[2])
-
-    upperIJK[0] = max(roiCorner1ijk[0],roiCorner2ijk[0],roiCorner3ijk[0],roiCorner4ijk[0],roiCorner5ijk[0],roiCorner6ijk[0],roiCorner7ijk[0],roiCorner8ijk[0])
-    upperIJK[1] = max(roiCorner1ijk[1],roiCorner2ijk[1],roiCorner3ijk[1],roiCorner4ijk[1],roiCorner5ijk[1],roiCorner6ijk[1],roiCorner7ijk[1],roiCorner8ijk[1])
-    upperIJK[2] = max(roiCorner1ijk[2],roiCorner2ijk[2],roiCorner3ijk[2],roiCorner4ijk[2],roiCorner5ijk[2],roiCorner6ijk[2],roiCorner7ijk[2],roiCorner8ijk[2])
-
-    image = self.__baselineVolume.GetImageData()
-    clipper = vtk.vtkImageClip()
-    clipper.ClipDataOn()
-    clipper.SetOutputWholeExtent(int(lowerIJK[0]),int(upperIJK[0]),int(lowerIJK[1]),int(upperIJK[1]),int(lowerIJK[2]),int(upperIJK[2]))
-    clipper.SetInput(image)
-    clipper.Update()
-
-    roiImageRegion = clipper.GetOutput()
-    intRange = roiImageRegion.GetScalarRange()
-    lThresh = 0.4*(intRange[0]+intRange[1])
-    uThresh = intRange[1]
-
-    # finally, update the focal point to be the center of ROI
-    camera = slicer.mrmlScene.GetNodeByID('vtkMRMLCameraNode1')
-    camera.SetFocalPoint(roiCenter)
     
   def onRunButtonToggled(self, checked):
     if checked:
@@ -339,7 +336,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     landmark registration (fiducial registration CLI Module)
     '''
     pNode = self.parameterNode()
-    baselineVolumeID = pNode.GetParameter('baselineVolumeID')
+    baselineVolumeID = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
     templateID = pNode.GetParameter('templateID')
     self.__followupTransform = slicer.mrmlScene.GetNodeByID('vtkMRMLLinearTransformNode4')
     slicer.mrmlScene.AddNode(self.__followupTransform)
@@ -352,8 +349,8 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     
     self.OutputMessage = ""
     parameters = {}
-    parameters["fixedLandmarks"] = slicer.mrmlScene.GetNodeByID("vtkMRMLAnnotationHierarchyNode4")
-    parameters["movingLandmarks"] = slicer.mrmlScene.GetNodeByID("vtkMRMLAnnotationHierarchyNode2")
+    parameters["fixedLandmarks"] = pNode.GetParameter('fixedLandmarksListID')
+    parameters["movingLandmarks"] = pNode.GetParameter('movingLandmarksListID')
     parameters["saveTransform"] = self.__followupTransform
     parameters["transformType"] = "Rigid"
     parameters["rms"] = self.RMS
@@ -488,6 +485,22 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
           self.fiducialButton.setEnabled(0)
           self.firstRegistration()
           self.stop()
+
+      elif applicator == "3pointsCorners":  
+        
+        if self.click == 0:
+          fiducial.SetName("1")
+          self.click += 1
+        elif self.click == 1:
+          fiducial.SetName("2")
+          self.click += 1
+        elif self.click == 2:
+          fiducial.SetName("3")
+          self.click += 1
+          self.click = 0
+          self.fiducialButton.setEnabled(0)
+          self.firstRegistration()
+          self.stop()
         
       fiducial.Initialize(slicer.mrmlScene)
       self.fixedLandmarks.AddItem(fiducial)
@@ -502,114 +515,57 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     super(iGyneFirstRegistrationStep, self).onEntry(comingFrom, transitionType)
     pNode = self.parameterNode()
     if pNode.GetParameter('skip') != '1':
+      
+      #hough transform parameters
+      volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+      imageData = volumeNode.GetImageData()
+      imageDimensions = imageData.GetDimensions()
+      m = vtk.vtkMatrix4x4()
+      volumeNode.GetIJKToRASMatrix(m)
+      hValue = round(m.GetElement(2,2)*imageDimensions[2]/float(25))
+      self.ratioHeightCroppedVolume.setValue(hValue)
+
       # setup the interface
       lm = slicer.app.layoutManager()
       lm.setLayout(slicer.vtkMRMLLayoutNode.SlicerLayoutOneUpRedSliceView)
       pNode = self.parameterNode()
-
-      # use this transform node to align ROI with the axes of the baseline
-      # volume
-      roiTfmNodeID = pNode.GetParameter('roiTransformID')
-      
-      if roiTfmNodeID != '':
-        self.__roiTransformNode = Helper.getNodeByID(roiTfmNodeID)
-      else:
-        Helper.Error('Internal error! Error code CT-S2-NRT, please report!')
    
       self.__template = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('templateID'))
       self.__baselineVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
-      # get the roiNode from parameters node, if it exists, and initialize the
-      # GUI
-      self.updateWidgetFromParameterNode(pNode)
-      bounds = [0,0,0,0,0,0]
-      self.__template.GetRASBounds(bounds)
-      #print(bounds)
-      if self.__roi != None:
-        self.__roi.SetROIAnnotationVisibility(1)
-      self.__roi.SetRadiusXYZ(abs(bounds[0]-bounds[1])/2,abs(bounds[2]-bounds[3])/2,abs(bounds[4]-bounds[5])/2)
+
       pNode.SetParameter('currentStep', self.stepid)
       
+      # get ID from fiducial list
+      hierarchyNodes = slicer.util.getNodes('vtkMRMLAnnotationHierarchyNode*')
+      for hierarchyNode in hierarchyNodes.values():
+        if hierarchyNode.GetName()=='Fiducial List_fixed':
+          fixedLandmarksListID=hierarchyNode.GetID()
+          pNode.SetParameter('fixedLandmarksListID',fixedLandmarksListID)
+        elif hierarchyNode.GetName()=='Fiducial List_moving':
+          movingLandmarksListID=hierarchyNode.GetID()
+          pNode.SetParameter('movingLandmarksListID',movingLandmarksListID)
+
+      # disable automatic registration in case of use of 3 fiducials only (old cases)
       if pNode.GetParameter('Template')=='3points':
         self.automaticRegistrationButton.setEnabled(0)
+        self.setDescription( 'Register the template based on 3 fiducial points. Choose the points counterclockwise, starting from the one in the middle.' )
       elif pNode.GetParameter('Template')=='4points':
         self.automaticRegistrationButton.setEnabled(1)
+        self.setDescription( 'Register the template based on 4 fiducial points. Choose the points counterclockwise, starting from top left corner.' )
+
     else:
       self.workflow().goForward() # 5
       
   def onExit(self, goingTo, transitionType):
     pNode = self.parameterNode()
     if pNode.GetParameter('skip') != '1':
-              
-      if self.__roi != None:
-        self.__roi.RemoveObserver(self.__roiObserverTag)
-        self.__roi.SetROIAnnotationVisibility(0)
-      
-      pNode = self.parameterNode()
-      pNode.SetParameter('roiNodeID', self.__roiSelector.currentNode().GetID())
-
-      if goingTo.id() == 'SecondRegistration':
-        self.doStepProcessing()
-      
+      slicer.mrmlScene.RemoveNode(slicer.util.getNode("template-area-ROI"))
+      slicer.mrmlScene.RemoveNode(slicer.util.getNode("AnnotationROI*"))
+      # hide fiducial nodes
       fiducialNodes = slicer.util.getNodes('vtkMRMLAnnotationFiducialNode*')
       for fiducialNode in fiducialNodes.values():
-        dfid = fiducialNode.GetDisplayNode()
-        dfid.SetVisibility(0)
+        fiducialNode.SetDisplayVisibility(0)
         
     if goingTo.id() != 'LoadModel' and goingTo.id() != 'SecondRegistration':
       return
     super(iGyneFirstRegistrationStep, self).onExit(goingTo, transitionType)
-
-  def updateWidgetFromParameterNode(self, parameterNode):
-    roiNodeID = parameterNode.GetParameter('roiNodeID')
-
-    if roiNodeID != '':
-      self.__roi = slicer.mrmlScene.GetNodeByID(roiNodeID)
-      self.__roiSelector.setCurrentNode(Helper.getNodeByID(self.__roi.GetID()))
-    else:
-      roi = slicer.mrmlScene.CreateNodeByClass('vtkMRMLAnnotationROINode')
-      slicer.mrmlScene.AddNode(roi)
-      parameterNode.SetParameter('roiNodeID', roi.GetID())
-      self.__roiSelector.setCurrentNode(roi)
-    
-    self.onROIChanged()
-   
-  def doStepProcessing(self):
-    '''
-    prepare roi image for the next step
-    '''
-    pNode = self.parameterNode()
-    cropVolumeNode =slicer.mrmlScene.CreateNodeByClass('vtkMRMLCropVolumeParametersNode')
-    cropVolumeNode.SetScene(slicer.mrmlScene)
-    cropVolumeNode.SetName('iGyne_CropVolume_node')
-    cropVolumeNode.SetIsotropicResampling(True)
-    cropVolumeNode.SetSpacingScalingConst(0.5)
-    slicer.mrmlScene.AddNode(cropVolumeNode)
-    # TODO hide from MRML tree
-
-    cropVolumeNode.SetInputVolumeNodeID(pNode.GetParameter('baselineVolumeID'))
-    cropVolumeNode.SetROINodeID(pNode.GetParameter('roiNodeID'))
-    # cropVolumeNode.SetAndObserveOutputVolumeNodeID(outputVolume.GetID())
-
-    cropVolumeLogic = slicer.modules.cropvolume.logic()
-    cropVolumeLogic.Apply(cropVolumeNode)
-
-    # TODO: cropvolume error checking
-    outputVolume = slicer.mrmlScene.GetNodeByID(cropVolumeNode.GetOutputVolumeNodeID())
-    outputVolume.SetName("baselineROI")
-    pNode.SetParameter('croppedBaselineVolumeID',cropVolumeNode.GetOutputVolumeNodeID())
-    pNode.SetParameter('cropVolumeNodeID',cropVolumeNode.GetID())
-
-    roiSegmentationID = pNode.GetParameter('croppedBaselineVolumeSegmentationID') 
-    if roiSegmentationID == '':
-      roiRange = outputVolume.GetImageData().GetScalarRange()
-
-      # default threshold is half-way of the range
-      thresholdParameter = str(0.15*(roiRange[0]+roiRange[1]))+','+str(roiRange[1])
-      pNode.SetParameter('thresholdRange', thresholdParameter)
-      pNode.SetParameter('useSegmentationThresholds', 'True')
-
-    # even if the seg. volume exists, it needs to be updated, because ROI
-    # could have changed
-    vl = slicer.modules.volumes.logic()
-    roiSegmentation = vl.CreateLabelVolume(slicer.mrmlScene, outputVolume, 'baselineROI_segmentation')
-    pNode.SetParameter('croppedBaselineVolumeSegmentationID', roiSegmentation.GetID())

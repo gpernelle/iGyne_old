@@ -1,3 +1,4 @@
+from __future__ import division
 from __main__ import qt, ctk
 
 class iGyneStep( ctk.ctkWorkflowWidgetStep ) :

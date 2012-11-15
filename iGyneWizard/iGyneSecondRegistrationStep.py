@@ -1,21 +1,19 @@
 from __main__ import qt, ctk, slicer
-
 from iGyneStep import *
 from Helper import *
 from EditorLib import *
 import math
 import Queue, threading
 import string
-
-'''
-TODO:
-  add advanced option to specify segmentation
-  Add a queue to start ICP reg after obturator segmentation
-'''
+import DICOMLib
 
 class iGyneSecondRegistrationStep( iGyneStep ) :
 
   def __init__( self, stepid ):
+    '''
+    TODO:
+      Add a queue to start ICP reg after obturator segmentation
+    '''
     self.initialize( stepid )
     self.setName( '5. Second Registration' )
     self.setDescription( 'Register the template based on the volume segmentation' )
@@ -65,6 +63,41 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.lastModelNode = None
     self.stringRMS = ""
     self.processingTime = "not calculated"
+    self.obturatorDisplayModel = None
+    self.templateDisplayModel = None
+    self.segmentationModel = None
+
+    #------------------------------------------------------------------------------
+    # initialize the dicom infrastructure
+    settings = qt.QSettings()
+    # the dicom database is a global object for slicer
+    if settings.contains('DatabaseDirectory'):
+      databaseDirectory = settings.value('DatabaseDirectory')
+      if databaseDirectory: 
+        slicer.dicomDatabase = ctk.ctkDICOMDatabase()
+        slicer.dicomDatabase.openDatabase(databaseDirectory + "/ctkDICOM.sql", "SLICER")
+        # the dicom listener is also global, but only started on app start if 
+        # the user so chooses
+        if settings.contains('DICOM/RunListenerAtStart'):
+          if bool(settings.value('DICOM/RunListenerAtStart')):
+            if not hasattr(slicer, 'dicomListener'):
+              try:
+                slicer.dicomListener = DICOMLib.DICOMListener(slicer.dicomDatabase)
+                slicer.dicomListener.start()
+              except (UserWarning,OSError) as message:
+                # TODO: how to put this into the error log?
+                print ('Problem trying to start DICOMListener:\n %s' % message)
+    else:
+      slicer.dicomDatabase = None
+
+    # TODO: are these wrapped so we can avoid magic numbers?
+    self.dicomModelUIDRole = 32
+    self.dicomModelTypeRole = self.dicomModelUIDRole + 1
+    self.dicomModelTypes = ('Root', 'Patient', 'Study', 'Series', 'Image')
+
+    # state management for compressing events
+    self.resumeModelRequested = False
+    self.updateRecentActivityRequested = False
     
   def createUserInterface( self ):
     '''
@@ -76,44 +109,142 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     '''
     self.__layout = self.__parent.createUserInterface()
     
-    ###Basic Settings Frame
+    # DICOM ToolBox
+    
+     # Listener 
+
+    settings = qt.QSettings()
+    self.toggleListener = qt.QPushButton()
+    if hasattr(slicer, 'dicomListener'):
+      self.toggleListener.text = "Stop Listener"
+      slicer.dicomListener.process.connect('stateChanged(int)',self.onListenerStateChanged)
+    else:
+      self.toggleListener.text = "Start Listener"
+    
+    self.toggleListener.connect('clicked()', self.onToggleListener)
+    
+    self.__DICOMFrame = ctk.ctkCollapsibleButton()
+    self.__DICOMFrame.text = "DICOM Input"
+    self.__DICOMFrame.collapsed = 1
+    dicomFrame = qt.QFormLayout(self.__DICOMFrame)
+    self.__layout.addRow(self.__DICOMFrame)
+
+    # voiGroupBox = qt.QGroupBox()
+    # voiGroupBox.setTitle( 'DICOM' )
+    dicomFrame.addRow(self.toggleListener)
+    # dicomFrame.addRow( voiGroupBox )
+    # voiGroupBoxLayout = qt.QFormLayout( voiGroupBox )
+    self.dicomApp = ctk.ctkDICOMAppWidget()
+    #voiGroupBoxLayout.addRow( self.dicomApp )
+    self.detailsPopup = DICOMLib.DICOMDetailsPopup(self.dicomApp,True)
+    self.exportButton = qt.QPushButton('Export Slicer Data to Study...')
+    self.loadButton = qt.QPushButton('Load to Slicer')
+    self.previewLabel = qt.QLabel()
+    self.tree = self.detailsPopup.tree
+    
+    self.showBrowser = qt.QPushButton('Show DICOM Browser')
+    dicomFrame.addRow(self.showBrowser)
+    self.showBrowser.connect('clicked()', self.detailsPopup.open)
+
+    # the recent activity frame
+    
+    self.recentActivity = DICOMLib.DICOMRecentActivityWidget(self.__DICOMFrame,detailsPopup=self.detailsPopup)
+    self.__DICOMFrame.layout().addWidget(self.recentActivity.widget)
+    self.requestUpdateRecentActivity()
+    
+    if not slicer.dicomDatabase:
+      self.promptForDatabaseDirectory()
+    else:
+      self.onDatabaseDirectoryChanged(self.dicomApp.databaseDirectory)
+    if hasattr(slicer, 'dicomListener'):
+      slicer.dicomListener.fileToBeAddedCallback = self.onListenerToAddFile
+      slicer.dicomListener.fileAddedCallback = self.onListenerAddedFile
+    
+    self.contextMenu = qt.QMenu(self.tree)
+    self.exportAction = qt.QAction("Export to Study", self.contextMenu)
+    self.contextMenu.addAction(self.exportAction)
+    self.exportAction.enabled = False
+    self.deleteAction = qt.QAction("Delete", self.contextMenu)
+    self.contextMenu.addAction(self.deleteAction)
+    self.contextMenu.connect('triggered(QAction*)', self.onContextMenuTriggered)
+    
+    self.dicomApp.connect('databaseDirectoryChanged(QString)', self.onDatabaseDirectoryChanged)
+    selectionModel = self.tree.selectionModel()
+    # TODO: can't use this because QList<QModelIndex> is not visible in PythonQt
+    #selectionModel.connect('selectionChanged(QItemSelection, QItemSelection)', self.onTreeSelectionChanged)
+    self.tree.connect('clicked(QModelIndex)', self.onTreeClicked)
+    self.tree.setContextMenuPolicy(3)
+    self.tree.connect('customContextMenuRequested(QPoint)', self.onTreeContextMenuRequested)
+
+    # enable to the Send button of the app widget and take it over
+    # for our purposes - TODO: fix this to enable it at the ctkDICOM level
+    self.sendButton = slicer.util.findChildren(self.dicomApp, text='Send')[0]
+    self.sendButton.enabled = False
+    self.sendButton.connect('clicked()', self.onSendClicked)
+
+    # select the volume
+    baselineScanLabel = qt.QLabel( 'CT or MR scan:' )
+    self.__baselineVolumeSelector = slicer.qMRMLNodeComboBox()
+    self.__baselineVolumeSelector.objectName = 'baselineVolumeSelector'
+    self.__baselineVolumeSelector.toolTip = "Choose the baseline scan"
+    self.__baselineVolumeSelector.nodeTypes = ['vtkMRMLScalarVolumeNode']
+    self.__baselineVolumeSelector.setMRMLScene(slicer.mrmlScene)
+    self.__baselineVolumeSelector.noneEnabled = False
+    self.__baselineVolumeSelector.addEnabled = False
+    self.__baselineVolumeSelector.removeEnabled = False
+    # self.__layout.connect('nodeAdded(vtkMRMLNode*)',self.__baselineVolumeSelector,'setCurrentNode(vtkMRMLNode*)')
+    self.__layout.connect('mrmlSceneChanged(vtkMRMLScene*)',
+                        self.__baselineVolumeSelector, 'setMRMLScene(vtkMRMLScene*)')
+    self.__layout.addRow( baselineScanLabel, self.__baselineVolumeSelector )
+
+    # Switch to this volume to the scene
+    switchVolumeButton = qt.QPushButton('Switch to selected volume')
+    switchVolumeButton.connect('clicked()', self.switchVolume)
+    self.__layout.addRow(switchVolumeButton)
+
+    # Basic Settings Frame
     basicFrame = ctk.ctkCollapsibleButton()
     basicFrame.text = "Basic settings"
     basicFrame.collapsed = 0
     basicFrameLayout = qt.QFormLayout(basicFrame)
     
-    ###Advanced Settings Frame
+    # Advanced Settings Frame
     advancedFrame = ctk.ctkCollapsibleButton()
     advancedFrame.text = "Advanced settings"
     advancedFrame.collapsed = 1
     advFrameLayout = qt.QFormLayout(advancedFrame)
     
-    ###Evaluation Settings Frame
+    # Evaluation Settings Frame
     evaluationFrame = ctk.ctkCollapsibleButton()
     evaluationFrame.text = "Evaluation settings"
     evaluationFrame.collapsed = 1
     evalFrameLayout = qt.QFormLayout(evaluationFrame)
     
-    ### Editor Frame
+    #  Editor Frame
     editorFrame = ctk.ctkCollapsibleButton()
     editorFrame.text = "Editor Tools (GrowCut Segmentation)"
     editorFrame.collapsed = 1
     editorFrameLayout = qt.QFormLayout(editorFrame)
     
-    ###Threshold slider for template segmentation
+    # Threshold slider for template segmentation
     threshLabel = qt.QLabel('Make the holes visible:')
     self.__threshRange = slicer.qMRMLRangeWidget()
     self.__threshRange.decimals = 0
     self.__threshRange.singleStep = 1
+    volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+    roiRange = volumeNode.GetImageData().GetScalarRange()
+    self.__threshRange.minimumValue = 15
+    self.__threshRange.maximum = 300
+    self.__threshRange.maximumValue = 300
 
-    ###disabled...
+    # disabled...
     self.__useThresholdsCheck = qt.QCheckBox()
     self.__useThresholdsCheck.setEnabled(0)
     threshCheckLabel = qt.QLabel('Use thresholds for segmentation')
     self.__threshRange.connect('valuesChanged(double,double)', self.onThresholdChanged)
     self.__useThresholdsCheck.connect('stateChanged(int)', self.onThresholdsCheckChanged)
 
-    ###Select segmentation button (disabled)
+    # Select segmentation button (disabled)
     roiLabel = qt.QLabel( 'Select segmentation:' )
     self.__roiLabelSelector = slicer.qMRMLNodeComboBox()
     self.__roiLabelSelector.nodeTypes = ( 'vtkMRMLScalarVolumeNode', '' )
@@ -123,26 +254,26 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.__roiLabelSelector.addEnabled = 0
     self.__roiLabelSelector.setMRMLScene(slicer.mrmlScene)
     
-    ###Make a 3D Model Button 
+    # Make a 3D Model Button 
     make3DModelButton = qt.QPushButton('Make a 3D Model')
     make3DModelButton.connect('clicked()', self.applyModelMaker)
      
-    ###Auto Segmentation of Obturator Button     
+    # Auto Segmentation of Obturator Button     
     autoSegmentationButton = qt.QPushButton('Automatic Obturator Segmentation')
     autoSegmentationButton.connect('clicked()', self.obturatorSegmentation)
     
-    ### Line separator
+    #  Line separator
     line = qt.QFrame()
     line.setFrameShape(qt.QFrame.HLine)
     line.setFrameShape(qt.QFrame.Sunken)
     
-    ###Editor Widget
+    # Editor Widget
     groupbox = qt.QGroupBox()
     groupboxLayout  = qt.QFormLayout(groupbox)
     groupboxLayout.addRow(slicer.modules.editor.widgetRepresentation())
     editorFrameLayout.addRow(groupbox)
     
-    ###Start ICP reg button
+    # Start ICP reg button
     self.ICPRegistrationButton = qt.QPushButton('ICP Registration')
     string = 'Register Template and Model'
     self.__registrationStatus = qt.QLabel(string)
@@ -150,7 +281,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.ICPRegistrationButton.setEnabled(0)
     self.ICPRegistrationButton.checkable = True 
     
-    ###Start ICP reg button with no template
+    # Start ICP reg button with no template
     self.ICPRegistrationButton2 = qt.QPushButton('ICP Registration w/o obturator')
     string = 'Register Template and Model'
     self.__registrationStatus = qt.QLabel(string)
@@ -158,56 +289,54 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.ICPRegistrationButton2.setEnabled(0)
     self.ICPRegistrationButton2.checkable = True 
     
-    ###I Feel Lucky Button
+    # I Feel Lucky Button
     IFeelLuckyButton = qt.QPushButton('I am Feeling Lucky')
     IFeelLuckyButton.connect('clicked()',self.IFeelLucky)
     
-    ###Restore Initial Registration Button
+    # Restore Initial Registration Button
     backToInitialRegistrationButton = qt.QPushButton('Restore Initial Registration')
     backToInitialRegistrationButton.connect('clicked()',self.backToInitialRegistration)
     
 
-    ###Obturator SpinBox
+    # Obturator SpinBox
     self.pullObturatorValueButton = qt.QSpinBox()
     self.pullObturatorValueButton.setMinimum(-500)
     self.pullObturatorValueButton.setMaximum(500)
     fLabel = qt.QLabel("Pull Obturator: ")
     self.pullObturatorValueButton.connect('valueChanged(int)', self.pullObturator)
     
-    
-    
-    ###ICP registration settings groupbox
+    # ICP registration settings groupbox
     ICPGroupBox = qt.QGroupBox()
     ICPGroupBox.setTitle( 'ICP Registration Settings' )
     advFrameLayout.addRow( ICPGroupBox )
     ICPGroupBoxLayout = qt.QFormLayout( ICPGroupBox )
     
-    ###Segment Template groupbox
+    # Segment Template groupbox
     segTemplateGroupBox = qt.QGroupBox()
     segTemplateGroupBox.setTitle( '1. Segmentation of the template' )
     basicFrameLayout.addRow( segTemplateGroupBox )
     segTemplateGroupBoxLayout = qt.QFormLayout( segTemplateGroupBox )
     
-    ###Segment Obturator groupbox
+    # Segment Obturator groupbox
     segObturatorGroupBox = qt.QGroupBox()
     segObturatorGroupBox.setTitle( '2. Segmentation of the Obturator' )
     basicFrameLayout.addRow( segObturatorGroupBox )
     segObturatorGroupBoxLayout = qt.QFormLayout( segObturatorGroupBox )
     
-    ###Registration groupbox
+    # Registration groupbox
     registrationGroupBox = qt.QGroupBox()
     registrationGroupBox.setTitle( '3. Registration: Choose one of the following registration methods' )
     basicFrameLayout.addRow( registrationGroupBox )
     registrationGroupBoxLayout = qt.QFormLayout( registrationGroupBox )
     
-    ###Evaluation groupbox
+    # Evaluation groupbox
     evaluationGroupBox = qt.QGroupBox()
     evaluationGroupBox.setTitle( '4. Evaluation' )
     basicFrameLayout.addRow( evaluationGroupBox )
     evaluationGroupBoxLayout = qt.QFormLayout( evaluationGroupBox )
     
     
-    ###Evaluation settings 4,5,7
+    # Evaluation settings 4,5,7
     pNode = self.parameterNode()
     transformNodeID = pNode.GetParameter('followupTransformID')
     print("transfo id:" , transformNodeID)
@@ -243,7 +372,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     evalFrameLayout.addRow( chronoButton)
     #evalFrameLayout.addRow( evaluationButton)
     
-    ###CP Registration Settings -> Advanced Settings group
+    # CP Registration Settings -> Advanced Settings group
     self.nbIterButton = qt.QSpinBox()
     self.nbIterButton.setMinimum(0)
     self.nbIterButton.setMaximum(1000)
@@ -269,13 +398,13 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     landmarksNbLabel = qt.QLabel('LandMarksNb')
     ICPGroupBoxLayout.addRow( landmarksNbLabel, self.landmarksNb)
     
-    ###Segmentation settings groupbox
+    # Segmentation settings groupbox
     SegGroupBox = qt.QGroupBox()
     SegGroupBox.setTitle( 'Segmentation Settings' )
     advFrameLayout.addRow( SegGroupBox )
     SegGroupBoxLayout = qt.QFormLayout( SegGroupBox )
     
-    ###Segmentation Settings
+    # Segmentation Settings
     self.medianFilterRadioButton = qt.QRadioButton('Median Filter')
     self.fourierFilterRadioButton =  qt.QRadioButton('LowPass filter in frequency domain')
     self.medianFilterRadioButton.setChecked(1)
@@ -316,7 +445,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     zRoiLabel = qt.QLabel('y median filter value')
     SegGroupBoxLayout.addRow( zRoiLabel, self.zRoi)
     
-    ### Add button to Basic Frame
+    #  Add button to Basic Frame
     segTemplateGroupBoxLayout.addRow(threshLabel, self.__threshRange)
     segTemplateGroupBoxLayout.addRow(make3DModelButton)
     segObturatorGroupBoxLayout.addRow(autoSegmentationButton)
@@ -328,28 +457,26 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     evaluationGroupBoxLayout.addRow(self.result)
     
     
-    ###Buttons Full Auto Seg + Reg and Restore Registration
+    # Buttons Full Auto Seg + Reg and Restore Registration
     widget = qt.QWidget()
     hlay = qt.QHBoxLayout(widget)
     hlay.addWidget(IFeelLuckyButton)
     hlay.addWidget(backToInitialRegistrationButton)
     
-    ###Processing Status
+    # Processing Status
     self.__layout.addRow(self.__registrationStatus)
     
-    ### Add 'I Feel Lucky' and 'Restore Initial Registration Button'
+    #  Add 'I Feel Lucky' and 'Restore Initial Registration Button'
     self.__layout.addRow( widget )
     
-    ### Basic Frame
+    #  Basic Frame
     self.__layout.addRow(basicFrame)
     
-    ###Add Editor and Advanced Settings for segmentation
-    
+    # Add Editor and Advanced Settings for segmentation
     self.__layout.addRow(advancedFrame)
     self.__layout.addRow(evaluationFrame)
     
-    # reset module
-    
+    # reset module 
     resetButton = qt.QPushButton( 'Reset Module' )
     resetButton.connect( 'clicked()', self.onResetButton )
     self.__layout.addRow(resetButton)
@@ -366,7 +493,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     '''
     Move the obturator along its z-axis. Positive value to pull.
     '''
-    ###give the step size
+    # give the step size
     nDepth = self.pullObturatorValueButton.value-self.pos0
     pNode=self.parameterNode()
     mrmlScene=slicer.mrmlScene  
@@ -376,7 +503,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       self.m_poly = vtk.vtkPolyData()  
       self.m_poly.DeepCopy(self.ObturatorNode.GetPolyData())
     
-    ### 4x4 transformation matrix. Only z (2,3) is to be modified
+    #  4x4 transformation matrix. Only z (2,3) is to be modified
     vtkmat = vtk.vtkMatrix4x4()
     vtkmat.SetElement(2,3,nDepth)
     
@@ -386,7 +513,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.TransformPolyDataFilter.SetTransform(self.Transform)
     self.TransformPolyDataFilter.Update()
     
-    ###Apply the transformation
+    # Apply the transformation
     triangles=vtk.vtkTriangleFilter()
     triangles.SetInput(self.TransformPolyDataFilter.GetOutput())
     self.ObturatorNode.SetAndObservePolyData(triangles.GetOutput())
@@ -413,7 +540,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     '''
     ICP Registration based on vtk.vtkIterativeClosestPointTransform()
     '''
-    ### Initialisation
+    #  Initialisation
     self.__registrationStatus.setText('ICP registration running...')
     segmentationModel = None 
     modelFromImageNode = None
@@ -424,7 +551,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.glyphBalls = vtk.vtkSphereSource()
     self.glyphPoints3D = vtk.vtkGlyph3D()
     self.pointId=0
-    ### Scroll all the model nodes. Keep the CAD template and CAD Obturator
+    #  Scroll all the model nodes. Keep the CAD template and CAD Obturator
     numNodes = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLModelNode" ) 
     for n in xrange(numNodes): 
       node = slicer.mrmlScene.GetNthNodeByClass( n, "vtkMRMLModelNode" ) 
@@ -433,7 +560,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       if node.GetName() == "obturator": 
         modelFromImageNodeManu = node 
     
-    ### Scroll all the model nodes. Keep nodes from automatic segmentation and from manual/growCut Segmentation. Keep in priority these last one.
+    #  Scroll all the model nodes. Keep nodes from automatic segmentation and from manual/growCut Segmentation. Keep in priority these last one.
     modelnodes = slicer.util.getNodes('modelobturator')
     for node in modelnodes.values():
       modelFromImageNodeAuto=node
@@ -445,22 +572,22 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     else:
       modelFromImageNode = modelFromImageNodeManu
     
-    ### Need segmented obturator to continue
+    #  Need segmented obturator to continue
     if modelFromImageNode != None:
           
       self.__registrationStatus.setText('Please Wait ...')
-      ###Block the ICP Registration button to avoid user to click during the process
+      # Block the ICP Registration button to avoid user to click during the process
       self.ICPRegistrationButton.setEnabled(0)
       scene = slicer.mrmlScene
       pNode= self.parameterNode()
       
-      ### Get the transformation matrix
+      #  Get the transformation matrix
       pNode=self.parameterNode()
       transformNodeID = pNode.GetParameter('followupTransformID')
       self.transform = Helper.getNodeByID(transformNodeID)
       self.vtkMatInitial = self.transform.GetMatrixTransformToParent()
       
-      ### Set a list of known points from template CAD Model
+      #  Set a list of known points from template CAD Model
       self.setPointData(50,28.019)
       self.setPointData(40.209,24.456)
       self.setPointData(35,14)
@@ -493,16 +620,16 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       self.glyphPoints3D.SetSource(self.glyphBalls.GetOutput())
       self.glyphPoints3D.Update()  
       
-      ### Get CAD Template 
+      #  Get CAD Template 
       template = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('templateID'))
       inputSurface = template
       
-      ### Get Segmented Template
+      #  Get Segmented Template
       targetSurface = segmentationModel
       self.templateDisplayModel = segmentationModel.GetDisplayNode()
       self.obturatorDisplayModel = modelFromImageNode.GetDisplayNode()
       
-      ### Define target : segmented obturator (modelFromImageNode) + segmented template (targetSurface)
+      #  Define target : segmented obturator (modelFromImageNode) + segmented template (targetSurface)
       addTarget = vtk.vtkAppendPolyData()
       addTarget.AddInput(targetSurface.GetPolyData())
       addTarget.AddInput(modelFromImageNode.GetPolyData())
@@ -520,13 +647,13 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       TransformPolyDataFilter.SetTransform(Transform)
       TransformPolyDataFilter.Update()
       
-      ### Define source: list of known points on the CAD template (the holes) + polydata filter on the CAD obturator
+      #  Define source: list of known points on the CAD template (the holes) + polydata filter on the CAD obturator
       addSource = vtk.vtkAppendPolyData()
       addSource.AddInput( self.glyphInputData)
       addSource.AddInput(TransformPolyDataFilter.GetOutput())
       addSource.Update()
       
-      ### Set parameters to the ICP transformation
+      #  Set parameters to the ICP transformation
       icpTransform = vtk.vtkIterativeClosestPointTransform()
       icpTransform.SetSource(addSource.GetOutput())
       icpTransform.SetTarget(addTarget.GetOutput())
@@ -540,18 +667,18 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       self.nIterations = icpTransform.GetNumberOfIterations()
       FinalMatrix = vtk.vtkMatrix4x4()
       
-      ### Apply the transformation: Multiply the transformation matrix
+      #  Apply the transformation: Multiply the transformation matrix
       FinalMatrix.Multiply4x4(icpTransform.GetMatrix(),self.vtkMatInitial,FinalMatrix)
-      ### Update the linear transform with the computed transformation matrix  
+      #  Update the linear transform with the computed transformation matrix  
       self.transform.SetAndObserveMatrixTransformToParent(FinalMatrix)
 
-      ### post registration stuffs
+      #  post registration stuffs
       self.processRegistrationCompletion()
     
-    ### In case the user try the ICP without having a manually segmented obturator named 'obturator' 
-    ### or an auto segmented obturator named 'modelobturator'
+    #  In case the user try the ICP without having a manually segmented obturator named 'obturator' 
+    #  or an auto segmented obturator named 'modelobturator'
     
-      ### evaluates processing time
+      #  evaluates processing time
       self.processingTime = time.clock()-self.t0
       
     elif self.fullAutoRegOn == 0:
@@ -559,11 +686,16 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       self.ICPRegistrationButton.setChecked(0)
       self.ICPRegistrationButton.text = "3/ ICP Registration"
       
+  def switchVolume(self):
+    pNode=self.parameterNode()
+    pNode.SetParameter('baselineVolumeID',self.baselineVolumeSelector.currentNode().GetID())
+    Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
+
   def ICPRegistrationTemplateOnly(self):
     '''
     ICP Registration based on vtk.vtkIterativeClosestPointTransform()
     '''
-    ### Initialisation
+    #  Initialisation
     
     segmentationModel = None 
     modelFromImageNode = None
@@ -575,7 +707,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.glyphPoints3D = vtk.vtkGlyph3D()
     self.pointId=0
     
-    ### Scroll all the model nodes. Keep the CAD template and CAD Obturator
+    #  Scroll all the model nodes. Keep the CAD template and CAD Obturator
     numNodes = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLModelNode" ) 
     for n in xrange(numNodes): 
       node = slicer.mrmlScene.GetNthNodeByClass( n, "vtkMRMLModelNode" ) 
@@ -583,15 +715,15 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
         segmentationModel = node 
 
     self.__registrationStatus.setText('Please Wait ...')
-    ###Block the ICP Registration button to avoid user to click during the process
+    # Block the ICP Registration button to avoid user to click during the process
     self.ICPRegistrationButton.setEnabled(0)
     scene = slicer.mrmlScene
     pNode= self.parameterNode()
     
-    ### Get the transformation matrix
+    #  Get the transformation matrix
     self.vtkMatInitial = self.transform.GetMatrixTransformToParent()
     
-    ### Set a list of known points from template CAD Model
+    #  Set a list of known points from template CAD Model
     self.setPointData(50,28.019)
     self.setPointData(40.209,24.456)
     self.setPointData(35,14)
@@ -624,16 +756,16 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.glyphPoints3D.SetSource(self.glyphBalls.GetOutput())
     self.glyphPoints3D.Update()  
     
-    ### Get CAD Template 
+    #  Get CAD Template 
     template = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('templateID'))
     inputSurface = template
     
-    ### Get Segmented Template
+    #  Get Segmented Template
     targetSurface = segmentationModel
     self.templateDisplayModel = segmentationModel.GetDisplayNode()
     
     
-    ### Define target : segmented obturator (modelFromImageNode) + segmented template (targetSurface)
+    #  Define target : segmented obturator (modelFromImageNode) + segmented template (targetSurface)
     addTarget = vtk.vtkAppendPolyData()
     addTarget.AddInput(targetSurface.GetPolyData())
     addTarget.Update()
@@ -650,12 +782,12 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     TransformPolyDataFilter.SetTransform(Transform)
     TransformPolyDataFilter.Update()
     
-    ### Define source: list of known points on the CAD template (the holes) + polydata filter on the CAD obturator
+    #  Define source: list of known points on the CAD template (the holes) + polydata filter on the CAD obturator
     addSource = vtk.vtkAppendPolyData()
     addSource.AddInput( self.glyphInputData)
     addSource.Update()
     
-    ### Set parameters to the ICP transformation
+    #  Set parameters to the ICP transformation
     icpTransform = vtk.vtkIterativeClosestPointTransform()
     icpTransform.SetSource(addSource.GetOutput())
     icpTransform.SetTarget(addTarget.GetOutput())
@@ -669,17 +801,17 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.nIterations = icpTransform.GetNumberOfIterations()
     FinalMatrix = vtk.vtkMatrix4x4()
     
-    ### Apply the transformation: Multiply the transformation matrix
+    #  Apply the transformation: Multiply the transformation matrix
     FinalMatrix.Multiply4x4(icpTransform.GetMatrix(),self.vtkMatInitial,FinalMatrix)
-    ### Update the linear transform with the computed transformation matrix  
+    #  Update the linear transform with the computed transformation matrix  
     self.transform.SetAndObserveMatrixTransformToParent(FinalMatrix)
 
-    ### post registration stuffs
+    #  post registration stuffs
     self.processRegistrationCompletion()
   
-    ### In case the user try the ICP without having a manually segmented obturator named 'obturator' 
-    ### or an auto segmented obturator named 'modelobturator'
-    ### evaluates processing time
+    #  In case the user try the ICP without having a manually segmented obturator named 'obturator' 
+    #  or an auto segmented obturator named 'modelobturator'
+    #  evaluates processing time
     self.processingTime = time.clock()-self.t0
       
   def processRegistrationCompletion(self):
@@ -693,7 +825,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.ICPRegistrationButton.setChecked(0)
     Helper.SetLabelVolume('None')
     pNode =self.parameterNode()
-    ### restore the default view
+    #  restore the default view
     Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
     
   def onICPButtonToggled(self,checked):
@@ -744,42 +876,45 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     '''
     Create a model (vtkMRMLModelNode) for labelmap done with threshold the volume cropped by a box adjusted around the CAD templated 
     '''
+    self.updateROItemplate()
     
-    ### Scroll all the model nodes. Keep the Segmented templated if existing, then delete it, because we're going to make a new one!
+    #  Scroll all the model nodes. Keep the Segmented templated if existing, then delete it, because we're going to make a new one!
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
     for modelNode in modelNodes.values():
       if modelNode.GetName()=='templateSegmentedModel':
         slicer.mrmlScene.RemoveNode(modelNode)
     
-    ### Parameters used from on step to another
+    #  Parameters used from on step to another
     pNode = self.parameterNode()
     range0 = self.__threshRange.minimumValue
     range1 = self.__threshRange.maximumValue
     roiVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
     roiSegmentationNode = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeSegmentationID'))
 
-    ### threshold segmentation. 
-    thresh = vtk.vtkImageThreshold()
-    thresh.SetInput(roiVolume.GetImageData())
-    thresh.ThresholdBetween(range0, range1)
-    thresh.SetInValue(10)
-    thresh.SetOutValue(0)
-    thresh.ReplaceOutOn()
-    thresh.ReplaceInOn()
-    thresh.Update()
+    #  threshold segmentation. 
+    if roiVolume!=None:
+      self.onThresholdChanged()
+      thresh = vtk.vtkImageThreshold()
+      thresh.SetInput(roiVolume.GetImageData())
+      thresh.ThresholdBetween(range0, range1)
+      thresh.SetInValue(10)
+      thresh.SetOutValue(0)
+      thresh.ReplaceOutOn()
+      thresh.ReplaceInOn()
+      thresh.Update()
 
-    ### Adjust the labelmap accordingly
+    #  Adjust the labelmap accordingly
     roiSegmentationNode.SetAndObserveImageData(thresh.GetOutput())
     Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
     
 
-    ### set up the model maker node 
+    #  set up the model maker node 
     parameters = {} 
     parameters['Name'] = 'templateSegmentedModel' 
     parameters["InputVolume"] = roiSegmentationNode.GetID() 
     parameters['FilterType'] = "Sinc" 
 
-    ### build only the currently selected model. 
+    #  build only the currently selected model. 
     parameters['Labels'] = 10
     parameters["StartLabel"] = -1 
     parameters["EndLabel"] = -1 
@@ -791,9 +926,9 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     parameters["Decimate"] = 0.25 
     parameters["Smooth"] = 10 
   
-    ### output 
-    ### - make a new hierarchy node if needed 
-    ### 
+    #  output 
+    #  - make a new hierarchy node if needed 
+    #  
     numNodes = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLModelHierarchyNode" ) 
     self.segmentationModel = None 
     for n in xrange(numNodes): 
@@ -814,7 +949,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.__cliNode = slicer.cli.run(modelMaker, self.__cliNode, parameters)
     self.__registrationStatus.setText('Template Segmented...')  
 
-    ### We have a segmented templated, we can allow the user to start an ICP registration
+    #  We have a segmented templated, we can allow the user to start an ICP registration
     self.ICPRegistrationButton.setEnabled(1)   
     self.ICPRegistrationButton2.setEnabled(1)     
         
@@ -827,19 +962,20 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     range1 = self.__threshRange.maximumValue
     roiVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
     self.__roiSegmentationNode = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeSegmentationID'))
-
-    thresh = vtk.vtkImageThreshold()
-    thresh.SetInput(roiVolume.GetImageData())
-    thresh.ThresholdBetween(range0, range1)
-    thresh.SetInValue(10)
-    thresh.SetOutValue(0)
-    thresh.ReplaceOutOn()
-    thresh.ReplaceInOn()
-    thresh.Update()
     
-    ### update the label volume accordingly
+    if roiVolume!=None:
+      thresh = vtk.vtkImageThreshold()
+      thresh.SetInput(roiVolume.GetImageData())
+      thresh.ThresholdBetween(range0, range1)
+      thresh.SetInValue(10)
+      thresh.SetOutValue(0)
+      thresh.ReplaceOutOn()
+      thresh.ReplaceInOn()
+      thresh.Update()
+    
+    #  update the label volume accordingly
     self.__roiSegmentationNode.SetAndObserveImageData(thresh.GetOutput())
-    Helper.SetBgFgVolumes(pNode.GetParameter('BaselineVolumeID'),'')
+    Helper.SetBgFgVolumes(pNode.GetParameter('croppedBaselineVolumeID'),'')
     Helper.SetLabelVolume(self.__roiSegmentationNode.GetID())
 
   def validate( self, desiredBranchId ):
@@ -851,19 +987,13 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
   def onExit(self, goingTo, transitionType):
     pNode = self.parameterNode()
     if pNode.GetParameter('skip') != '1':
-      pNode.SetParameter('thresholdRange', str(self.__threshRange.minimumValue)+','+str(self.__threshRange.maximumValue))
-      if self.segmentationModel:
+      if self.segmentationModel!=None:
         self.segmentationModel.RemoveAllChildrenNodes()
         slicer.mrmlScene.RemoveNode(self.segmentationModel)
-      print 'here'
-      print self.obturatorDisplayModel
-      print 'there'
-      self.obturatorDisplayModel.SetVisibility(0)
-      self.templateDisplayModel.SetVisibility(0)
-      numNodes = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLAnnotationROINode" ) 
-      for n in xrange(numNodes):
-        node = slicer.mrmlScene.GetNthNodeByClass( n, "vtkMRMLAnnotationROINode" )     
-        slicer.mrmlScene.RemoveNode(node)
+      if self.obturatorDisplayModel != None:
+        self.obturatorDisplayModel.SetVisibility(0)
+      if self.templateDisplayModel != None:
+        self.templateDisplayModel.SetVisibility(0)
     if goingTo.id() != 'FirstRegistration' and goingTo.id() != 'NeedlePlanning':
       return      
     super(iGyneSecondRegistrationStep, self).onExit(goingTo, transitionType)
@@ -879,60 +1009,19 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       lm = slicer.app.layoutManager()
       lm.setLayout(3)
       pNode = self.parameterNode()
-      self.updateWidgetFromParameters(pNode)
-      self.onThresholdsCheckChanged()
-      Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
-
-      roiVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
-      self.__roiVolume = roiVolume
-      self.__roiSegmentationNode = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeSegmentationID'))
-      
-      # setup color transfer function once
-      
-      baselineROIVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
-      baselineROIRange = baselineROIVolume.GetImageData().GetScalarRange()
-      threshRange = [self.__threshRange.minimumValue, self.__threshRange.maximumValue]
       labelsColorNode = slicer.modules.colors.logic().GetColorTableNodeID(10)
-      self.__roiSegmentationNode.GetDisplayNode().SetAndObserveColorNodeID(labelsColorNode)
-      Helper.SetLabelVolume(self.__roiSegmentationNode.GetID())
-      self.onThresholdChanged()
       self.saveInitialRegistration()
       pNode.SetParameter('currentStep', self.stepid)
+      if pNode.GetParameter('followupTransformID')!=None and slicer.util.getNode('Segmentation Model')==None:
+        print 'modelmaker'
+        self.applyModelMaker()
       
-      ###chrono start
+      # chrono start
       self.t0 = time.clock()
     else:
       self.workflow().goForward() # 3      
     
   def updateWidgetFromParameters(self, pNode):
-  
-    baselineROIVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
-    baselineROIRange = baselineROIVolume.GetImageData().GetScalarRange()
-    self.__threshRange.minimum = baselineROIRange[0]
-    self.__threshRange.maximum = baselineROIRange[1]
-    
-
-    if pNode.GetParameter('useSegmentationThresholds') == 'True':
-      self.__useThresholds = True
-      self.__useThresholdsCheck.setChecked(1)
-
-      thresholdRange = pNode.GetParameter('thresholdRange')
-      if thresholdRange != '':
-        rangeArray = string.split(thresholdRange, ',')
-        self.__threshRange.minimumValue = float(rangeArray[0])
-        self.__threshRange.maximumValue = float(rangeArray[1])
-      else:
-         Helper.Error('Unexpected parameter values! Error code CT-S03-TNA. Please report')
-    else:
-      self.__useThresholdsCheck.setChecked(0)
-      self.__useThresholds = False
-
-    segmentationID = pNode.GetParameter('croppedBaselineVolumeSegmentationID')
-    if segmentationID != '':
-      self.__roiLabelSelector.setCurrentNode(Helper.getNodeByID(segmentationID))
-    else:
-      Helper.Error('Unexpected parameter values! Error CT-S03-SNA. Please report')
-    self.__roiSegmentationNode = Helper.getNodeByID(segmentationID)
     transformNodeID = pNode.GetParameter('followupTransformID')
     self.transform = Helper.getNodeByID(transformNodeID)
 
@@ -966,7 +1055,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
 
   def processEvent(self,observee,event=None):
 
-    ######################################  transformation  ##########################
+    # # # # # # # # # # # # ##  transformation  # # # # # # # # ##
     scene = slicer.mrmlScene
     pNode= self.parameterNode()
 
@@ -994,7 +1083,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       
       if (self.actionState == "rotation" or self.actionState == "translation"):
 
-        ############################  rotation ########################################
+        # # # # # # # # # #  rotation # # # # # # # # # # # # # #
         if self.actionState == "rotation" and event == "MouseMoveEvent":
           # xy = style.GetInteractor().GetEventPosition()
           # xyz = sliceWidget.convertDeviceToXYZ(xy)
@@ -1047,7 +1136,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     
           # self.before += 1
           print("rotation is not supported yet - please use the transform Module")
-        ######################################### translation ###########################################
+        # # # # # # # # # # # # # ## translation # # # # # # # # # # # # # # #
         elif self.actionState == "translation" and event == "MouseMoveEvent":
           xy = style.GetInteractor().GetEventPosition()
           xyz = sliceWidget.convertDeviceToXYZ(xy);
@@ -1086,20 +1175,37 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     y = (65.1951-42.9222)/2+42.9222
     z = 150/2-110
     pNode = self.parameterNode()
+    # volume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
+    # volume = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+    # pNode.SetParameter('BaselineVolumeID', volume.GetID())
     volume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
     for modelNode in modelNodes.values():
       if modelNode.GetName()=='Obturator_reg':
         obturator = modelNode
+      elif modelNode.GetName()=='modelobturator':
+        slicer.mrmlScene.RemoveNode(modelNode)
     
+    # remove previous scalar nodes
+    scalarNodes = slicer.util.getNodes('vtkMRMLScalarVolumeNode*')
+    for scalarNode in scalarNodes.values():
+      if scalarNode.GetName()=='Median Filter Output':
+        slicer.mrmlScene.RemoveNode(scalarNode)
+    nodeToRemove = slicer.util.getNode('obturator_segmentation*')
+    slicer.mrmlScene.RemoveNode(nodeToRemove)
+
     coord=[0,0,0]
     polydata = obturator.GetPolyData()
     polydata.GetPoint(polydata.GetNumberOfPoints()-1,coord)
     
-    
-    # create ROI
+    # remove previous ROI
+    if pNode.GetParameter('roiObturatorID')!=None:
+      slicer.mrmlScene.RemoveNode(slicer.mrmlScene.GetNodeByID(pNode.GetParameter('roiObturatorID')))
+
+    # create new ROI
     roi = slicer.mrmlScene.CreateNodeByClass('vtkMRMLAnnotationROINode')
     slicer.mrmlScene.AddNode(roi)
+    pNode.SetParameter('roiObturatorID',roi.GetID())
     roi.SetROIAnnotationVisibility(1)
     # Transform ROI to match the obturator after the first (fiducial) registration
     transform = slicer.vtkMRMLLinearTransformNode()
@@ -1133,7 +1239,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     cropVolumeNode.SetScene(slicer.mrmlScene)
     cropVolumeNode.SetName('obturator_CropVolume_node')
     cropVolumeNode.SetIsotropicResampling(True)
-    cropVolumeNode.SetSpacingScalingConst(0.5)
+    cropVolumeNode.SetSpacingScalingConst(2)
     slicer.mrmlScene.AddNode(cropVolumeNode)
     cropVolumeNode.SetInputVolumeNodeID(volume.GetID())
     cropVolumeNode.SetROINodeID(roi.GetID())
@@ -1155,13 +1261,14 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       medianfiltercli = slicer.modules.medianimagefilter
       __cliNode = None
       __cliNode = slicer.cli.run(medianfiltercli, __cliNode, parameters)
-      
+      pNode.SetParameter('obturatorCroppedAndSmooth',self.imagefiltered.GetID())
       self.__cliObserverTag = __cliNode.AddObserver('ModifiedEvent', self.medianFilterCompleted)
 
     
     else:
       self.__registrationStatus.setText('FFT and Low Pass filter running...')
       self.imagefiltered = self.outputLowPassFilter(outputVolume.GetID())
+      pNode.SetParameter('obturatorCroppedAndSmooth',self.imagefiltered.GetID())
       self.thresholdObturator() 
 
   def medianFilterCompleted(self, node, event):
@@ -1174,7 +1281,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
 
   def thresholdObturator(self):
     pNode = self.parameterNode()
-   
+    inputImage = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('obturatorCroppedAndSmooth'))
     vl = slicer.modules.volumes.logic()
     roiSegmentation = vl.CreateLabelVolume(slicer.mrmlScene, self.imagefiltered, 'obturator_segmentation')
     # roiRange = outputVolume.GetImageData().GetScalarRange()
@@ -1185,7 +1292,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     roiSegmentation.GetDisplayNode().SetAndObserveColorNodeID(labelsColorNode)
     
     thresh = vtk.vtkImageThreshold()
-    thresh.SetInput(self.imagefiltered.GetImageData())
+    thresh.SetInput(inputImage.GetImageData())
     thresh.ThresholdBetween(0, self.thresholdFilteredOnImage.value)
     thresh.SetInValue(30)
     thresh.SetOutValue(0)
@@ -1206,7 +1313,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     islandsEffect.__del__()
     
     islandTool = EditorLib.IdentifyIslandsEffectLogic(sliceLogic)
-    parameterNode.SetParameter("IslandEffect,minimumSize",'100000')
+    parameterNode.SetParameter("IslandEffect,minimumSize",'1000')
     islandTool.removeIslands()
     self.__registrationStatus.setText('Threshold, island effect applied. Model Maker Running...')
     
@@ -1238,12 +1345,14 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       node = slicer.mrmlScene.GetNthNodeByClass( n, "vtkMRMLModelHierarchyNode" ) 
       if node.GetName() == "Obturator Segmentation Model": 
         segmentationModel = node
-        self.segmentationModelID = segmentationModel.GetID()         
+        self.segmentationModelID = segmentationModel.GetID()
+        pNode.SetParameter('obturatorSegmentedID',self.segmentationModelID)        
         break  
     if not segmentationModel: 
       segmentationModel = slicer.vtkMRMLModelHierarchyNode()  
       slicer.mrmlScene.AddNode( segmentationModel )
-      self.segmentationModelID = segmentationModel.GetID() 
+      self.segmentationModelID = segmentationModel.GetID()
+      pNode.SetParameter('obturatorSegmentedID',self.segmentationModelID)
     # if self.fullAutoRegOn == 1 :
       # slicer.mrmlScene.AddObserver(8193,self.startICP)  
       # print self.segmentationModelID
@@ -1277,7 +1386,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     y = (65.1951-42.9222)/2+42.9222
     z = 0
     pNode = self.parameterNode()
-    ### remove old nodes cropped volume and labelmap
+    #  remove old nodes cropped volume and labelmap
     roiVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
     roiSegmentationNode = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeSegmentationID'))
     if roiVolume != None:
@@ -1286,6 +1395,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       slicer.mrmlScene.RemoveNode(roiSegmentationNode)
       
     template = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('templateID'))
+    # volume = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+    # pNode.SetParameter('baselineVolumeID',volume.GetID())
     volume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
     
     # create ROI
@@ -1305,7 +1416,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     template.SetAndObserveTransformNodeID(t.GetID())
     bounds = [0,0,0,0,0,0]
     template.GetRASBounds(bounds)
-    roi.SetRadiusXYZ(abs(bounds[0]-bounds[1])/2,abs(bounds[2]-bounds[3])/2,abs(bounds[4]-bounds[5])/2)
+    roi.SetRadiusXYZ(abs(bounds[0]-bounds[1])/2,abs(bounds[2]-bounds[3])/2,abs(bounds[4]-bounds[5])/3)
+    roi.SetXYZ(0,0,abs(bounds[4]-bounds[5])/3)
     # move again template in previous position (after first registration)
     template.SetAndObserveTransformNodeID(transform.GetID())
     m.DeepCopy(M)
@@ -1323,7 +1435,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     cropVolumeNode.SetScene(slicer.mrmlScene)
     cropVolumeNode.SetName('obturator_CropVolume_node')
     cropVolumeNode.SetIsotropicResampling(True)
-    cropVolumeNode.SetSpacingScalingConst(0.5)
+    cropVolumeNode.SetSpacingScalingConst(2)
     slicer.mrmlScene.AddNode(cropVolumeNode)
     cropVolumeNode.SetInputVolumeNodeID(volume.GetID())
     cropVolumeNode.SetROINodeID(roi.GetID())
@@ -1349,7 +1461,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     Helper.SetLabelVolume(roiSegmentationNode.GetID())
     self.onThresholdChanged()
     
-    Helper.SetBgFgVolumes(pNode.GetParameter('BaselineVolumeID'),'')
+    Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
     
   def outputLowPassFilter(self, inputImageID):
 
@@ -1417,23 +1529,9 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     
     self.nbModelNodes = slicer.mrmlScene.GetNumberOfNodesByClass('vtkMRMLModelNode')
     self.applyModelMaker()
-    ###chrono start
+    # chrono start
     self.obturatorSegmentation()
     self.updatedNbModelNodes = 0
-
-    
-    # self.startICP()
-    
-    
-    # while queue.empty()!= True:
-      # #grabs host from queue
-      # host = queue.get()
-      # if host == 1:
-        # self.obturatorSegmentation()
-      # if host ==2:
-        # self.startICP()
-    
-    # queue.join()
     self.fullAutoRegOn = 1
     
   def RMS(self):
@@ -1508,8 +1606,290 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.result.setText(self.stringRMS)
 
   def chrono(self):
-    
-    ###reset chrono and  start
+    # reset chrono and  start
     self.t0 = time.clock()
 
-    
+  #-----------------------------------------------------------#
+  '''
+  DICOM functions
+  '''
+      
+  def onDatabaseChanged(self):
+    """Use this because to update the view in response to things
+    like database inserts.  Ideally the model would do this
+    directly based on signals from the SQLite database, but
+    that is not currently available.
+    https://bugreports.qt-project.org/browse/QTBUG-10775
+    """
+    self.dicomApp.suspendModel()
+    self.requestResumeModel()
+    self.requestUpdateRecentActivity()
+
+  def requestUpdateRecentActivity(self):
+    """This method serves to compress the requests for updating
+    the recent activity widget since it is time consuming and there can be
+    many of them coming in a rapid sequence when the 
+    database is active"""
+    if self.updateRecentActivityRequested:
+      return
+    self.updateRecentActivityRequested = True
+    qt.QTimer.singleShot(500, self.onUpateRecentActivityRequestTimeout)
+
+  def onUpateRecentActivityRequestTimeout(self):
+    self.recentActivity.update()
+    self.updateRecentActivityRequested = False
+
+  def requestResumeModel(self):
+    """This method serves to compress the requests for resuming
+    the dicom model since it is time consuming and there can be
+    many of them coming in a rapid sequence when the 
+    database is active"""
+    if self.resumeModelRequested:
+      return
+    self.resumeModelRequested = True
+    qt.QTimer.singleShot(500, self.onResumeModelRequestTimeout)
+
+  def onResumeModelRequestTimeout(self):
+    self.dicomApp.resumeModel()
+    self.resumeModelRequested = False
+
+  def onDatabaseDirectoryChanged(self,databaseDirectory):
+    if not hasattr(slicer, 'dicomDatabase') or not slicer.dicomDatabase:
+      slicer.dicomDatabase = ctk.ctkDICOMDatabase()
+      self.setDatabasePrecacheTags()
+    databaseFilepath = databaseDirectory + "/ctkDICOM.sql"
+    if not (os.access(databaseDirectory, os.W_OK) and os.access(databaseDirectory, os.R_OK)):
+      self.messageBox('The database file path "%s" cannot be opened.' % databaseFilepath)
+    else:
+      slicer.dicomDatabase.openDatabase(databaseDirectory + "/ctkDICOM.sql", "SLICER")
+      if not slicer.dicomDatabase.isOpen:
+        self.messageBox('The database file path "%s" cannot be opened.' % databaseFilepath)
+        self.dicomDatabase = None
+      else:
+        if self.dicomApp:
+          if self.dicomApp.databaseDirectory != databaseDirectory:
+            self.dicomApp.databaseDirectory = databaseDirectory
+        else:
+          settings = qt.QSettings()
+          settings.setValue('DatabaseDirectory', databaseDirectory)
+          settings.sync()
+    if slicer.dicomDatabase:
+      slicer.app.setDICOMDatabase(slicer.dicomDatabase)
+
+  def setDatabasePrecacheTags(self):
+    """query each plugin for tags that should be cached on import
+       and set them for the dicom app widget and slicer"""
+    tagsToPrecache = list(slicer.dicomDatabase.tagsToPrecache)
+    for pluginClass in slicer.modules.dicomPlugins:
+      plugin = slicer.modules.dicomPlugins[pluginClass]()
+      tagsToPrecache += plugin.tags.values()
+    tagsToPrecache = list(set(tagsToPrecache))  # remove duplicates
+    tagsToPrecache.sort()
+    if hasattr(slicer, 'dicomDatabase'):
+      slicer.dicomDatabase.tagsToPrecache = tagsToPrecache
+    if self.dicomApp:
+      self.dicomApp.tagsToPrecache = tagsToPrecache
+
+  def promptForDatabaseDirectory(self):
+    """Ask the user to pick a database directory.
+    But, if the application is in testing mode, just pick
+    a temp directory
+    """
+    commandOptions = slicer.app.commandOptions()
+    if commandOptions.testingEnabled:
+      databaseDirectory = slicer.app.temporaryPath + '/tempDICOMDatbase'
+      qt.QDir().mkpath(databaseDirectory)
+      self.onDatabaseDirectoryChanged(databaseDirectory)
+    else:
+      settings = qt.QSettings()
+      databaseDirectory = settings.value('DatabaseDirectory')
+      if databaseDirectory:
+        self.onDatabaseDirectoryChanged(databaseDirectory)
+      else:
+        fileDialog = ctk.ctkFileDialog(slicer.util.mainWindow())
+        fileDialog.setWindowModality(1)
+        fileDialog.setWindowTitle("Select DICOM Database Directory")
+        fileDialog.setFileMode(2) # prompt for directory
+        fileDialog.connect('fileSelected(QString)', self.onDatabaseDirectoryChanged)
+        label = qt.QLabel("<p><p>The Slicer DICOM module stores a local database with an index to all datasets that are <br>pushed to slicer, retrieved from remote dicom servers, or imported.<p>Please select a location for this database where you can store the amounts of data you require.<p>Be sure you have write access to the selected directory.", fileDialog)
+        fileDialog.setBottomWidget(label)
+        fileDialog.exec_()
+
+  def onTreeClicked(self,index):
+    self.model = index.model()
+    self.tree.setExpanded(index, not self.tree.expanded(index))
+    self.selection = index.sibling(index.row(), 0)
+    typeRole = self.selection.data(self.dicomModelTypeRole)
+    if typeRole > 0:
+      self.sendButton.enabled = True
+    else:
+      self.sendButton.enabled = False
+    if typeRole:
+      self.exportAction.enabled = self.dicomModelTypes[typeRole] == "Study"
+    else:
+      self.exportAction.enabled = False
+    self.detailsPopup.open()
+    uid = self.selection.data(self.dicomModelUIDRole)
+    role = self.dicomModelTypes[self.selection.data(self.dicomModelTypeRole)]
+    self.detailsPopup.offerLoadables(uid, role)
+
+  def onTreeContextMenuRequested(self,pos):
+    index = self.tree.indexAt(pos)
+    self.selection = index.sibling(index.row(), 0)
+    self.contextMenu.popup(self.tree.mapToGlobal(pos))
+
+  def onContextMenuTriggered(self,action):
+    if action == self.deleteAction:
+      typeRole = self.selection.data(self.dicomModelTypeRole)
+      role = self.dicomModelTypes[typeRole]
+      uid = self.selection.data(self.dicomModelUIDRole)
+      if self.okayCancel('This will remove references from the database\n(Files will not be deleted)\n\nDelete %s?' % role):
+        # TODO: add delete option to ctkDICOMDatabase
+        self.dicomApp.suspendModel()
+        if role == "Patient":
+          removeWorked = slicer.dicomDatabase.removePatient(uid)
+        elif role == "Study":
+          removeWorked = slicer.dicomDatabase.removeStudy(uid)
+        elif role == "Series":
+          removeWorked = slicer.dicomDatabase.removeSeries(uid)
+        if not removeWorked:
+          self.messageBox(self,"Could not remove %s" % role,title='DICOM')
+        self.dicomApp.resumeModel()
+    elif action == self.exportAction:
+      self.onExportClicked()
+
+  def onExportClicked(self):
+    """Associate a slicer volume as a series in the selected dicom study"""
+    uid = self.selection.data(self.dicomModelUIDRole)
+    exportDialog = DICOMLib.DICOMExportDialog(uid,onExportFinished=self.onExportFinished)
+    self.dicomApp.suspendModel()
+    exportDialog.open()
+
+  def onExportFinished(self):
+    self.requestResumeModel()
+
+  def onSendClicked(self):
+    """Perform a dicom store of slicer data to a peer"""
+    # TODO: this should migrate to ctk for a more complete implementation
+    # - just the basics for now
+    uid = self.selection.data(self.dicomModelUIDRole)
+    role = self.dicomModelTypes[self.selection.data(self.dicomModelTypeRole)]
+    studies = []
+    if role == "Patient":
+      studies = slicer.dicomDatabase.studiesForPatient(uid)
+    if role == "Study":
+      studies = [uid]
+    series = []
+    if role == "Series":
+      series = [uid]
+    else:
+      for study in studies:
+        series += slicer.dicomDatabase.seriesForStudy(study)
+    files = []
+    for serie in series:
+      files += slicer.dicomDatabase.filesForSeries(serie)
+    sendDialog = DICOMLib.DICOMSendDialog(files)
+    sendDialog.open()
+
+  def setBrowserPersistence(self,onOff):
+    self.detailsPopup.setModality(not onOff)
+    self.browserPersistent = onOff
+
+  def onToggleListener(self):
+    if hasattr(slicer, 'dicomListener'):
+      slicer.dicomListener.stop()
+      del slicer.dicomListener
+      self.toggleListener.text = "Start Listener"
+    else:
+      try:
+        slicer.dicomListener = DICOMLib.DICOMListener(database=slicer.dicomDatabase)
+        slicer.dicomListener.start()
+        self.onListenerStateChanged(slicer.dicomListener.process.state())
+        slicer.dicomListener.process.connect('stateChanged(QProcess::ProcessState)',self.onListenerStateChanged)
+        slicer.dicomListener.fileToBeAddedCallback = self.onListenerToAddFile
+        slicer.dicomListener.fileAddedCallback = self.onListenerAddedFile
+        self.toggleListener.text = "Stop Listener"
+      except UserWarning as message:
+        self.messageBox(self,"Could not start listener:\n %s" % message,title='DICOM')
+
+  def onListenerStateChanged(self,newState):
+    """ Called when the indexer process state changes
+    so we can provide feedback to the user
+    """
+    if newState == 0:
+      slicer.util.showStatusMessage("DICOM Listener not running")
+    if newState == 1:
+      slicer.util.showStatusMessage("DICOM Listener starting")
+    if newState == 2:
+      slicer.util.showStatusMessage("DICOM Listener running")
+
+  def onListenerToAddFile(self):
+    """ Called when the indexer is about to add a file to the database.
+    Works around issue where ctkDICOMModel has open queries that keep the
+    database locked.
+    """
+    self.dicomApp.suspendModel()
+
+  def onListenerAddedFile(self):
+    """Called after the listener has added a file.
+    Restore and refresh the app model
+    """
+    newFile = slicer.dicomListener.lastFileAdded
+    if newFile:
+      slicer.util.showStatusMessage("Loaded: %s" % newFile, 1000)
+    self.requestResumeModel()
+
+  def onToggleServer(self):
+    if self.testingServer and self.testingServer.qrRunning():
+      self.testingServer.stop()
+      self.toggleServer.text = "Start Testing Server"
+    else:
+      #
+      # create&configure the testingServer if needed, start the server, and populate it
+      #
+      if not self.testingServer:
+        # find the helper executables (only works on build trees
+        # with standard naming conventions)
+        self.exeDir = slicer.app.slicerHome 
+        if slicer.app.intDir:
+          self.exeDir = self.exeDir + '/' + slicer.app.intDir
+        self.exeDir = self.exeDir + '/../CTK-build/DCMTK-build'
+
+        # TODO: deal with Debug/RelWithDebInfo on windows
+
+        # set up temp dir
+        tmpDir = slicer.app.settings().value('Modules/TemporaryDirectory')
+        if not os.path.exists(tmpDir):
+          os.mkdir(tmpDir)
+        self.tmpDir = tmpDir + '/DICOM'
+        if not os.path.exists(self.tmpDir):
+          os.mkdir(self.tmpDir)
+        self.testingServer = DICOMLib.DICOMTestingQRServer(exeDir=self.exeDir,tmpDir=self.tmpDir)
+
+      # look for the sample data to load (only works on build trees
+      # with standard naming conventions)
+      self.dataDir =  slicer.app.slicerHome + '/../../Slicer4/Testing/Data/Input/CTHeadAxialDicom'
+      files = glob.glob(self.dataDir+'/*.dcm')
+
+      # now start the server
+      self.testingServer.start(verbose=self.verboseServer.checked,initialFiles=files)
+      self.toggleServer.text = "Stop Testing Server"
+
+  def onRunListenerAtStart(self):
+    settings = qt.QSettings()
+    settings.setValue('DICOM/RunListenerAtStart', self.runListenerAtStart.checked)
+
+  def messageBox(self,text,title='DICOM'):
+    self.mb = qt.QMessageBox(slicer.util.mainWindow())
+    self.mb.setWindowTitle(title)
+    self.mb.setText(text)
+    self.mb.setWindowModality(1)
+    self.mb.exec_()
+    return
+
+  def question(self,text,title='DICOM'):
+    return qt.QMessageBox.question(slicer.util.mainWindow(), title, text, 0x14000) == 0x4000
+
+  def okayCancel(self,text,title='DICOM'):
+    return qt.QMessageBox.question(slicer.util.mainWindow(), title, text, 0x400400) == 0x400
+        

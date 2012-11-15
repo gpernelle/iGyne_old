@@ -1,11 +1,17 @@
+from __future__ import division
 from __main__ import qt, ctk, slicer
+
 
 from iGyneStep import *
 from Helper import *
 from EditorLib import *
-import math,time, functools
-
+import math,time, functools, operator
+import DICOMLib, EditorLib
 import string
+import numpy
+import thread
+import random
+import copy
 
 '''
 TODO:
@@ -22,6 +28,13 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.__parent = super( iGyneNeedleSegmentationStep, self )
     self.analysisGroupBox = None
     self.buttonsGroupBox = None
+    self.round=1
+    self.row=0
+    self.table=None
+    self.view = None
+    self.previousValues=[[0,0,0]]
+    self.interactorObserverTags = []    
+    self.styleObserverTags = []
     self.option = {0:'Ba',
        1:'Bb',
        2:'Bc',
@@ -84,9 +97,40 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
        59:'Fe',
        60:'Ff',
        61:'Fg',
-       62:'Fh'}
-    
+       62:'Fh',
+       63:'--'}
 
+    # initialize the dicom infrastructure
+    settings = qt.QSettings()
+    # the dicom database is a global object for slicer
+    if settings.contains('DatabaseDirectory'):
+      databaseDirectory = settings.value('DatabaseDirectory')
+      if databaseDirectory: 
+        slicer.dicomDatabase = ctk.ctkDICOMDatabase()
+        slicer.dicomDatabase.openDatabase(databaseDirectory + "/ctkDICOM.sql", "SLICER")
+        # the dicom listener is also global, but only started on app start if 
+        # the user so chooses
+        if settings.contains('DICOM/RunListenerAtStart'):
+          if bool(settings.value('DICOM/RunListenerAtStart')):
+            if not hasattr(slicer, 'dicomListener'):
+              try:
+                slicer.dicomListener = DICOMLib.DICOMListener(slicer.dicomDatabase)
+                slicer.dicomListener.start()
+              except (UserWarning,OSError) as message:
+                # TODO: how to put this into the error log?
+                print ('Problem trying to start DICOMListener:\n %s' % message)
+    else:
+      slicer.dicomDatabase = None
+
+    # TODO: are these wrapped so we can avoid magic numbers?
+    self.dicomModelUIDRole = 32
+    self.dicomModelTypeRole = self.dicomModelUIDRole + 1
+    self.dicomModelTypes = ('Root', 'Patient', 'Study', 'Series', 'Image')
+
+    # state management for compressing events
+    self.resumeModelRequested = False
+    self.updateRecentActivityRequested = False
+    
   def createUserInterface( self ):
     '''
     '''
@@ -94,48 +138,156 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     pNode = self.parameterNode()
     self.__layout = self.__parent.createUserInterface()
     
+    #-------------------------------------------------------------
+    # DICOM ToolBox
+     # Listener 
+    settings = qt.QSettings()
+    self.toggleListener = qt.QPushButton()
+    if hasattr(slicer, 'dicomListener'):
+      self.toggleListener.text = "Stop Listener"
+      slicer.dicomListener.process.connect('stateChanged(int)',self.onListenerStateChanged)
+    else:
+      self.toggleListener.text = "Start Listener"
+    self.toggleListener.connect('clicked()', self.onToggleListener)
+    self.__DICOMFrame = ctk.ctkCollapsibleButton()
+    self.__DICOMFrame.text = "DICOM Input"
+    self.__DICOMFrame.collapsed = 1
+    dicomFrame = qt.QFormLayout(self.__DICOMFrame)
+    self.__layout.addRow(self.__DICOMFrame)
+    dicomFrame.addRow(self.toggleListener)
+    self.dicomApp = ctk.ctkDICOMAppWidget()
+    self.detailsPopup = DICOMLib.DICOMDetailsPopup(self.dicomApp,True)
+    self.exportButton = qt.QPushButton('Export Slicer Data to Study...')
+    self.loadButton = qt.QPushButton('Load to Slicer')
+    self.previewLabel = qt.QLabel()
+    self.tree = self.detailsPopup.tree
+    self.showBrowser = qt.QPushButton('Show DICOM Browser')
+    dicomFrame.addRow(self.showBrowser)
+    self.showBrowser.connect('clicked()', self.detailsPopup.open)
+
+    # the recent activity frame
+    self.recentActivity = DICOMLib.DICOMRecentActivityWidget(self.__DICOMFrame,detailsPopup=self.detailsPopup)
+    self.__DICOMFrame.layout().addWidget(self.recentActivity.widget)
+    self.requestUpdateRecentActivity()
+    
+    if not slicer.dicomDatabase:
+      self.promptForDatabaseDirectory()
+    else:
+      self.onDatabaseDirectoryChanged(self.dicomApp.databaseDirectory)
+    if hasattr(slicer, 'dicomListener'):
+      slicer.dicomListener.fileToBeAddedCallback = self.onListenerToAddFile
+      slicer.dicomListener.fileAddedCallback = self.onListenerAddedFile
+    
+    self.contextMenu = qt.QMenu(self.tree)
+    self.exportAction = qt.QAction("Export to Study", self.contextMenu)
+    self.contextMenu.addAction(self.exportAction)
+    self.exportAction.enabled = False
+    self.deleteAction = qt.QAction("Delete", self.contextMenu)
+    self.contextMenu.addAction(self.deleteAction)
+    self.contextMenu.connect('triggered(QAction*)', self.onContextMenuTriggered)
+    
+    self.dicomApp.connect('databaseDirectoryChanged(QString)', self.onDatabaseDirectoryChanged)
+    selectionModel = self.tree.selectionModel()
+    # TODO: can't use this because QList<QModelIndex> is not visible in PythonQt
+    #selectionModel.connect('selectionChanged(QItemSelection, QItemSelection)', self.onTreeSelectionChanged)
+    self.tree.connect('clicked(QModelIndex)', self.onTreeClicked)
+    self.tree.setContextMenuPolicy(3)
+    self.tree.connect('customContextMenuRequested(QPoint)', self.onTreeContextMenuRequested)
+
+    # enable to the Send button of the app widget and take it over
+    # for our purposes - TODO: fix this to enable it at the ctkDICOM level
+    self.sendButton = slicer.util.findChildren(self.dicomApp, text='Send')[0]
+    self.sendButton.enabled = False
+    self.sendButton.connect('clicked()', self.onSendClicked)
+
+    #-----------------------------------------------------------------------------
+    # segmentation report
+    self.analysisGroupBox = qt.QGroupBox()
+    self.analysisGroupBox.setFixedHeight(330)
+    self.analysisGroupBox.setTitle( 'Segmentation Report' )
+    self.__layout.addRow( self.analysisGroupBox )
+    self.analysisGroupBoxLayout = qt.QFormLayout( self.analysisGroupBox )    
+
+
+    #----------------------------------------------------------------------------
     #  editor widgetRepresentation
-    self.__editorFrame = ctk.ctkCollapsibleButton()
-    self.__editorFrame.text = "Editor"
-    self.__editorFrame.collapsed = 0
-    editorFrame = qt.QFormLayout(self.__editorFrame)
-    self.__layout.addRow(self.__editorFrame)
+    # editUtil = EditorLib.EditUtil.EditUtil()
+    # parameterNode = editUtil.getParameterNode()
+    # sliceLogic = editUtil.getSliceLogic()
+    # islandTool = EditorLib.IdentifyIslandsEffectLogic(sliceLogic)
+    # parameterNode.SetParameter("IslandEffect,minimumSize",'0')
+    # self.__editorFrame = ctk.ctkCollapsibleButton()
+    # self.__editorFrame.text = "Editor"
+    # self.__editorFrame.collapsed = 0
+    # editorFrame = qt.QFormLayout(self.__editorFrame)
+    # self.__layout.addRow(self.__editorFrame)
     
-    groupbox = qt.QGroupBox()
-    groupboxLayout  = qt.QFormLayout(groupbox)
-    groupboxLayout.addRow(slicer.modules.editor.widgetRepresentation())
-    editorFrame.addRow(groupbox)
+    # groupbox = qt.QGroupBox()
+    # groupboxLayout  = qt.QFormLayout(groupbox)
+    # groupboxLayout.addRow(slicer.modules.editor.widgetRepresentation())
+    # editorFrame.addRow(groupbox)
     
-    needleLabel = qt.QLabel( 'Needle Label:' )
-    self.__needleLabelSelector = slicer.qMRMLNodeComboBox()
-    self.__needleLabelSelector.toolTip = "Choose the needle-label image"
-    self.__needleLabelSelector.nodeTypes = ['vtkMRMLScalarVolumeNode']
-    self.__needleLabelSelector.addAttribute("vtkMRMLScalarVolumeNode", "LabelMap", "1")
-    self.__needleLabelSelector.setMRMLScene(slicer.mrmlScene)
-    self.__needleLabelSelector.addEnabled = 0
-    self.__needleLabelSelector.removeEnabled = 0
-    self.__needleLabelSelector.noneEnabled = 0
-    self.__layout.connect('mrmlSceneChanged(vtkMRMLScene*)',
-                        self.__needleLabelSelector, 'setMRMLScene(vtkMRMLScene*)')
+    #-----------------------------------------------------------------------------
+    # Volume and Label selection. For use with CLI module for straight needle detection
+    # needleLabel = qt.QLabel( 'Needle Label:' )
+    # self.__needleLabelSelector = slicer.qMRMLNodeComboBox()
+    # self.__needleLabelSelector.toolTip = "Choose the needle-label image"
+    # self.__needleLabelSelector.nodeTypes = ['vtkMRMLScalarVolumeNode']
+    # self.__needleLabelSelector.addAttribute("vtkMRMLScalarVolumeNode", "LabelMap", "1")
+    # self.__needleLabelSelector.setMRMLScene(slicer.mrmlScene)
+    # self.__needleLabelSelector.addEnabled = 0
+    # self.__needleLabelSelector.removeEnabled = 0
+    # self.__needleLabelSelector.noneEnabled = 0
+    # self.__layout.connect('mrmlSceneChanged(vtkMRMLScene*)',
+    #                     self.__needleLabelSelector, 'setMRMLScene(vtkMRMLScene*)')
     
-    self.__layout.addRow( needleLabel, self.__needleLabelSelector )
-    if Helper.getNodeByID(pNode.GetParameter("baselineVolumeID")) == None:
-      volumeLabel = qt.QLabel( 'Volume:' )
-      self.__volumeSelector = slicer.qMRMLNodeComboBox()
-      self.__volumeSelector.toolTip = "Choose the Volume"
-      self.__volumeSelector.nodeTypes = ['vtkMRMLScalarVolumeNode']
-      self.__volumeSelector.setMRMLScene(slicer.mrmlScene)
-      self.__volumeSelector.addEnabled = 0
-      self.__volumeSelector.removeEnabled = 0
-      self.__volumeSelector.noneEnabled = 0
-      self.__layout.addRow( volumeLabel, self.__volumeSelector )
-      self.__layout.connect('mrmlSceneChanged(vtkMRMLScene*)',
-                        self.__volumeSelector, 'setMRMLScene(vtkMRMLScene*)')
+    # self.__layout.addRow( needleLabel, self.__needleLabelSelector )
+    # if Helper.getNodeByID(pNode.GetParameter("baselineVolumeID")) == None:
+    #   volumeLabel = qt.QLabel( 'Volume:' )
+    #   self.__volumeSelector = slicer.qMRMLNodeComboBox()
+    #   self.__volumeSelector.toolTip = "Choose the Volume"
+    #   self.__volumeSelector.nodeTypes = ['vtkMRMLScalarVolumeNode']
+    #   self.__volumeSelector.setMRMLScene(slicer.mrmlScene)
+    #   self.__volumeSelector.addEnabled = 0
+    #   self.__volumeSelector.removeEnabled = 0
+    #   self.__volumeSelector.noneEnabled = 0
+    #   self.__layout.addRow( volumeLabel, self.__volumeSelector )
+    #   self.__layout.connect('mrmlSceneChanged(vtkMRMLScene*)',
+    #                     self.__volumeSelector, 'setMRMLScene(vtkMRMLScene*)')
+
+    #-----------------------------------------------------------------------------
+
+    # give needle tips
+    self.fiducialButton = qt.QPushButton('Start Giving Needle Tips')
+    self.fiducialButton.checkable = True
+    self.__layout.addRow(self.fiducialButton)
+    self.fiducialButton.connect('toggled(bool)', self.onRunButtonToggled)
+
+    # #Segment Needle Button 
+    # self.needleButton = qt.QPushButton('Segment Needles')
+    # self.__layout.addRow(self.needleButton)
+    # self.needleButton.connect('clicked()', self.needleSegmentation)
+    # self.needleButton.setEnabled(0)
 
     #Segment Needle Button 
-    self.needleButton = qt.QPushButton('Segment Needles')
-    self.__layout.addRow(self.needleButton)
-    self.needleButton.connect('clicked()', self.needleSegmentation)
+    self.needleButton2 = qt.QPushButton('Segment/Update Needles - Python')
+    self.__layout.addRow(self.needleButton2)
+    self.needleButton2.connect('clicked()', self.needleDetection)
+
+    #New insertion - create new round of needles with different colors
+    self.newInsertionButton = qt.QPushButton('New Insertion Needle')
+    self.__layout.addRow(self.newInsertionButton)
+    self.newInsertionButton.connect('clicked()', self.newInsertionNeedle)
+
+    #Delete Needles Button 
+    self.deleteNeedleButton = qt.QPushButton('Delete Segmented Needles')
+    self.__layout.addRow(self.deleteNeedleButton)
+    self.deleteNeedleButton.connect('clicked()', self.deleteSegmentedNeedle)
+
+    #Reset Needle Detection Button 
+    self.resetDetectionButton = qt.QPushButton('Reset Needle Detection')
+    self.__layout.addRow(self.resetDetectionButton)
+    self.resetDetectionButton.connect('clicked()', self.resetNeedleDetection)
     
     self.updateWidgetFromParameters(self.parameterNode())
       
@@ -146,142 +298,60 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     filterFrame = qt.QFormLayout(self.__filterFrame)
     
     # Filter spin box
-    self.filterValueButton = qt.QSpinBox()
-    self.filterValueButton.setMaximum(500)
-    fLabel = qt.QLabel("Max Deviation Value: ")
+    # self.filterValueButton = qt.QSpinBox()
+    # self.filterValueButton.setMaximum(500)
+    # fLabel = qt.QLabel("Max Deviation Value: ")
     
-    self.removeDuplicates = qt.QCheckBox('Remove duplicates by segmenting')
-    self.removeDuplicates.setChecked(1)
-    self.removeDuplicatesButton = qt.QPushButton('Remove duplicates')
-    self.removeDuplicatesButton.connect('clicked()', self.positionFilteringNeedles)
+    # self.removeDuplicates = qt.QCheckBox('Remove duplicates by segmenting')
+    # self.removeDuplicates.setChecked(1)
+    # self.removeDuplicatesButton = qt.QPushButton('Remove duplicates')
+    # self.removeDuplicatesButton.connect('clicked()', self.positionFilteringNeedles)
     
-    filterNeedlesButton = qt.QPushButton('Filter Needles')
-    filterNeedlesButton.connect('clicked()', self.angleFilteringNeedles)
+    # filterNeedlesButton = qt.QPushButton('Filter Needles')
+    # filterNeedlesButton.connect('clicked()', self.angleFilteringNeedles)
     
-    filterFrame.addRow(self.removeDuplicates)
-    filterFrame.addRow(self.removeDuplicatesButton)
+    # filterFrame.addRow(self.removeDuplicates)
+    # filterFrame.addRow(self.removeDuplicatesButton)
     
-    filterFrame.addRow(fLabel,self.filterValueButton)
-    filterFrame.addRow(filterNeedlesButton)
+    # filterFrame.addRow(fLabel,self.filterValueButton)
+    # filterFrame.addRow(filterNeedlesButton)
     
     self.displayFiducialButton = qt.QPushButton('Display Labels On Needles')
     self.displayFiducialButton.connect('clicked()',self.displayFiducial)
     # self.displayRadPlannedButton = qt.QPushButton('Hide Radiation On Planned Needles')
     # self.displayRadPlannedButton.checkable = True
     # self.displayRadPlannedButton.connect('clicked()',self.displayRadPlanned)
-    self.displayRadSegmentedButton = qt.QPushButton('Hide Radiation On Segmented Needles')
-    self.displayRadSegmentedButton.checkable = True
-    self.displayRadSegmentedButton.connect('clicked()',self.displayRadSegmented)
+    # self.displayRadSegmentedButton = qt.QPushButton('Hide Radiation On Segmented Needles')
+    # self.displayRadSegmentedButton.checkable = True
+    # self.displayRadSegmentedButton.connect('clicked()',self.displayRadSegmented)
     self.displayContourButton = qt.QPushButton('Draw Isosurfaces')
     self.displayContourButton.checkable = False
     self.displayContourButton.connect('clicked()',self.drawIsoSurfaces)
-    self.analysisReportButton = qt.QPushButton('Print Analysis')
-    self.analysisReportButton.connect('clicked()',self.analyzeSegmentation)
+    self.hideContourButton = qt.QPushButton('Hide Isosurfaces')
+    self.hideContourButton.checkable = True
+    self.hideContourButton.connect('clicked()',self.hideIsoSurfaces)
+    self.hideContourButton.setEnabled(0)
+    # self.analysisReportButton = qt.QPushButton('Print Analysis')
+    # self.analysisReportButton.connect('clicked()',self.analyzeSegmentation)
     
     
     self.__layout.addRow(self.displayFiducialButton)
     # self.__layout.addRow(self.displayRadPlannedButton)
     # self.__layout.addRow(self.displayRadSegmentedButton)
     self.__layout.addRow(self.displayContourButton)
-    self.__layout.addRow(self.analysisReportButton)
+    self.__layout.addRow(self.hideContourButton)
+    # self.__layout.addRow(self.analysisReportButton)
     
-    # self.dim = qt.QSpinBox()
-    # self.dim.setMinimum(-500)
-    # self.dim.setMaximum(500)
-    # dimLabel = qt.QLabel("Dimensions: ")
-    # self.__layout.addRow(dimLabel,self.dim)
-    # self.adist = qt.QSpinBox()
-    # self.adist.setMinimum(-50000)
-    # self.adist.setMaximum(50000)
-    # aLabel = qt.QLabel("Adjust Distance: ")
-    # self.__layout.addRow(aLabel,self.adist)
-    # self.maxdist = qt.QSpinBox()
-    # self.maxdist.setMinimum(-50000)
-    # self.maxdist.setMaximum(50000)
-    # mdistLabel = qt.QLabel("Maximum Distance: ")
-    # self.__layout.addRow(mdistLabel,self.maxdist)
-    # self.nb = qt.QSpinBox()
-    # self.nb.setMinimum(0)
-    # self.nb.setMaximum(50)
-    # nbLabel = qt.QLabel("Nb contours: ")
-    # self.__layout.addRow(nbLabel,self.nb)
-    # self.minRange = qt.QSpinBox()
-    # self.minRange.setMinimum(0)
-    # self.minRange.setMaximum(500)
-    
-    
-    # self.abonds = qt.QSpinBox()
-    # self.abonds.setMinimum(0)
-    # self.abonds.setMaximum(1)
-    # abondsLabel = qt.QLabel("Adjust Bonds: ")
-    # self.__layout.addRow(abondsLabel,self.abonds)
-    # self.cells = qt.QSpinBox()
-    # self.cells.setMinimum(0)
-    # self.cells.setMaximum(1)
-    # cellsLabel = qt.QLabel("Cell/Voxel: ")
-    # self.__layout.addRow(cellsLabel,self.cells)
-    
-    # self.contour = qt.QSpinBox()
-    # self.contour.setMinimum(0)
-    # self.contour.setMaximum(10)
-    # contourLabel = qt.QLabel("Contour: ")
-    # self.__layout.addRow(contourLabel,self.contour)
-    # self.contourValue = qt.QSpinBox()
-    # self.contourValue.setMinimum(0)
-    # self.contourValue.setMaximum(1000)
-    # contourValueLabel = qt.QLabel("Contour Value: ")
-    # self.__layout.addRow(contourValueLabel,self.contourValue)
-    # self.contour2 = qt.QSpinBox()
-    # self.contour2.setMinimum(0)
-    # self.contour2.setMaximum(10)
-    # contourLabel = qt.QLabel("Contour: ")
-    # self.__layout.addRow(contourLabel,self.contour2)
-    # self.contourValue2 = qt.QSpinBox()
-    # self.contourValue2.setMinimum(0)
-    # self.contourValue2.setMaximum(1000)
-    # contourValueLabel = qt.QLabel("Contour Value: ")
-    # self.__layout.addRow(contourValueLabel,self.contourValue2)
-    # self.contour3 = qt.QSpinBox()
-    # self.contour3.setMinimum(0)
-    # self.contour3.setMaximum(10)
-    # contourLabel = qt.QLabel("Contour: ")
-    # self.__layout.addRow(contourLabel,self.contour3)
-    # self.contourValue3 = qt.QSpinBox()
-    # self.contourValue3.setMinimum(0)
-    # self.contourValue3.setMaximum(1000)
-    # contourValueLabel = qt.QLabel("Contour Value: ")
-    # self.__layout.addRow(contourValueLabel,self.contourValue3)
-    # self.contour4 = qt.QSpinBox()
-    # self.contour4.setMinimum(0)
-    # self.contour4.setMaximum(10)
-    # contourLabel = qt.QLabel("Contour: ")
-    # self.__layout.addRow(contourLabel,self.contour4)
-    # self.contourValue4 = qt.QSpinBox()
-    # self.contourValue4.setMinimum(0)
-    # self.contourValue4.setMaximum(1000)
-    # contourValueLabel = qt.QLabel("Contour Value: ")
-    # self.__layout.addRow(contourValueLabel,self.contourValue4)
-    # self.contour5 = qt.QSpinBox()
-    # self.contour5.setMinimum(0)
-    # self.contour5.setMaximum(10)
-    # contourLabel = qt.QLabel("Contour: ")
-    # self.__layout.addRow(contourLabel,self.contour5)
-    # self.contourValue5 = qt.QSpinBox()
-    # self.contourValue5.setMinimum(0)
-    # self.contourValue5.setMaximum(1000)
-    # contourValueLabel = qt.QLabel("Contour Value: ")
-    # self.__layout.addRow(contourValueLabel,self.contourValue5)
-    
-    
+
     # Bending parameters
     self.__bendingFrame = ctk.ctkCollapsibleButton()
-    self.__bendingFrame.text = "Bending Needle Parameters"
+    self.__bendingFrame.text = "Needle Detection Parameters"
     self.__bendingFrame.collapsed = 1
     bendingFrame = qt.QFormLayout(self.__bendingFrame)
     
     # nb points per line spin box
     self.nbPointsPerLine = qt.QSpinBox()
-    self.nbPointsPerLine.setMaximum(2)
+    self.nbPointsPerLine.setMinimum(2)
     self.nbPointsPerLine.setMaximum(500)
     self.nbPointsPerLine.setValue(20)
     nbPointsPerLineLabel = qt.QLabel("Number of points per line: ")
@@ -289,35 +359,66 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     
     # nb radius iteration spin box
     self.nbRadiusIterations = qt.QSpinBox()
-    self.nbRadiusIterations.setMaximum(2)
+    self.nbRadiusIterations.setMinimum(2)
     self.nbRadiusIterations.setMaximum(50)
-    self.nbRadiusIterations.setValue(4)
+    self.nbRadiusIterations.setValue(20)
     nbRadiusIterationsLabel = qt.QLabel("Number of distance iterations: ")
     bendingFrame.addRow( nbRadiusIterationsLabel, self.nbRadiusIterations)
     
     # distance max spin box
     self.distanceMax = qt.QSpinBox()
-    self.distanceMax.setMaximum(0)
+    self.distanceMax.setMinimum(0)
     self.distanceMax.setMaximum(50)
     self.distanceMax.setValue(10)
-    distanceMaxLabel = qt.QLabel("Distance max. from straight line: ")
+    distanceMaxLabel = qt.QLabel("rMax: ")
     bendingFrame.addRow( distanceMaxLabel, self.distanceMax)
     
     # nb rotating iterations spin box
     self.nbRotatingIterations = qt.QSpinBox()
-    self.nbRotatingIterations.setMaximum(2)
+    self.nbRotatingIterations.setMinimum(2)
     self.nbRotatingIterations.setMaximum(500)
     self.nbRotatingIterations.setValue(15)
-    nbRotatingIterationsLabel = qt.QLabel("Number of rotating iterations: ")
+    nbRotatingIterationsLabel = qt.QLabel("Number of rotating steps: ")
     bendingFrame.addRow( nbRotatingIterationsLabel, self.nbRotatingIterations)
     
     # nb heights per needle spin box
     self.numberOfPointsPerNeedle = qt.QSpinBox()
-    self.numberOfPointsPerNeedle.setMaximum(1)
+    self.numberOfPointsPerNeedle.setMinimum(1)
     self.numberOfPointsPerNeedle.setMaximum(50)
-    self.numberOfPointsPerNeedle.setValue(3)
-    numberOfPointsPerNeedleLabel = qt.QLabel("Number of heights per line: ")
+    self.numberOfPointsPerNeedle.setValue(7)
+    numberOfPointsPerNeedleLabel = qt.QLabel("Number of Control Points: ")
     bendingFrame.addRow( numberOfPointsPerNeedleLabel, self.numberOfPointsPerNeedle)
+
+    # nb heights per needle spin box
+    self.stepsize = qt.QSpinBox()
+    self.stepsize.setMinimum(1)
+    self.stepsize.setMaximum(50)
+    self.stepsize.setValue(5)
+    stepsizeLabel = qt.QLabel("Stepsize: ")
+    bendingFrame.addRow( stepsizeLabel, self.stepsize)
+
+    #lenghtNeedle
+    self.lenghtNeedleParameter = qt.QSpinBox()
+    self.lenghtNeedleParameter.setMinimum(1)
+    self.lenghtNeedleParameter.setMaximum(200)
+    self.lenghtNeedleParameter.setValue(70)
+    stepsizeLabel = qt.QLabel("Lenght of the needles: ")
+    bendingFrame.addRow( stepsizeLabel, self.lenghtNeedleParameter)
+
+    # Compute gradient?
+    self.gradient=qt.QCheckBox('Compute gradient?')
+    self.gradient.setChecked(1)
+    bendingFrame.addRow(self.gradient)
+
+    # Filter ControlPoints?
+    self.filterControlPoints=qt.QCheckBox('Filter Control Points?')
+    self.filterControlPoints.setChecked(0)
+    bendingFrame.addRow(self.filterControlPoints)
+
+    # Draw Fiducial Points?
+    self.drawFiducialPoints=qt.QCheckBox('Draw Control Points?')
+    self.drawFiducialPoints.setChecked(0)
+    bendingFrame.addRow(self.drawFiducialPoints)
     
     self.__layout.addRow(self.__filterFrame)
     self.__layout.addRow(self.__bendingFrame)
@@ -337,10 +438,8 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.workflow().goBackward() # 2
     self.workflow().goBackward() # 1
     
-    
   def drawIsoSurfaces0( self ):
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
-       
     v= vtk.vtkAppendPolyData()
     
     for modelNode in modelNodes.values():
@@ -368,46 +467,52 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     contourFilter.SetValue(self.contour4.value,self.contourValue4.value)
     contourFilter.SetValue(self.contour5.value,self.contourValue5.value)
 
-    isoSurface = contourFilter.GetOutput()
-    
-    
+    isoSurface = contourFilter.GetOutput()   
     self.AddContour(isoSurface)  
  
   def drawIsoSurfaces( self ):
+    self.hideContourButton.setEnabled(1)
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
        
     v= vtk.vtkAppendPolyData()
-    
+    canContinue = 0
     for modelNode in modelNodes.values():
       if modelNode.GetAttribute("nth")!=None and modelNode.GetDisplayVisibility()==1 :
+        canContinue = 1
         v.AddInput(modelNode.GetPolyData())
        
-    modeller = vtk.vtkImplicitModeller()
-    modeller.SetInput(v.GetOutput())
-    modeller.SetSampleDimensions(80,80,80)
-    modeller.SetCapping(0)
-    modeller.AdjustBoundsOn()
-    modeller.SetProcessModeToPerVoxel() 
-    modeller.SetAdjustDistance(1)
-    modeller.SetMaximumDistance(1)    
-    
-    contourFilter = vtk.vtkContourFilter()
-    contourFilter.SetNumberOfContours(5)
-    contourFilter.SetInputConnection(modeller.GetOutputPort())    
-    contourFilter.ComputeNormalsOn()
-    contourFilter.ComputeScalarsOn()
-    contourFilter.UseScalarTreeOn()
-    contourFilter.SetValue(1,11)
-    contourFilter.SetValue(2,13)
-    contourFilter.SetValue(3,15)
-    contourFilter.SetValue(4,20)
-    contourFilter.SetValue(5,25)
-    isoSurface = contourFilter.GetOutput()
-    
-    
-    self.AddContour(isoSurface)
-
+    if canContinue ==1:
+      modeller = vtk.vtkImplicitModeller()
+      modeller.SetInput(v.GetOutput())
+      modeller.SetSampleDimensions(60,60,60)
+      modeller.SetCapping(0)
+      modeller.AdjustBoundsOn()
+      modeller.SetProcessModeToPerVoxel() 
+      modeller.SetAdjustDistance(1)
+      modeller.SetMaximumDistance(1.0)    
       
+      contourFilter = vtk.vtkContourFilter()
+      contourFilter.SetNumberOfContours(1)
+      contourFilter.SetInputConnection(modeller.GetOutputPort())    
+      contourFilter.ComputeNormalsOn()
+      contourFilter.ComputeScalarsOn()
+      contourFilter.UseScalarTreeOn()
+      contourFilter.SetValue(1,10)
+      # contourFilter.SetValue(2,13)
+      # contourFilter.SetValue(3,15)
+      # contourFilter.SetValue(4,20)
+      # contourFilter.SetValue(5,25)
+      isoSurface = contourFilter.GetOutput()
+
+      self.AddContour(isoSurface)
+
+  def hideIsoSurfaces(self):
+    contourNode = None
+    contourNode = slicer.util.getNode('Contours')
+    if contourNode != None:
+      contourNode.SetDisplayVisibility(abs(self.hideContourButton.isChecked()-1))
+      contourNode.GetModelDisplayNode().SetSliceIntersectionVisibility(abs(self.hideContourButton.isChecked()-1))
+
   def displayRadPlanned(self):
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
     for modelNode in modelNodes.values():
@@ -546,7 +651,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
             ijk[2] = int(round(o.GetElement(2,3)))
             pixelValue = imageData.GetScalarComponentAsDouble(ijk[0], ijk[1], ijk[2], 0)
             total += pixelValue
-          indice = total/float(nb-1)
+          indice = total/(nb-1)
 
           polyData = modelNode.GetPolyData()
           polyData.Update()
@@ -639,7 +744,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
             pixelValue = imageData.GetScalarComponentAsDouble(ijk[0], ijk[1], ijk[2], 0)
             total += pixelValue
         
-          indice = total/float(nb-1) 
+          indice = total/(nb-1) 
           polyData = modelNode.GetPolyData()
           polyData.Update()
           nb = polyData.GetNumberOfPoints()
@@ -686,8 +791,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         col += 1 
       
       self.analysisGroupBoxLayout.addRow(self.view)
-
-        
+      
   def angleDeviationEvaluation(self, modelNode):
     if self.transform !=None :
       # transformation matrix
@@ -747,9 +851,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
           self.angleDeviation = (phi1-phi)**2+(theta1-theta)**2+(psi1-psi)**2  
   
   def positionFilteringNeedles(self):
-    
     # remove "duplicates"
-    
     for i in xrange(63):
       if self.base[i] != [0,0,0]:
         for j in xrange(63):
@@ -1008,7 +1110,6 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         hlay.addWidget(buttonReformat)
         self.buttonsGroupBoxLayout.addRow(widget)
   
-
   def displayBentNeedle(self,i):
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
     for modelNode in modelNodes.values():
@@ -1023,7 +1124,6 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
           displayNode.SliceIntersectionVisibilityOn()
           displayNode.SetVisibility(1)
   
-   
   def displayNeedle(self,i):
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
     for modelNode in modelNodes.values():
@@ -1061,34 +1161,70 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         # if needleNode.GetDisplayVisibility()==0:
           # modelNode.SetDisplayVisibility(0)
           
+  def displayNeedleID(self,ID):
+    modelNode = slicer.util.getNode('vtkMRMLModelNode'+str(ID))
+    displayNode = modelNode.GetModelDisplayNode()
+    nVisibility = displayNode.GetVisibility()
+    # print nVisibility
+    if nVisibility:
+      displayNode.SliceIntersectionVisibilityOff()
+      displayNode.SetVisibility(0)
+    else:
+      displayNode.SliceIntersectionVisibilityOn()
+      displayNode.SetVisibility(1)
+
+  def reformatNeedleID(self,ID):
+    for i in range(2):  
+      modelNode = slicer.util.getNode('vtkMRMLModelNode'+str(ID))
+      polyData = modelNode.GetPolyData()
+      nb = polyData.GetNumberOfPoints()
+      base = [0,0,0]
+      tip = [0,0,0]
+      polyData.GetPoint(nb-1,tip)
+      polyData.GetPoint(0,base)
+      a,b,c = tip[0]-base[0],tip[1]-base[1],tip[2]-base[2]
+      
+      sYellow = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeYellow")
+      if sYellow ==None :
+        sYellow = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNode2")        
+      reformatLogic = slicer.vtkSlicerReformatLogic()
+      sYellow.SetSliceVisible(1)
+      reformatLogic.SetSliceNormal(sYellow,1,-a/b,0)
+      m= sYellow.GetSliceToRAS()
+      m.SetElement(0,3,base[0])
+      m.SetElement(1,3,base[1])
+      m.SetElement(2,3,base[2])
+      sYellow.Modified()
+
   def reformatNeedle(self,i):
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
-    for modelNode in modelNodes.values():
-      if modelNode.GetAttribute("nth")==str(i):
-        polyData = modelNode.GetPolyData()
-        nb = polyData.GetNumberOfPoints()
-        base = [0,0,0]
-        tip = [0,0,0]
-        polyData.GetPoint(nb-1,tip)
-        polyData.GetPoint(0,base)
-        phi = math.degrees(math.acos((tip[0]-base[0])/((tip[0]*-base[0])**2+(tip[1]*100-base[1]*100)**2)**0.5))
-        theta = math.degrees(math.acos((tip[1]-base[1])/((tip[1]-base[1])**2+(tip[2]-base[2])**2)**0.5))
-        psi = math.degrees(math.acos((tip[0]-base[0])/((tip[0]-base[0])**2+(tip[2]-base[2])**2)**0.5))
-        print base[0],tip[0],base[1],tip[1],base[2],tip[2]
-        a,b,c = tip[0]-base[0],tip[1]-base[1],tip[2]-base[2]
-        print '---------'
-        
-        sYellow = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeYellow")
-        if sYellow ==None :
-          sYellow = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNode2")        
-        reformatLogic = slicer.vtkSlicerReformatLogic()
-        sYellow.SetSliceVisible(1)
-        reformatLogic.SetSliceNormal(sYellow,1,-a/b,0)
-        m= sYellow.GetSliceToRAS()
-        m.SetElement(0,3,base[0])
-        m.SetElement(1,3,base[1])
-        m.SetElement(2,3,base[2])
-        sYellow.Modified()
+    for i in range(2):  # bug from slicer? need to do it 2 times
+      for modelNode in modelNodes.values():
+        if modelNode.GetAttribute("nth")==str(i):
+          polyData = modelNode.GetPolyData()
+          nb = polyData.GetNumberOfPoints()
+          base = [0,0,0]
+          tip = [0,0,0]
+          polyData.GetPoint(nb-1,tip)
+          polyData.GetPoint(0,base)
+          phi = math.degrees(math.acos((tip[0]-base[0])/((tip[0]*-base[0])**2+(tip[1]*100-base[1]*100)**2)**0.5))
+          theta = math.degrees(math.acos((tip[1]-base[1])/((tip[1]-base[1])**2+(tip[2]-base[2])**2)**0.5))
+          psi = math.degrees(math.acos((tip[0]-base[0])/((tip[0]-base[0])**2+(tip[2]-base[2])**2)**0.5))
+          print base[0],tip[0],base[1],tip[1],base[2],tip[2]
+          a,b,c = tip[0]-base[0],tip[1]-base[1],tip[2]-base[2]
+          print '---------'
+          
+          sYellow = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeYellow")
+          if sYellow ==None :
+            sYellow = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNode2")        
+          reformatLogic = slicer.vtkSlicerReformatLogic()
+          sYellow.SetSliceVisible(1)
+          reformatLogic.SetSliceNormal(sYellow,1,-a/b,0)
+          m= sYellow.GetSliceToRAS()
+          m.SetElement(0,3,base[0])
+          m.SetElement(1,3,base[1])
+          m.SetElement(2,3,base[2])
+          sYellow.Modified()
  
   def displayFiducial(self):
     
@@ -1152,6 +1288,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     '''
     super(iGyneNeedleSegmentationStep, self).onEntry(comingFrom, transitionType)
     pNode = self.parameterNode()
+    self.colorLabel()
     if pNode.GetParameter('skip') != '1':
       self.updateWidgetFromParameters(pNode)
       Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
@@ -1161,7 +1298,9 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       dObturator.SetVisibility(0)
       dTemplate = template.GetDisplayNode()
       dTemplate.SetVisibility(0)
+      self.colorLabel()
 
+    pNode.SetParameter('skip','0')  
     pNode.SetParameter('currentStep', self.stepid)
       
   def updateWidgetFromParameters(self, pNode):
@@ -1305,14 +1444,47 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       transformMatrix = transformNode.GetMatrixTransformToParent()
       for i in xrange(63):
         vtkmat = vtk.vtkMatrix4x4()
+        vtkmatOut = vtk.vtkMatrix4x4()
         vtkmat.SetElement(0,3,self.p[0][i])
         vtkmat.SetElement(1,3,self.p[1][i])
 
-        vtkmat.Multiply4x4(transformMatrix,vtkmat,vtkmat)
+        vtkmat.Multiply4x4(transformMatrix,vtkmat,vtkmatOut)
 
-        self.p[0][i] = vtkmat.GetElement(0,3)
-        self.p[1][i] = vtkmat.GetElement(1,3)
+        self.p[0][i] = vtkmatOut.GetElement(0,3)
+        self.p[1][i] = vtkmatOut.GetElement(1,3)
                  
+  def findLabelNeedleID(self,ID):
+    volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+    imageData = volumeNode.GetImageData()
+    imageDimensions = imageData.GetDimensions()
+    m = vtk.vtkMatrix4x4()
+    minZ=None
+    mindist=None
+    volumeNode.GetIJKToRASMatrix(m)
+    Z = m.GetElement(2,3)
+    needleNode = slicer.mrmlScene.GetNodeByID(ID)
+    polydata = needleNode.GetPolyData()
+    nb = polydata.GetNumberOfPoints()
+    for i in range(nb):
+      if 20*i<nb:
+        pt=[0,0,0]
+        polydata.GetPoint(20*i,pt)
+        if (pt[2]-Z)**2<minZ or minZ == None:
+          minZ = (pt[2]-Z)**2
+          bestNB = 20*i
+    self.setNeedleCoordinates()
+    print bestNB
+    A=[0,0,0]
+    polydata.GetPoint(bestNB,A)
+    for j in xrange(63):
+      delta = ((self.p[0][j]-(A[0]))**2+(self.p[1][j]-A[1])**2)**(0.5)
+      if delta < mindist or mindist == None:
+        bestmatch = j
+        mindist = delta
+        
+    result = [bestmatch,mindist]
+    return result
+
   def colorLabel(self):
     self.color= [[0,0,0] for i in range(310)]
     self.color255= [[0,0,0] for i in range(310)]    
@@ -1524,7 +1696,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     for i in range(310):
       for j in range(3):
         self.color255[i][j] = self.color[i][j]
-        self.color[i][j] = self.color[i][j]/float(255)
+        self.color[i][j] = self.color[i][j]/(255)
 
   def computerPolydataAndMatrix(self):
 
@@ -1713,7 +1885,6 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     modelNode.SetAndObserveDisplayNodeID(displayNode.GetID())
     if self.transform != None:
       modelNode.SetAndObserveTransformNodeID(self.transform.GetID())
-    self.colorLabel()
     displayNode.SetColor(self.color[i])
     displayNode.SetSliceIntersectionVisibility(0)
     pNode= self.parameterNode()
@@ -1723,29 +1894,26 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
   
   def AddContour(self,polyData):
     # print polyData
+    scene = slicer.mrmlScene
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
-    for modelNode in modelNodes.values():
-      if modelNode.GetAttribute('isocontours') == "1":
-        slicer.mrmlScene.RemoveNode(modelNode)        
+    contourNode = None
+    contourNode = slicer.util.getNode('Contours')
+    if contourNode != None:
+      slicer.mrmlScene.RemoveNode(contourNode.GetStorageNode())
+      contourNode.RemoveAllDisplayNodeIDs()
+      slicer.mrmlScene.RemoveNode(contourNode)        
   
     modelNode = slicer.vtkMRMLModelNode()
+    modelNode.SetScene(scene)
+    modelNode.SetAndObservePolyData(polyData)
+    # display node
     displayNode = slicer.vtkMRMLModelDisplayNode()
  
-    fileName = 'Contour'
-    # print("contour:",fileName)
-
-    mrmlScene = slicer.mrmlScene
-    modelNode.SetName(fileName)  
-    modelNode.SetAndObservePolyData(polyData)
-    modelNode.SetAttribute("isocontours","1")
-    modelNode.SetScene(mrmlScene)
-    displayNode.SetScene(mrmlScene)
+    modelNode.SetName('Contours')  
     
-    
-    mrmlScene.AddNode(displayNode)
-    mrmlScene.AddNode(modelNode)
-    modelNode.SetAndObserveDisplayNodeID(displayNode.GetID())
-    
+    scene.AddNode(displayNode)
+    scene.AddNode(modelNode)
+     
     displayNode.SetVisibility(1)
     displayNode.SetOpacity(0.06)
     displayNode.SetSliceIntersectionVisibility(1)
@@ -1754,43 +1922,567 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     displayNode.SetAndObserveColorNodeID('vtkMRMLColorTableNodeFileHotToColdRainbow2.txt')
     displayNode.SetScalarRange(10,40)
     displayNode.SetBackfaceCulling(0)
+    displayNode.SetScene(scene)
+    scene.AddNode(displayNode)
+    modelNode.SetAndObserveDisplayNodeID(displayNode.GetID())
+    # add to scene
+    displayNode.SetInputPolyData(modelNode.GetPolyData())
+    scene.AddNode(modelNode)
 
     pNode= self.parameterNode()
-    pNode.SetParameter(fileName,modelNode.GetID())
+    pNode.SetParameter('Contours',modelNode.GetID())
 
     qt.QApplication.processEvents()
 	
-    if int(slicer.app.repositoryRevision)>= 20973:
-      parameters = {}
-      parameters['nodeID'] = modelNode.GetID()
-      parameters['fileName'] = self.foldername+'/Isocontours.vtp'
-      slicer.app.coreIOManager().saveNodes('modelFile', parameters)
+    # if int(slicer.app.repositoryRevision)>= 20973:
+    #   parameters = {}
+    #   parameters['nodeID'] = modelNode.GetID()
+    #   parameters['fileName'] = self.foldername+'/Isocontours.vtp'
+    #   slicer.app.coreIOManager().saveNodes('modelFile', parameters)
+    # else:
+    #   storageNode = slicer.vtkMRMLModelStorageNode()
+    #   storageNode.SetScene(mrmlScene)
+    #   mrmlScene.AddNode(storageNode)
+    #   storageNode.SetFileName(self.foldername+'/Isocontours.vtp')
+    #   modelNode.SetAndObserveStorageNodeID(storageNode.GetID())
+    #   storageNode.WriteData(modelNode)
+	
+    # slicer.mrmlScene.RemoveNode(storageNode)
+    # modelNode.SetDisplayVisibility(0)
+    # slicer.mrmlScene.RemoveNode(modelNode)
+	
+    # contourModel = slicer.util.loadModel(self.foldername+'/Isocontours.vtp', True)
+    # if contourModel[0] == True and contourModel[1] != None:
+    #   contourModel[1].SetAttribute("isocontours","1")
+    #   displayNode = contourModel[1].GetDisplayNode()
+    #   displayNode.SetVisibility(1)
+    #   displayNode.SetSliceIntersectionVisibility(1)
+    #   displayNode.SetPolyData(modelNode.GetPolyData())
+    #   displayNode.SetActiveScalarName('ImageScalars')
+    #   displayNode.SetScalarRange(10,40)
+    #   displayNode.SetOpacity(0.06)
+    #   displayNode.SetAndObserveColorNodeID('vtkMRMLColorTableNodeFileHotToColdRainbow2.txt')
+    #   displayNode.SetBackfaceCulling(0)
+      
+  #-----------------------------------------------------------
+  # Needle Detection
+  def array2(self):
+    inputLabelID = self.__needleLabelSelector.currentNode().GetID()
+    labelnode=slicer.mrmlScene.GetNodeByID(inputLabelID)
+    i = labelnode.GetImageData()
+    shape = list(i.GetDimensions())
+    shape.reverse()
+    a = vtk.util.numpy_support.vtk_to_numpy(i.GetPointData().GetScalars()).reshape(shape)
+    labels=[]
+    val=[[0,0,0] for i in range(a.max()+1)]
+    for i in xrange(2,a.max()+1):
+      w =numpy.transpose(numpy.where(a==i))
+      # labels.append(w.mean(axis=0))
+      val[i]=[0,0,0]
+      val[i][0]=w[int(round(w.shape[0]/2))][2]
+      val[i][1]=w[int(round(w.shape[0]/2))][1]
+      val[i][2]=w[int(round(w.shape[0]/2))][0]
+      if val[i] not in self.previousValues:
+        labels.append(val[i])
+        self.previousValues.append(val[i])
+    return labels
+
+  def factorial(self,n):
+    '''factorial(n): return the factorial of the integer n.
+    factorial(0) = 1
+    factorial(n) with n<0 is -factorial(abs(n))
+    '''
+    result = 1
+    for i in xrange(1, abs(n)+1):
+     result *= i
+    if n >= 0:
+      return result
     else:
-      storageNode = slicer.vtkMRMLModelStorageNode()
-      storageNode.SetScene(mrmlScene)
-      mrmlScene.AddNode(storageNode)
-      storageNode.SetFileName(self.foldername+'/Isocontours.vtp')
-      modelNode.SetAndObserveStorageNodeID(storageNode.GetID())
-      storageNode.WriteData(modelNode)
-	
-    slicer.mrmlScene.RemoveNode(storageNode)
-    modelNode.SetDisplayVisibility(0)
-    slicer.mrmlScene.RemoveNode(modelNode)
-	
-    contourModel = slicer.util.loadModel(self.foldername+'/Isocontours.vtp', True)
-    if contourModel[0] == True and contourModel[1] != None:
-      contourModel[1].SetAttribute("isocontours","1")
-      displayNode = contourModel[1].GetDisplayNode()
-      displayNode.SetVisibility(1)
-      displayNode.SetSliceIntersectionVisibility(1)
-      displayNode.SetPolyData(modelNode.GetPolyData())
-      displayNode.SetActiveScalarName('ImageScalars')
-      displayNode.SetScalarRange(10,40)
-      displayNode.SetOpacity(0.06)
-      displayNode.SetAndObserveColorNodeID('vtkMRMLColorTableNodeFileHotToColdRainbow2.txt')
-      displayNode.SetBackfaceCulling(0)
+      return -result
+      
+  def binomial(self,n, k):
+    if not 0 <= k <= n:
+      return 0
+    if k == 0 or k == n:
+      return 1
+    # calculate n!/k! as one product, avoiding factors that 
+    # just get canceled
+    P = k+1
+    for i in xrange(k+2, n+1):
+      P *= i
+    # if you are paranoid:
+    # C, rem = divmod(P, factorial(n-k))
+    # assert rem == 0
+    # return C
+    return P//self.factorial(n-k)
+
+  def Fibonacci(self,n):
+    F=[0,1]
+    for i in range(1,n+1):
+      F.append(F[i-1]+F[i])
+    return F
+
+  def stepSize(self,k,l):
+    F = self.Fibonacci(l+1)
+    s =(sum(self.Fibonacci(k),-1)+F[k+1])/(sum(self.Fibonacci(l+1),-1))
+    return s
+
+  def ijk2ras(self,A):
+    m=vtk.vtkMatrix4x4()
+    volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+    volumeNode.GetIJKToRASMatrix(m)
+    imageData = volumeNode.GetImageData()
+    ras=[0,0,0]
+    k = vtk.vtkMatrix4x4()
+    o = vtk.vtkMatrix4x4()
+    k.SetElement(0,3,A[0])
+    k.SetElement(1,3,A[1])
+    k.SetElement(2,3,A[2])
+    k.Multiply4x4(m,k,o)
+    ras[0] = o.GetElement(0,3)
+    ras[1] = o.GetElement(1,3)
+    ras[2] = o.GetElement(2,3)
+    return ras
+
+  def ras2ijk(self,A):
+    m=vtk.vtkMatrix4x4()
+    volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+    volumeNode.GetIJKToRASMatrix(m)
+    m.Invert()
+    imageData = volumeNode.GetImageData()
+    ijk=[0,0,0]
+    k = vtk.vtkMatrix4x4()
+    o = vtk.vtkMatrix4x4()
+    k.SetElement(0,3,A[0])
+    k.SetElement(1,3,A[1])
+    k.SetElement(2,3,A[2])
+    k.Multiply4x4(m,k,o)
+    ijk[0] = o.GetElement(0,3)
+    ijk[1] = o.GetElement(1,3)
+    ijk[2] = o.GetElement(2,3)
+    return ijk
+  
+  def needleDetection(self):
+    # Apply Island Effect
+    editUtil = EditorLib.EditUtil.EditUtil()
+    parameterNode = editUtil.getParameterNode()
+    sliceLogic = editUtil.getSliceLogic()
+    lm = slicer.app.layoutManager()
+    sliceWidget = lm.sliceWidget('Red')
+    islandsEffect = EditorLib.IdentifyIslandsEffectOptions()
+    islandsEffect.setMRMLDefaults()
+    islandsEffect.__del__()
+    islandTool = EditorLib.IdentifyIslandsEffectLogic(sliceLogic)
+    parameterNode.SetParameter("IslandEffect,minimumSize",'0')
+    islandTool.removeIslands()
+    # select the image node from the Red slice viewer
+    m=vtk.vtkMatrix4x4()
+    volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+    volumeNode.GetIJKToRASMatrix(m)
+    imageData = volumeNode.GetImageData()
+    spacing = volumeNode.GetSpacing()
+    # chrono starts
+    self.t0 = time.clock()
+    # radius variation from 0 to rMax
+    label=self.array2()
+    for I in xrange(len(label)):
+      A=label[I]
+      colorVar = I/(len(label))
+      self.needleDetectionThread(A, imageData, colorVar,spacing)
+
+  def needleDetectionThread(self,A, imageData,colorVar,spacing):
+    ijk = [0,0,0]
+    bestPoint = [0,0,0]
+    lenghtNeedle = self.lenghtNeedleParameter.value/spacing[2]
+    ### initialisation of the parameters
+    tIter = self.nbPointsPerLine.value
+    rIter = self.nbRadiusIterations.value
+    rMax = self.distanceMax.value/spacing[0]
+    NbStepsNeedle = self.numberOfPointsPerNeedle.value-1
+    nbRotatingStep = self.nbRotatingIterations.value
+    dims=[0,0,0]
+    imageData.GetDimensions(dims)
+    pixelValue = numpy.zeros(shape=(dims[0],dims[1],dims[2]))
+    ### difference: evaluate difference in average intensity between to position : new one and old one (oldtotal)
+    difference = 0
+    oldtotal = 0
+    A0=A
+    controlPoints = []
+    controlPointsIJK = []
+    controlPoints.append(self.ijk2ras(A))
+    controlPointsIJK.append(A)
+    bestControlPoints = []
+    bestControlPoints.append(self.ijk2ras(A))
+    for step in range(0,NbStepsNeedle+2):
+      
+      if step==0:
+        C0 = [A[0],A[1],A[2]-3]
+        rMax =5
+        tIter=5
+        rIter=5
+      # elif step==NbStepsNeedle+1:
+      #   stepsize = 30
+      #   C0 = [2*A[0]-tip0[0],2*A[1]-tip0[1],A[2]-stepsize]
+      #   rMax = self.distanceMax.value
+      #   rIter = self.nbRadiusIterations.value
+      else:
+        stepsize = max(self.stepSize(step,NbStepsNeedle+1)*lenghtNeedle,self.stepsize.value/spacing[2])
+        C0 = [2*A[0]-tip0[0],2*A[1]-tip0[1],A[2]-stepsize]
+        rMax = max(stepsize,self.distanceMax.value/spacing[0])
+        rIter = max(int(stepsize/(2))+5,self.nbRadiusIterations.value)
+      
+      if step==NbStepsNeedle+1:
+        bestPoint = [(A[0]-A0[0])/(0.5*step)+A[0],(A[1]-A0[1])/(0.5*step)+A[1],(A[2]-A0[2])/(0.5*step)+A[2]]
+      else:
+      # if 1==1:
+        estimator = 0
+        minEstimator = 0  
+        for R in range(rIter+1):
+          r=rMax*(float(R)/rIter)
+          ### angle variation from 0 to 360
+          area=0
+          for thetaStep in xrange(nbRotatingStep ):
+            angleInDegree = float(thetaStep*360)/nbRotatingStep
+            theta = math.radians(angleInDegree)
+            ###
+            C = [C0[0]+r*(math.cos(theta)),C0[1]+r*(math.sin(theta)),C0[2]]
+            total = 0
+            M=[[0,0,0] for i in xrange(tIter+1)]
+            
+            if step==NbStepsNeedle+1:
+            # if 0==1:
+              M=[[0,0,0] for i in xrange(100+1)]
+              controlPointsAndLastPoint = copy.deepcopy(controlPointsIJK)
+              controlPointsAndLastPoint.insert(len(controlPointsIJK),C)
+              print controlPointsAndLastPoint
+              n = len(controlPointsAndLastPoint)
+
+              # calculates tIter = number of points per segment 
+              for t in range(100+1):
+                tt = t/tIter
+                # x,y,z coordinates
+                for i in range(3):
+                  for j in range(n):
+                    M[t][i]+=self.binomial(n,j)*(1-tt)**(n-j)*tt**j*controlPointsAndLastPoint[j][i]
+                  ijk[i]=M[t][i]
+                if ijk[0]<dims[0] and ijk[1]<dims[1] and ijk[2]<dims[2]:
+                  center=imageData.GetScalarComponentAsDouble(ijk[0], ijk[1], ijk[2], 0)
+                  total += center
+            else:
+              # calculates tIter = number of points per segment 
+              for t in xrange(tIter+1):
+                tt = t/(tIter)
+                # x,y,z coordinates
+                for i in range(3):
+                  M[t][i] = (1-tt)*A[i] + tt*C[i]
+                  ijk[i]=M[t][i]
+                
+                # first, test if points are in the image space 
+                if ijk[0]<dims[0] and ijk[0]>0 and  ijk[1]<dims[1] and ijk[1]>0 and ijk[2]<dims[2] and ijk[2]>0:
+                  center=imageData.GetScalarComponentAsDouble(ijk[0], ijk[1], ijk[2], 0)
+                  total += center
+                  if self.gradient.isChecked():
+                    total += center - imageData.GetScalarComponentAsDouble(ijk[0]+5, ijk[1], ijk[2], 0)/4
+                    total += center - imageData.GetScalarComponentAsDouble(ijk[0]-5, ijk[1], ijk[2], 0)/4
+                    total += center - imageData.GetScalarComponentAsDouble(ijk[0], ijk[1]+5, ijk[2], 0)/4
+                    total += center - imageData.GetScalarComponentAsDouble(ijk[0], ijk[1]-5, ijk[2], 0)/4
+                    total += center - imageData.GetScalarComponentAsDouble(ijk[0]+5, ijk[1]+5, ijk[2], 0)/4
+                    total += center - imageData.GetScalarComponentAsDouble(ijk[0]-5, ijk[1]-5, ijk[2], 0)/4
+                    total += center - imageData.GetScalarComponentAsDouble(ijk[0]-5, ijk[1]+5, ijk[2], 0)/4
+                    total += center - imageData.GetScalarComponentAsDouble(ijk[0]+5, ijk[1]-5, ijk[2], 0)/4
+                
+            if R==0:
+              initialIntensity = total
+              
+            if total != 0:     
+              estimator = total
+              if estimator<initialIntensity:
+                area+=1
+                
+              if estimator<minEstimator or minEstimator == 0:
+                minEstimator=estimator
+                if minEstimator!=0:  
+                  bestPoint=C
+                  
+      tip0=A 
+      A=bestPoint
+      print area
+      if area < 5:
+        bestControlPoints.append(self.ijk2ras(A))
+      controlPoints.append(self.ijk2ras(A))
+      controlPointsIJK.append(A)
+      
+      # Draw Fiducial points at the control points if the checkbox is checked
+      if self.drawFiducialPoints.isChecked():
+        fiducial = slicer.mrmlScene.CreateNodeByClass('vtkMRMLAnnotationFiducialNode')
+        fiducial.SetName(str(step)+"-"+str(area)) 
+        fiducial.Initialize(slicer.mrmlScene)
+        fiducial.SetFiducialCoordinates(controlPoints[step+1])
+    if len(bestControlPoints) >= 3 and self.filterControlPoints.isChecked():
+      self.addNeedleToScene(bestControlPoints,colorVar)
+    elif len(controlPoints) >= 2:
+      self.addNeedleToScene(controlPoints,colorVar)
+
+  def addNeedleToScene(self,controlPoint,colorVar): 
+    ### Create a line from list of point
+    # initialisation
+    print controlPoint
+    label=None
+    scene = slicer.mrmlScene
+    points = vtk.vtkPoints()
+    polyData = vtk.vtkPolyData()
+    polyData.SetPoints(points)
+    lines = vtk.vtkCellArray()
+    polyData.SetLines(lines)
+    linesIDArray = lines.GetData()
+    linesIDArray.Reset()
+    linesIDArray.InsertNextTuple1(0)
+    polygons = vtk.vtkCellArray()
+    polyData.SetPolys( polygons )
+    idArray = polygons.GetData()
+    idArray.Reset()
+    idArray.InsertNextTuple1(0)
+    nbEvaluationPoints=50
+    n = len(controlPoint)-1
+    Q=[[0,0,0] for t in range(nbEvaluationPoints+1)]
+    # start calculation
+    for t in range(nbEvaluationPoints):
+      tt = float(t)/(1*nbEvaluationPoints)
+      for j in range(3):
+        for i in range(n+1):
+          Q[t][j]+=self.binomial(n,i)*(1-tt)**(n-i)*tt**i*controlPoint[i][j]
+          
+      pointIndex = points.InsertNextPoint(*Q[t])
+      linesIDArray.InsertNextTuple1(pointIndex)
+      linesIDArray.SetTuple1( 0, linesIDArray.GetNumberOfTuples() - 1 )
+      lines.SetNumberOfCells(1)
+    ### Create model node
+    model = slicer.vtkMRMLModelNode()
+    model.SetScene(scene)
+    model.SetAndObservePolyData(polyData)
+    ### Create display node
+    modelDisplay = slicer.vtkMRMLModelDisplayNode()
+    if self.round==1: 
+      modelDisplay.SetColor(1,1-colorVar,colorVar) # yellow to magenta
+    elif self.round==2:
+      modelDisplay.SetColor(colorVar,1,1) # cyan
+    elif self.round==3:
+      modelDisplay.SetColor(1,0.5+colorVar/2,1) # 
+    elif self.round==4:
+      modelDisplay.SetColor(0.5+colorVar/2,1,0.5+colorVar/2) #
+    else:
+      modelDisplay.SetColor(random.randrange(0,10,1)/(10),random.randrange(0,10,1)/(10),random.randrange(0,10,1)/(10))
+
+    modelDisplay.SetScene(scene)
+    scene.AddNode(modelDisplay)
+    model.SetAndObserveDisplayNodeID(modelDisplay.GetID())
+    ### Add to scene
+    modelDisplay.SetInputPolyData(model.GetPolyData())
+    scene.AddNode(model)
+    ###Create Tube around the line
+    tube=vtk.vtkTubeFilter()
+    polyData = model.GetPolyData()
+    tube.SetInput(polyData)
+    tube.SetRadius(1)
+    tube.SetNumberOfSides(50)
+    tube.Update()
+    model.SetAndObservePolyData(tube.GetOutput())
+    model.GetDisplayNode().SliceIntersectionVisibilityOn()
+    model.SetName('python-catch-round_'+str(self.round)+'-ID-'+str(model.GetID()))
+    processingTime = time.clock()-self.t0
+    print processingTime
+    # if registration has been done, find the label for the needle
+    if self.transform!=None:
+      label = self.findLabelNeedleID(model.GetID())
+      modelDisplay.SetColor(self.color[label[0]][0],self.color[label[0]][1],self.color[label[0]][2])
+      model.SetAttribute("nth",str(label[0]))
+    else:
+      nth = model.GetID().strip('vtkMRMLModelNode')
+      modelDisplay.SetColor(self.color[int(nth)][0],self.color[int(nth)][1],self.color[int(nth)][2])
+      model.SetAttribute("nth",str(nth))
+
+    self.addSegmentedNeedleToTable(int(model.GetID().strip('vtkMRMLModelNode')),label)
+
+  def deleteSegmentedNeedle(self):
+    while slicer.util.getNodes('python-catch-round_'+str(self.round)) != {}:
+      nodes = slicer.util.getNodes('python-catch-round_'+str(self.round))
+      for node in nodes.values():
+        slicer.mrmlScene.RemoveNode(node)
+
+  def newInsertionNeedle(self):
+    messageBox = qt.QMessageBox.information( self, 'Information','You are creating a new set of needles')
+    self.round +=1
+    self.newInsertionButton.setText('Start a new set of needles - Round ' + str(self.round+1)+'?')
+    self.deleteNeedleButton.setText('Delete Needles from round ' + str(self.round))
+
+  def resetNeedleDetection(self):
+    ret = messageBox = qt.QMessageBox.question( self, 'Attention','''
+      Are you sure that you want to reset the needle detection? 
+      It will delete every segmented needles...
+      ''',qt.QMessageBox.Ok, qt.QMessageBox.Cancel)
+    if ret == qt.QMessageBox.Ok:
+      while slicer.util.getNodes('python-catch*') != {}:
+        nodes = slicer.util.getNodes('python-catch*')
+        for node in nodes.values():
+          slicer.mrmlScene.RemoveNode(node)
+      self.previousValues=[[0,0,0]]
+      self.round=1
+      self.newInsertionButton.setText('Start a new set of needles - Round ' + str(self.round+1)+'?')
+      self.deleteNeedleButton.setText('Delete Needles from round ' + str(self.round))
+      # reset report table
+      self.table =None
+      self.row=0
+      self.initTableView()
+
+  def start(self):    
+    self.removeObservers()
+    # get new slice nodes
+    layoutManager = slicer.app.layoutManager()
+    sliceNodeCount = slicer.mrmlScene.GetNumberOfNodesByClass('vtkMRMLSliceNode')
+    for nodeIndex in xrange(sliceNodeCount):
+      # find the widget for each node in scene
+      sliceNode = slicer.mrmlScene.GetNthNodeByClass(nodeIndex, 'vtkMRMLSliceNode')
+      sliceWidget = layoutManager.sliceWidget(sliceNode.GetLayoutName())      
+      if sliceWidget:     
+        # add obserservers and keep track of tags
+        style = sliceWidget.sliceView().interactorStyle()
+        self.sliceWidgetsPerStyle[style] = sliceWidget
+        events = ("LeftButtonPressEvent","LeftButtonReleaseEvent","MouseMoveEvent", "KeyPressEvent","KeyReleaseEvent","EnterEvent", "LeaveEvent")
+        for event in events:
+          tag = style.AddObserver(event, self.processEvent)   
+          self.styleObserverTags.append([style,tag])
+
+  def stop(self):
+    print("here")
+    self.removeObservers() 
+
+  def removeObservers(self):
+    # remove observers and reset
+    for observee,tag in self.styleObserverTags:
+      observee.RemoveObserver(tag)
+    self.styleObserverTags = []
+    self.sliceWidgetsPerStyle = {}
+
+  def processEvent(self,observee,event=None):
+    '''
+    get the mouse clicks and create a fiducial node at this position. Used later for the fiducial registration
+    '''
+    if self.sliceWidgetsPerStyle.has_key(observee) and event == "LeftButtonPressEvent":
+      if slicer.app.repositoryRevision<= 21022:
+        sliceWidget = self.sliceWidgetsPerStyle[observee]
+        style = sliceWidget.sliceView().interactorStyle()          
+        xy = style.GetInteractor().GetEventPosition()
+        xyz = sliceWidget.convertDeviceToXYZ(xy)
+        ras = sliceWidget.convertXYZToRAS(xyz)
+      else:
+        sliceWidget = self.sliceWidgetsPerStyle[observee]
+        sliceLogic = sliceWidget.sliceLogic()
+        sliceNode = sliceWidget.mrmlSliceNode()
+        interactor = observee.GetInteractor()
+        xy = interactor.GetEventPosition()
+        xyz = sliceWidget.sliceView().convertDeviceToXYZ(xy);
+        ras = sliceWidget.sliceView().convertXYZToRAS(xyz)
+      
+      colorVar = random.randrange(50,100,1)/(100)
+      volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+      imageData = volumeNode.GetImageData()
+      spacing = volumeNode.GetSpacing()
+      ijk=self.ras2ijk(ras)
+      self.t0=time.clock()
+      self.needleDetectionThread(ijk, imageData, colorVar,spacing)
+
+  def onRunButtonToggled(self, checked):
+    if checked:
+      self.start()
+      self.fiducialButton.text = "Stop Giving Tips"  
+    else:
+      self.stop()
+      self.fiducialButton.text = "Start Giving Needle Tips"  
+
+  #-----------------------------------------------------------
+  # Needle segmentation report
+  # model and view for stats table
+  def initTableView(self):
+    if self.table==None:
+      self.colorLabel()
+      self.keys = ("Label","Round" ,"Reliability")
+      self.labelStats = {}
+      self.labelStats['Labels'] = []
+      self.items = []
+      self.model = qt.QStandardItemModel()
+      self.model.setColumnCount(6)
+      self.model.setHeaderData(0,1,"")
+      self.model.setHeaderData(1,1,"Label")
+      self.model.setHeaderData(2,1,"R.")
+      self.model.setHeaderData(3,1,"Reliability")
+      self.model.setHeaderData(4,1,"Display")
+      self.model.setHeaderData(5,1,"Reformat")
+      if self.view == None:
+        self.view = qt.QTableView()
+        self.view.setMinimumHeight(300)
+        self.view.sortingEnabled = True
+        self.view.verticalHeader().visible = False
+      # col = 1
+      # for k in self.keys:
+      #   # self.view.setColumnWidth(col,15*len(k))
+      #   # self.model.setHeaderData(col,1,k)
+      #   col += 1 
+      self.view.setModel(self.model)
+      self.view.setColumnWidth(0,18)
+      self.view.setColumnWidth(1,58)
+      self.view.setColumnWidth(2,28)
+      self.table = 1
+
+  def addSegmentedNeedleToTable(self,ID,label=None):
+    
+    self.initTableView()
+    if label !=None:
+      ref = int(label[0])
+      needleLabel = self.option[ref]
+      reliability = label[1]
+    else:
+      needleLabel = str(ID)
+      ref = ID
+      reliability = '-'
+    # ref = int(modelNode.GetAttribute("nth"))
+    
+    self.labelStats["Labels"].append(ref)
+    self.labelStats[ref,"Label"] = needleLabel
+    self.labelStats[ref,"Round"] = str(self.round)
+    self.labelStats[ref,"Reliability"] = str(reliability) 
       
     
+    color = qt.QColor()
+    color.setRgb(self.color255[ref][0],self.color255[ref][1],self.color255[ref][2])
+    item = qt.QStandardItem()
+    item.setData(color,1)
+    self.model.setItem(self.row,0,item)
+    self.items.append(item)
+    col = 1
+    for k in self.keys:
+      item = qt.QStandardItem()
+      item.setText(self.labelStats[ref,k])
+      self.model.setItem(self.row,col,item)
+      self.items.append(item)
+      col += 1
+    displayButton = qt.QPushButton("Display")
+    displayButton.checked = True
+    displayButton.checkable = True
+    displayButton.connect("clicked()", lambda who=ID: self.displayNeedleID(who))
+    index = self.model.index(self.row,4)
+    self.view.setIndexWidget(index,displayButton)
+    reformatButton = qt.QPushButton("Reformat")
+    reformatButton.connect("clicked()", lambda who=ID: self.reformatNeedleID(who))
+    index2 = self.model.index(self.row,5)
+    self.view.setIndexWidget(index2,reformatButton)
+    self.row += 1  
+  
+    self.analysisGroupBoxLayout.addRow(self.view)
+
+
+  #-----------------------------------------------------------
+  # Radiation
+
   def AddRadiation(self,i,needleID):
     pass
     # needleNode = slicer.mrmlScene.GetNodeByID(needleID)
@@ -1867,5 +2559,291 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     # pNode= self.parameterNode()
     # pNode.SetParameter(fileName,modelNode.GetID())
     # mrmlScene.AddNode(modelNode)
+
+    #--------------------------------------------#
+  
+  #-----------------------------------------------------------
+  '''
+  DICOM functions
+  '''
+      
+  def onDatabaseChanged(self):
+    """Use this because to update the view in response to things
+    like database inserts.  Ideally the model would do this
+    directly based on signals from the SQLite database, but
+    that is not currently available.
+    https://bugreports.qt-project.org/browse/QTBUG-10775
+    """
+    self.dicomApp.suspendModel()
+    self.requestResumeModel()
+    self.requestUpdateRecentActivity()
+
+  def requestUpdateRecentActivity(self):
+    """This method serves to compress the requests for updating
+    the recent activity widget since it is time consuming and there can be
+    many of them coming in a rapid sequence when the 
+    database is active"""
+    if self.updateRecentActivityRequested:
+      return
+    self.updateRecentActivityRequested = True
+    qt.QTimer.singleShot(500, self.onUpateRecentActivityRequestTimeout)
+
+  def onUpateRecentActivityRequestTimeout(self):
+    self.recentActivity.update()
+    self.updateRecentActivityRequested = False
+
+  def requestResumeModel(self):
+    """This method serves to compress the requests for resuming
+    the dicom model since it is time consuming and there can be
+    many of them coming in a rapid sequence when the 
+    database is active"""
+    if self.resumeModelRequested:
+      return
+    self.resumeModelRequested = True
+    qt.QTimer.singleShot(500, self.onResumeModelRequestTimeout)
+
+  def onResumeModelRequestTimeout(self):
+    self.dicomApp.resumeModel()
+    self.resumeModelRequested = False
+
+  def onDatabaseDirectoryChanged(self,databaseDirectory):
+    if not hasattr(slicer, 'dicomDatabase') or not slicer.dicomDatabase:
+      slicer.dicomDatabase = ctk.ctkDICOMDatabase()
+      self.setDatabasePrecacheTags()
+    databaseFilepath = databaseDirectory + "/ctkDICOM.sql"
+    if not (os.access(databaseDirectory, os.W_OK) and os.access(databaseDirectory, os.R_OK)):
+      self.messageBox('The database file path "%s" cannot be opened.' % databaseFilepath)
+    else:
+      slicer.dicomDatabase.openDatabase(databaseDirectory + "/ctkDICOM.sql", "SLICER")
+      if not slicer.dicomDatabase.isOpen:
+        self.messageBox('The database file path "%s" cannot be opened.' % databaseFilepath)
+        self.dicomDatabase = None
+      else:
+        if self.dicomApp:
+          if self.dicomApp.databaseDirectory != databaseDirectory:
+            self.dicomApp.databaseDirectory = databaseDirectory
+        else:
+          settings = qt.QSettings()
+          settings.setValue('DatabaseDirectory', databaseDirectory)
+          settings.sync()
+    if slicer.dicomDatabase:
+      slicer.app.setDICOMDatabase(slicer.dicomDatabase)
+
+  def setDatabasePrecacheTags(self):
+    """query each plugin for tags that should be cached on import
+       and set them for the dicom app widget and slicer"""
+    tagsToPrecache = list(slicer.dicomDatabase.tagsToPrecache)
+    for pluginClass in slicer.modules.dicomPlugins:
+      plugin = slicer.modules.dicomPlugins[pluginClass]()
+      tagsToPrecache += plugin.tags.values()
+    tagsToPrecache = list(set(tagsToPrecache))  # remove duplicates
+    tagsToPrecache.sort()
+    if hasattr(slicer, 'dicomDatabase'):
+      slicer.dicomDatabase.tagsToPrecache = tagsToPrecache
+    if self.dicomApp:
+      self.dicomApp.tagsToPrecache = tagsToPrecache
+
+  def promptForDatabaseDirectory(self):
+    """Ask the user to pick a database directory.
+    But, if the application is in testing mode, just pick
+    a temp directory
+    """
+    commandOptions = slicer.app.commandOptions()
+    if commandOptions.testingEnabled:
+      databaseDirectory = slicer.app.temporaryPath + '/tempDICOMDatbase'
+      qt.QDir().mkpath(databaseDirectory)
+      self.onDatabaseDirectoryChanged(databaseDirectory)
+    else:
+      settings = qt.QSettings()
+      databaseDirectory = settings.value('DatabaseDirectory')
+      if databaseDirectory:
+        self.onDatabaseDirectoryChanged(databaseDirectory)
+      else:
+        fileDialog = ctk.ctkFileDialog(slicer.util.mainWindow())
+        fileDialog.setWindowModality(1)
+        fileDialog.setWindowTitle("Select DICOM Database Directory")
+        fileDialog.setFileMode(2) # prompt for directory
+        fileDialog.connect('fileSelected(QString)', self.onDatabaseDirectoryChanged)
+        label = qt.QLabel("<p><p>The Slicer DICOM module stores a local database with an index to all datasets that are <br>pushed to slicer, retrieved from remote dicom servers, or imported.<p>Please select a location for this database where you can store the amounts of data you require.<p>Be sure you have write access to the selected directory.", fileDialog)
+        fileDialog.setBottomWidget(label)
+        fileDialog.exec_()
+
+  def onTreeClicked(self,index):
+    self.model = index.model()
+    self.tree.setExpanded(index, not self.tree.expanded(index))
+    self.selection = index.sibling(index.row(), 0)
+    typeRole = self.selection.data(self.dicomModelTypeRole)
+    if typeRole > 0:
+      self.sendButton.enabled = True
+    else:
+      self.sendButton.enabled = False
+    if typeRole:
+      self.exportAction.enabled = self.dicomModelTypes[typeRole] == "Study"
+    else:
+      self.exportAction.enabled = False
+    self.detailsPopup.open()
+    uid = self.selection.data(self.dicomModelUIDRole)
+    role = self.dicomModelTypes[self.selection.data(self.dicomModelTypeRole)]
+    self.detailsPopup.offerLoadables(uid, role)
+
+  def onTreeContextMenuRequested(self,pos):
+    index = self.tree.indexAt(pos)
+    self.selection = index.sibling(index.row(), 0)
+    self.contextMenu.popup(self.tree.mapToGlobal(pos))
+
+  def onContextMenuTriggered(self,action):
+    if action == self.deleteAction:
+      typeRole = self.selection.data(self.dicomModelTypeRole)
+      role = self.dicomModelTypes[typeRole]
+      uid = self.selection.data(self.dicomModelUIDRole)
+      if self.okayCancel('This will remove references from the database\n(Files will not be deleted)\n\nDelete %s?' % role):
+        # TODO: add delete option to ctkDICOMDatabase
+        self.dicomApp.suspendModel()
+        if role == "Patient":
+          removeWorked = slicer.dicomDatabase.removePatient(uid)
+        elif role == "Study":
+          removeWorked = slicer.dicomDatabase.removeStudy(uid)
+        elif role == "Series":
+          removeWorked = slicer.dicomDatabase.removeSeries(uid)
+        if not removeWorked:
+          self.messageBox(self,"Could not remove %s" % role,title='DICOM')
+        self.dicomApp.resumeModel()
+    elif action == self.exportAction:
+      self.onExportClicked()
+
+  def onExportClicked(self):
+    """Associate a slicer volume as a series in the selected dicom study"""
+    uid = self.selection.data(self.dicomModelUIDRole)
+    exportDialog = DICOMLib.DICOMExportDialog(uid,onExportFinished=self.onExportFinished)
+    self.dicomApp.suspendModel()
+    exportDialog.open()
+
+  def onExportFinished(self):
+    self.requestResumeModel()
+
+  def onSendClicked(self):
+    """Perform a dicom store of slicer data to a peer"""
+    # TODO: this should migrate to ctk for a more complete implementation
+    # - just the basics for now
+    uid = self.selection.data(self.dicomModelUIDRole)
+    role = self.dicomModelTypes[self.selection.data(self.dicomModelTypeRole)]
+    studies = []
+    if role == "Patient":
+      studies = slicer.dicomDatabase.studiesForPatient(uid)
+    if role == "Study":
+      studies = [uid]
+    series = []
+    if role == "Series":
+      series = [uid]
+    else:
+      for study in studies:
+        series += slicer.dicomDatabase.seriesForStudy(study)
+    files = []
+    for serie in series:
+      files += slicer.dicomDatabase.filesForSeries(serie)
+    sendDialog = DICOMLib.DICOMSendDialog(files)
+    sendDialog.open()
+
+  def setBrowserPersistence(self,onOff):
+    self.detailsPopup.setModality(not onOff)
+    self.browserPersistent = onOff
+
+  def onToggleListener(self):
+    if hasattr(slicer, 'dicomListener'):
+      slicer.dicomListener.stop()
+      del slicer.dicomListener
+      self.toggleListener.text = "Start Listener"
+    else:
+      try:
+        slicer.dicomListener = DICOMLib.DICOMListener(database=slicer.dicomDatabase)
+        slicer.dicomListener.start()
+        self.onListenerStateChanged(slicer.dicomListener.process.state())
+        slicer.dicomListener.process.connect('stateChanged(QProcess::ProcessState)',self.onListenerStateChanged)
+        slicer.dicomListener.fileToBeAddedCallback = self.onListenerToAddFile
+        slicer.dicomListener.fileAddedCallback = self.onListenerAddedFile
+        self.toggleListener.text = "Stop Listener"
+      except UserWarning as message:
+        self.messageBox(self,"Could not start listener:\n %s" % message,title='DICOM')
+
+  def onListenerStateChanged(self,newState):
+    """ Called when the indexer process state changes
+    so we can provide feedback to the user
+    """
+    if newState == 0:
+      slicer.util.showStatusMessage("DICOM Listener not running")
+    if newState == 1:
+      slicer.util.showStatusMessage("DICOM Listener starting")
+    if newState == 2:
+      slicer.util.showStatusMessage("DICOM Listener running")
+
+  def onListenerToAddFile(self):
+    """ Called when the indexer is about to add a file to the database.
+    Works around issue where ctkDICOMModel has open queries that keep the
+    database locked.
+    """
+    self.dicomApp.suspendModel()
+
+  def onListenerAddedFile(self):
+    """Called after the listener has added a file.
+    Restore and refresh the app model
+    """
+    newFile = slicer.dicomListener.lastFileAdded
+    if newFile:
+      slicer.util.showStatusMessage("Loaded: %s" % newFile, 1000)
+    self.requestResumeModel()
+
+  def onToggleServer(self):
+    if self.testingServer and self.testingServer.qrRunning():
+      self.testingServer.stop()
+      self.toggleServer.text = "Start Testing Server"
+    else:
+      #
+      # create&configure the testingServer if needed, start the server, and populate it
+      #
+      if not self.testingServer:
+        # find the helper executables (only works on build trees
+        # with standard naming conventions)
+        self.exeDir = slicer.app.slicerHome 
+        if slicer.app.intDir:
+          self.exeDir = self.exeDir + '/' + slicer.app.intDir
+        self.exeDir = self.exeDir + '/../CTK-build/DCMTK-build'
+
+        # TODO: deal with Debug/RelWithDebInfo on windows
+
+        # set up temp dir
+        tmpDir = slicer.app.settings().value('Modules/TemporaryDirectory')
+        if not os.path.exists(tmpDir):
+          os.mkdir(tmpDir)
+        self.tmpDir = tmpDir + '/DICOM'
+        if not os.path.exists(self.tmpDir):
+          os.mkdir(self.tmpDir)
+        self.testingServer = DICOMLib.DICOMTestingQRServer(exeDir=self.exeDir,tmpDir=self.tmpDir)
+
+      # look for the sample data to load (only works on build trees
+      # with standard naming conventions)
+      self.dataDir =  slicer.app.slicerHome + '/../../Slicer4/Testing/Data/Input/CTHeadAxialDicom'
+      files = glob.glob(self.dataDir+'/*.dcm')
+
+      # now start the server
+      self.testingServer.start(verbose=self.verboseServer.checked,initialFiles=files)
+      self.toggleServer.text = "Stop Testing Server"
+
+  def onRunListenerAtStart(self):
+    settings = qt.QSettings()
+    settings.setValue('DICOM/RunListenerAtStart', self.runListenerAtStart.checked)
+
+  def messageBox(self,text,title='DICOM'):
+    self.mb = qt.QMessageBox(slicer.util.mainWindow())
+    self.mb.setWindowTitle(title)
+    self.mb.setText(text)
+    self.mb.setWindowModality(1)
+    self.mb.exec_()
+    return
+
+  def question(self,text,title='DICOM'):
+    return qt.QMessageBox.question(slicer.util.mainWindow(), title, text, 0x14000) == 0x4000
+
+  def okayCancel(self,text,title='DICOM'):
+    return qt.QMessageBox.question(slicer.util.mainWindow(), title, text, 0x400400) == 0x400
     
 
