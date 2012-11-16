@@ -62,7 +62,6 @@ class iGyneLoadModelStep( iGyneStep ) :
     self.__layout.connect('mrmlSceneChanged(vtkMRMLScene*)',
                         self.__baselineVolumeSelector, 'setMRMLScene(vtkMRMLScene*)')
 
-	
 	#Load Template Button 
     self.loadTemplateButton = qt.QPushButton('Load template')
     self.__layout.addRow(self.loadTemplateButton)
@@ -229,7 +228,7 @@ class iGyneLoadModelStep( iGyneStep ) :
   def updateWidgetFromParameters(self, parameterNode):
     baselineVolumeID = parameterNode.GetParameter('baselineVolumeID')
     if baselineVolumeID != None:
-      self.__baselineVolumeSelector.setCurrentNode(Helper.getNodeByID(baselineVolumeID))
+      self.__baselineVolumeSelector.setCurrentNode(slicer.mrmlScene.GetNodeByID(baselineVolumeID))
 
   def doStepProcessing(self):
 
@@ -237,8 +236,8 @@ class iGyneLoadModelStep( iGyneStep ) :
     # baseline volume
     pNode = self.parameterNode()
 
-    baselineVolume = Helper.getNodeByID(pNode.GetParameter('baselineVolumeID'))
-    template = Helper.getNodeByID(pNode.GetParameter('templateID'))
+    baselineVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
+    template = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('templateID'))
     #print pNode.GetParameter('templateID')
     #print template
    
@@ -246,7 +245,7 @@ class iGyneLoadModelStep( iGyneStep ) :
     roiTransformNode = None
     
     if roiTransformID != '':
-      roiTransformNode = Helper.getNodeByID(roiTransformID)
+      roiTransformNode = slicer.mrmlScene.GetNodeByID(roiTransformID)
     else:
       roiTransformNode = slicer.mrmlScene.CreateNodeByClass('vtkMRMLLinearTransformNode')
       slicer.mrmlScene.AddNode(roiTransformNode)
@@ -275,7 +274,7 @@ class iGyneLoadModelStep( iGyneStep ) :
         pathToScene = slicer.modules.igynepy.path.replace("iGynePy.py","iGynePyTemplate/Template/3points/Template.mrml")
       elif nb ==4:
         pathToScene = slicer.modules.igynepy.path.replace("iGynePy.py","iGynePyTemplate/Template/4points/Template.mrml")
-#      slicer.util.loadScene( pathToScene, True)
+      # slicer.util.loadScene( pathToScene, True)
       slicer.util.loadScene( pathToScene)
       self.loadTemplateButton.setEnabled(0)
       pNode.SetParameter("Template-loaded","1")

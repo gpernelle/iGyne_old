@@ -102,7 +102,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
   def createUserInterface( self ):
     '''
     The user interface is composed from:
-    - fully auto seg/reg button + restore initial regI
+    - DICOM frame
+    - fully auto seg/reg button + restore initial registration
     - frame with semi manual operations
     - frame with the embedded editor modules
     - frame with parameters for segmentation/registration
@@ -129,13 +130,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     dicomFrame = qt.QFormLayout(self.__DICOMFrame)
     self.__layout.addRow(self.__DICOMFrame)
 
-    # voiGroupBox = qt.QGroupBox()
-    # voiGroupBox.setTitle( 'DICOM' )
     dicomFrame.addRow(self.toggleListener)
-    # dicomFrame.addRow( voiGroupBox )
-    # voiGroupBoxLayout = qt.QFormLayout( voiGroupBox )
     self.dicomApp = ctk.ctkDICOMAppWidget()
-    #voiGroupBoxLayout.addRow( self.dicomApp )
     self.detailsPopup = DICOMLib.DICOMDetailsPopup(self.dicomApp,True)
     self.exportButton = qt.QPushButton('Export Slicer Data to Study...')
     self.loadButton = qt.QPushButton('Load to Slicer')
@@ -584,7 +580,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       #  Get the transformation matrix
       pNode=self.parameterNode()
       transformNodeID = pNode.GetParameter('followupTransformID')
-      self.transform = Helper.getNodeByID(transformNodeID)
+      self.transform = slicer.mrmlScene.GetNodeByID(transformNodeID)
       self.vtkMatInitial = self.transform.GetMatrixTransformToParent()
       
       #  Set a list of known points from template CAD Model
@@ -888,8 +884,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     pNode = self.parameterNode()
     range0 = self.__threshRange.minimumValue
     range1 = self.__threshRange.maximumValue
-    roiVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
-    roiSegmentationNode = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeSegmentationID'))
+    roiVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
+    roiSegmentationNode = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('croppedBaselineVolumeSegmentationID'))
 
     #  threshold segmentation. 
     if roiVolume!=None:
@@ -960,8 +956,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     pNode = self.parameterNode()
     range0 = self.__threshRange.minimumValue
     range1 = self.__threshRange.maximumValue
-    roiVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
-    self.__roiSegmentationNode = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeSegmentationID'))
+    roiVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
+    self.__roiSegmentationNode = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('croppedBaselineVolumeSegmentationID'))
     
     if roiVolume!=None:
       thresh = vtk.vtkImageThreshold()
@@ -1023,7 +1019,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     
   def updateWidgetFromParameters(self, pNode):
     transformNodeID = pNode.GetParameter('followupTransformID')
-    self.transform = Helper.getNodeByID(transformNodeID)
+    self.transform = slicer.mrmlScene.GetNodeByID(transformNodeID)
 
   def start(self):    
     self.removeObservers()
@@ -1387,8 +1383,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     z = 0
     pNode = self.parameterNode()
     #  remove old nodes cropped volume and labelmap
-    roiVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
-    roiSegmentationNode = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeSegmentationID'))
+    roiVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
+    roiSegmentationNode = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('croppedBaselineVolumeSegmentationID'))
     if roiVolume != None:
       slicer.mrmlScene.RemoveNode(roiVolume)
     if roiSegmentationNode != None:
@@ -1453,7 +1449,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     pNode.SetParameter('croppedBaselineVolumeSegmentationID', roiSegmentationNode.GetID())
     
     
-    baselineROIVolume = Helper.getNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
+    baselineROIVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('croppedBaselineVolumeID'))
     baselineROIRange = baselineROIVolume.GetImageData().GetScalarRange()
     
     labelsColorNode = slicer.modules.colors.logic().GetColorTableNodeID(10)

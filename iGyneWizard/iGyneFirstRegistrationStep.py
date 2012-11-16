@@ -92,8 +92,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     
     self.__layout.addRow(self.__houghFrame)
 
-    # reset module
-    
+    # reset module button 
     # resetButton = qt.QPushButton( 'Reset Module' )
     # resetButton.connect( 'clicked()', self.onResetButton )
     # self.__layout.addWidget( resetButton )

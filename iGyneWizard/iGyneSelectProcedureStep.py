@@ -25,6 +25,15 @@ class iGyneSelectProcedureStep( iGyneStep ) :
 
     self.__layout = self.__parent.createUserInterface()
     
+    self.templateButton = qt.QRadioButton("Template")
+    self.templateButton.setChecked(1)
+    self.noTemplateButton = qt.QRadioButton("No Template")  
+    self.__layout.addRow(self.templateButton)
+    self.__layout.addRow(self.noTemplateButton)
+    
+    #--------------------------------------------
+    # to be used in the future
+    
     # checkButton1 = qt.QCheckBox("EBRT")
     # radioButton2 = qt.QRadioButton("Brachy HDR Intracav")
     # radioButton3 = qt.QRadioButton("Brachy HDR Interstitial")
@@ -35,13 +44,6 @@ class iGyneSelectProcedureStep( iGyneStep ) :
     # self.__layout.addRow(radioButton3)
     # self.__layout.addRow(radioButton4)
     # self.__layout.addRow(radioButton5)
-    self.templateButton = qt.QRadioButton("Template")
-    self.templateButton.setChecked(1)
-    self.noTemplateButton = qt.QRadioButton("No Template")  
-    self.__layout.addRow(self.templateButton)
-    self.__layout.addRow(self.noTemplateButton)
-    
-
       
   def onEntry(self, comingFrom, transitionType):
 

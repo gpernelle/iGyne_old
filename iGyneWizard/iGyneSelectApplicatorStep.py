@@ -11,45 +11,40 @@ class iGyneSelectApplicatorStep( iGyneStep ) :
     self.setName( '2. Choose Applicator' )
     self.setDescription( 'Choose the applicator you are using. It will load the right template.' )
     self.__parent = super( iGyneSelectApplicatorStep, self )
-    self.checkBox1 = qt.QRadioButton('')
-    self.checkBox3 = qt.QRadioButton('')
-    self.ptcorners3 = qt.QRadioButton('')
-    # qt.QTimer.singleShot(0, self.killButton)
+    self.fourPointsCheckbox = qt.QRadioButton('')
+    self.threePointsCheckbox = qt.QRadioButton('')
+    self.threePointsCornersCheckbox = qt.QRadioButton('')
 
   def createUserInterface( self ):
   
     self.__layout = self.__parent.createUserInterface()
-    self.checkBox1 = qt.QRadioButton("Syed-Neblett Template and Obturator 4 points")
-    self.checkBox1.setChecked(1)
+
+    self.fourPointsCheckbox = qt.QRadioButton("Syed-Neblett Template and Obturator 4 points")
+    self.fourPointsCheckbox.setChecked(1)
     
-    # checkBox2 = qt.QCheckBox("Obturator")
-    # checkBox2.setEnabled(0)
-    self.checkBox3 = qt.QRadioButton("Syed-Neblett Template and Obturator 3 points")
-    self.checkBox3.setChecked(0)
+    self.threePointsCheckbox = qt.QRadioButton("Syed-Neblett Template and Obturator 3 points")
 
-    self.ptcorners3 = qt.QRadioButton("Syed-Neblett Template 3 points in corners")
+    self.threePointsCornersCheckbox = qt.QRadioButton("Syed-Neblett Template 3 points in corners")
 
-    # checkBox3 = qt.QCheckBox("Intrauterine Tandem")
-    # checkBox3.setCheckable(0)
-    checkBox4 = qt.QCheckBox("Intravaginal Ovoids")
-    # checkBox4.setCheckable(0)
-    checkBox5 = qt.QCheckBox("Seed marker")
-    # checkBox5.setCheckable(0)
-    checkBox6 = qt.QCheckBox("Rings")
-    # checkBox6.setCheckable(0)
-    checkBox7 = qt.QCheckBox("Utrecht")
-    # checkBox7.setCheckable(0)
-    checkBox8 = qt.QCheckBox("Wien")
-    # checkBox8.setCheckable(0)
-    self.__layout.addRow(self.checkBox1)
-    # self.__layout.addRow(checkBox2)
-    self.__layout.addRow(self.checkBox3)
-    self.__layout.addRow(self.ptcorners3)
-    self.__layout.addRow(checkBox4)
-    self.__layout.addRow(checkBox5)
-    self.__layout.addRow(checkBox6)
-    self.__layout.addRow(checkBox7)
-    self.__layout.addRow(checkBox8)
+    self.__layout.addRow(self.fourPointsCheckbox)
+    self.__layout.addRow(self.threePointsCheckbox)
+    self.__layout.addRow(self.threePointsCornersCheckbox)
+
+    #--------------------------------------------
+    # to be used in the future
+
+    # threePointsCheckbox = qt.QCheckBox("Intrauterine Tandem")
+    # checkBox4 = qt.QCheckBox("Intravaginal Ovoids")
+    # checkBox5 = qt.QCheckBox("Seed marker")
+    # checkBox6 = qt.QCheckBox("Rings")
+    # checkBox7 = qt.QCheckBox("Utrecht")
+    # checkBox8 = qt.QCheckBox("Wien")
+    
+    # self.__layout.addRow(checkBox4)
+    # self.__layout.addRow(checkBox5)
+    # self.__layout.addRow(checkBox6)
+    # self.__layout.addRow(checkBox7)
+    # self.__layout.addRow(checkBox8)
     # self.updateWidgetFromParameters(self.parameterNode())
     # qt.QTimer.singleShot(0, self.killButton)
 
@@ -66,12 +61,12 @@ class iGyneSelectApplicatorStep( iGyneStep ) :
   def onExit(self, goingTo, transitionType):
     pNode = self.parameterNode()
     if pNode.GetParameter('skip')!='1':
-      if self.checkBox1.isChecked():
+      if self.fourPointsCheckbox.isChecked():
         pNode.SetParameter('Template', "4points")
-      if self.checkBox3.isChecked():
+      if self.threePointsCheckbox.isChecked():
         pNode = self.parameterNode()
         pNode.SetParameter('Template', "3points") 
-      if self.ptcorners3.isChecked():
+      if self.threePointsCornersCheckbox.isChecked():
         pNode = self.parameterNode()
         pNode.SetParameter('Template', "3pointsCorners")       
     if goingTo.id() != 'SelectProcedure' and goingTo.id() != 'LoadModel':
@@ -81,6 +76,7 @@ class iGyneSelectApplicatorStep( iGyneStep ) :
 
   def validate( self, desiredBranchId ):
     '''
+    here, nothing to validate
     '''
     self.__parent.validate( desiredBranchId )    
     self.__parent.validationSucceeded(desiredBranchId)

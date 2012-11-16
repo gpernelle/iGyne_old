@@ -242,7 +242,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     #                     self.__needleLabelSelector, 'setMRMLScene(vtkMRMLScene*)')
     
     # self.__layout.addRow( needleLabel, self.__needleLabelSelector )
-    # if Helper.getNodeByID(pNode.GetParameter("baselineVolumeID")) == None:
+    # if slicer.mrmlScene.GetNodeByID(pNode.GetParameter("baselineVolumeID")) == None:
     #   volumeLabel = qt.QLabel( 'Volume:' )
     #   self.__volumeSelector = slicer.qMRMLNodeComboBox()
     #   self.__volumeSelector.toolTip = "Choose the Volume"
@@ -962,12 +962,12 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
   def needleSegmentation(self):
     scene = slicer.mrmlScene
     pNode = self.parameterNode()
-    if Helper.getNodeByID(pNode.GetParameter("baselineVolumeID")) == None:
+    if slicer.mrmlScene.GetNodeByID(pNode.GetParameter("baselineVolumeID")) == None:
       inputVolume = self.__volumeSelector.currentNode()
       inputVolumeID = self.__volumeSelector.currentNode().GetID()
     else:
-      inputVolume = Helper.getNodeByID(pNode.GetParameter("baselineVolumeID"))
-      inputVolumeID = Helper.getNodeByID(pNode.GetParameter("baselineVolumeID")).GetID()
+      inputVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter("baselineVolumeID"))
+      inputVolumeID = slicer.mrmlScene.GetNodeByID(pNode.GetParameter("baselineVolumeID")).GetID()
     inputLabelID = self.__needleLabelSelector.currentNode().GetID()
     
     datetime = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime())
@@ -1305,9 +1305,9 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       
   def updateWidgetFromParameters(self, pNode):
   
-    self.baselineVolume = Helper.getNodeByID(pNode.GetParameter('baselineVolumeID'))
+    self.baselineVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
     transformNodeID = pNode.GetParameter('followupTransformID')
-    self.transform = Helper.getNodeByID(transformNodeID)
+    self.transform = slicer.mrmlScene.GetNodeByID(transformNodeID)
     
   def setNeedleCoordinates(self):
     self.p = [[0 for j in range(63)] for j in range(3)]
@@ -1439,7 +1439,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.p[1][62]=12
     pNode = self.parameterNode()
     transformNodeID = pNode.GetParameter('followupTransformID')
-    transformNode = Helper.getNodeByID(transformNodeID)
+    transformNode = slicer.mrmlScene.GetNodeByID(transformNodeID)
     if transformNode != None:
       transformMatrix = transformNode.GetMatrixTransformToParent()
       for i in xrange(63):

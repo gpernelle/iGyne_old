@@ -1535,9 +1535,9 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
 
   def updateWidgetFromParameters(self, pNode):
   
-    baselineVolume = Helper.getNodeByID(pNode.GetParameter('baselineVolumeID'))
+    baselineVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
     transformNodeID = pNode.GetParameter('followupTransformID')
-    self.transform = Helper.getNodeByID(transformNodeID)
+    self.transform = slicer.mrmlScene.GetNodeByID(transformNodeID)
       
   def createSpinbox(self, popup, popupSpinbox):
 
@@ -1690,7 +1690,6 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     Cylinder.SetHeight( float(200.0) )
     Cylinder.SetRadius( float(1.0) )
     self.m_polyCylinder=Cylinder.GetOutput()
-    
     
     quad = vtk.vtkQuadric()
     quad.SetCoefficients(1,0.15,1,0,0,0,0,1,0,0)

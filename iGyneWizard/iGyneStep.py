@@ -6,9 +6,6 @@ class iGyneStep( ctk.ctkWorkflowWidgetStep ) :
   def __init__( self, stepid ):
     self.initialize( stepid )
     self.procedure = None
-#    self.__mrmlManager = None
-#    self.__logic = None
-#    self.__workflow = None
 
   def setWorkflow( self, workflow ):
     '''
