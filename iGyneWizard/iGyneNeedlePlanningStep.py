@@ -1472,7 +1472,8 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
       self.workflow().goForward() # 6  
 
   def updateWidgetFromParameters(self, pNode):
-  
+    pNode = self.parameterNode()
+    transformNodeID = pNode.GetParameter('followupTransformID')
     self.transform = slicer.mrmlScene.GetNodeByID(transformNodeID)
       
   def createSpinbox(self, popup, popupSpinbox):

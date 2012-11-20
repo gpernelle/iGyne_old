@@ -229,7 +229,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.__threshRange.singleStep = 1
     volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
     roiRange = volumeNode.GetImageData().GetScalarRange()
-    self.__threshRange.minimumValue = 15
+    self.__threshRange.minimumValue = 13
     self.__threshRange.maximum = 300
     self.__threshRange.maximumValue = 300
 
@@ -422,14 +422,14 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.xRoi = qt.QSpinBox()
     self.xRoi.setMinimum(0)
     self.xRoi.setMaximum(30)
-    self.xRoi.setValue(3)
+    self.xRoi.setValue(5)
     self.xRoi.toolTip = "x median"
     xRoiLabel = qt.QLabel('x median filter')
     SegGroupBoxLayout.addRow( xRoiLabel, self.xRoi)
     self.yRoi = qt.QSpinBox()
     self.yRoi.setMinimum(0)
     self.yRoi.setMaximum(30)
-    self.yRoi.setValue(8)
+    self.yRoi.setValue(5)
     self.yRoi.toolTip = "y median"
     yRoiLabel = qt.QLabel('y median filter value')
     SegGroupBoxLayout.addRow( yRoiLabel, self.yRoi)
@@ -1169,7 +1169,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
   def obturatorSegmentation(self):
     x=  (46.1749-23.8251)/2+23.8251
     y = (65.1951-42.9222)/2+42.9222
-    z = 150/2-110
+    z = 150/2-90
     pNode = self.parameterNode()
     # volume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
     # volume = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
