@@ -4,11 +4,11 @@ import iGyneWizard
 
 class iGynePy:
   def __init__( self, parent ):
-    parent.title = """iGynePy"""
-    parent.categories = ["""Wizards"""]
-    parent.contributors = ["""Xiaojun Chen""", """Yi Gao""", """Guillaume Pernelle""", """Tina Kapur""", """Jan Egger""", """Carolina Vale"""]
-    parent.helpText = """ Good Luck!""";
-    parent.acknowledgementText = """ Version : """ + 'iGyne v2.0.'
+    parent.title = "iGynePy"
+    parent.categories = ["Wizards"]
+    parent.contributors = ["Guillaume Pernelle", "Xiaojun Chen", "Yi Gao", "Tina Kapur", "Jan Egger", "Carolina Vale"]
+    parent.helpText = "https://github.com/gpernelle/iGynePy/wiki";
+    parent.acknowledgementText = " Version : " + "iGyne v2.0."
     self.parent = parent
 
 class iGynePyWidget:
