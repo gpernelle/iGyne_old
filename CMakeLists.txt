@@ -21,7 +21,9 @@ if(NOT Slicer_SOURCE_DIR)
 endif()
 
 #-----------------------------------------------------------------------------
-ADD_SUBDIRECTORY(iGyneWizard)
+add_subdirectory(iGyneWizard)
+
+file(COPY ${CMAKE_SOURCE_DIR}/Resources DESTINATION ${Slicer_QTSCRIPTEDMODULES_LIB_DIR}) 
 
 set(MODULE_PYTHON_SCRIPTS
   iGynePy.py)
@@ -29,10 +31,10 @@ set(MODULE_PYTHON_SCRIPTS
 set(MODULE_PYTHON_RESOURCES
   )
 
-add_custom_command(TARGET MyTest POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_SOURCE_DIR}/iGynePyTemplate"
-        ${Slicer_DIR}/lib/qt-scripted)
+#add_custom_command(TARGET MyTest POST_BUILD
+ #   COMMAND ${CMAKE_COMMAND} -E copy_directory
+  #      "${CMAKE_SOURCE_DIR}/iGynePyTemplate"
+   #     ${Slicer_DIR}/lib/qt-scripted)
 
 #-----------------------------------------------------------------------------
 # Build
@@ -41,17 +43,17 @@ ctkMacroCompilePythonScript(
   TARGET_NAME iGynePy
   SCRIPTS "${MODULE_PYTHON_SCRIPTS}"
   RESOURCES "${MODULE_PYTHON_RESOURCES}"
-  DESTINATION_DIR ${Slicer_DIR}/${Slicer_QTSCRIPTEDMODULES_LIB_DIR}
-  INSTALL_DIR ${Slicer_INSTALL_QTSCRIPTEDMODULES_LIB_DIR}
+  DESTINATION_DIR ${CMAKE_BINARY_DIR}/${Slicer_QTSCRIPTEDMODULES_LIB_DIR}
+  INSTALL_DIR ${Slicer_INSTALL_QTSCRIPTEDMODULES_LIB_DIR}  NO_INSTALL_SUBDIR
   NO_INSTALL_SUBDIR
   )
 
 #-----------------------------------------------------------------------------
 # Testing
 #-----------------------------------------------------------------------------
-if(BUILD_TESTING)
-  add_subdirectory(Testing)
-endif()
+#if(BUILD_TESTING)
+# add_subdirectory(Testing)
+#endif()
 
 #-----------------------------------------------------------------------------
 # Packaging

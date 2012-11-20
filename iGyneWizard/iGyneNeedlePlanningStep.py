@@ -49,7 +49,7 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
       sizePolicy.setHeightForWidth(self.label.sizePolicy.hasHeightForWidth())
       self.label.setSizePolicy(sizePolicy)
       self.label.setText((""))
-      pathToImage = slicer.modules.igynepy.path.replace("iGynePy.py","iGynePyTemplate/Template/TemplateSheet.png")
+      pathToImage = slicer.modules.igynepy.path.replace("iGynePy.py","Resources/Template/TemplateSheet.png")
       self.label.setPixmap(qt.QPixmap(pathToImage))
       self.label.setObjectName("label")
       self.CqColorPushButton = qt.QPushButton(TemplateSheetWidget)

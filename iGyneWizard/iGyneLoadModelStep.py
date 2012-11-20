@@ -271,9 +271,9 @@ class iGyneLoadModelStep( iGyneStep ) :
     alreadyloaded = pNode.GetParameter("Template-loaded")
     if alreadyloaded != "1":
       if nb == 3:
-        pathToScene = slicer.modules.igynepy.path.replace("iGynePy.py","iGynePyTemplate/Template/3points/Template.mrml")
+        pathToScene = slicer.modules.igynepy.path.replace("iGynePy.py","Resources/Template/3points/Template.mrml")
       elif nb ==4:
-        pathToScene = slicer.modules.igynepy.path.replace("iGynePy.py","iGynePyTemplate/Template/4points/Template.mrml")
+        pathToScene = slicer.modules.igynepy.path.replace("iGynePy.py","Resources/Template/4points/Template.mrml")
       # slicer.util.loadScene( pathToScene, True)
       slicer.util.loadScene( pathToScene)
       self.loadTemplateButton.setEnabled(0)
