@@ -297,7 +297,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.nbRadiusIterations = qt.QSpinBox()
     self.nbRadiusIterations.setMinimum(2)
     self.nbRadiusIterations.setMaximum(50)
-    self.nbRadiusIterations.setValue(20)
+    self.nbRadiusIterations.setValue(13)
     nbRadiusIterationsLabel = qt.QLabel("Number of distance iterations: ")
     bendingFrame.addRow( nbRadiusIterationsLabel, self.nbRadiusIterations)
     
@@ -305,7 +305,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.distanceMax = qt.QSpinBox()
     self.distanceMax.setMinimum(0)
     self.distanceMax.setMaximum(50)
-    self.distanceMax.setValue(10)
+    self.distanceMax.setValue(5)
     distanceMaxLabel = qt.QLabel("rMax: ")
     bendingFrame.addRow( distanceMaxLabel, self.distanceMax)
     
