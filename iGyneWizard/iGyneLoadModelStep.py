@@ -248,8 +248,6 @@ class iGyneLoadModelStep( iGyneStep ) :
 
     baselineVolume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
     template = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('templateID'))
-    #print pNode.GetParameter('templateID')
-    #print template
    
     roiTransformID = pNode.GetParameter('roiTransformID')
     roiTransformNode = None
