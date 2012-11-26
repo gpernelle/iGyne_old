@@ -48,7 +48,7 @@ class iGyneLoadModelStep( iGyneStep ) :
 
   def createUserInterface( self ):
     self.__layout = self.__parent.createUserInterface()
-   
+
     baselineScanLabel = qt.QLabel( 'CT or MR scan:' )
     self.__baselineVolumeSelector = slicer.qMRMLNodeComboBox()
     self.__baselineVolumeSelector.objectName = 'baselineVolumeSelector'
@@ -62,12 +62,12 @@ class iGyneLoadModelStep( iGyneStep ) :
     self.__layout.connect('mrmlSceneChanged(vtkMRMLScene*)',
                         self.__baselineVolumeSelector, 'setMRMLScene(vtkMRMLScene*)')
 
-	#Load Template Button 
+	  #Load Template Button 
     self.loadTemplateButton = qt.QPushButton('Load template')
     self.__layout.addRow(self.loadTemplateButton)
     self.loadTemplateButton.connect('clicked()', self.loadTemplate)
 
-	#Load Scan Button
+	  #Load Scan Button
     self.__fileFrame = ctk.ctkCollapsibleButton()
     self.__fileFrame.text = "NRRD File Input"
     self.__fileFrame.collapsed = 1
@@ -78,6 +78,16 @@ class iGyneLoadModelStep( iGyneStep ) :
     loadDataButton.connect('clicked()', self.loadData)
     fileFrame.addRow(loadDataButton)
 
+    # Sample Data Button
+    sampleDATA = qt.QPushButton('Download Sample Data')
+    sampleDATA.connect('clicked()',self.downloadPhantom)
+    fileFrame.addRow(sampleDATA)
+    
+    # Sample Data Status
+    self.log = qt.QTextEdit()
+    self.log.readOnly = True
+    self.__fileFrame.layout().addRow(self.log)
+    self.logMessage('<p>Status: <i>Idle</i>\n')
     
     # DICOM ToolBox
     
@@ -278,6 +288,65 @@ class iGyneLoadModelStep( iGyneStep ) :
       slicer.util.loadScene( pathToScene)
       self.loadTemplateButton.setEnabled(0)
       pNode.SetParameter("Template-loaded","1")
+
+  #------------------------------------------------------------------------------------
+  '''Download Sample Data'''
+  #------------------------------------------------------------------------------------
+  def logMessage(self,message):
+    self.log.insertHtml(message)
+    self.log.insertPlainText('\n')
+    self.log.ensureCursorVisible()
+    self.log.repaint()
+    slicer.app.processEvents(qt.QEventLoop.ExcludeUserInputEvents)
+
+  def downloadPhantom(self):
+    filePath = self.downloadFileIntoCache('http://slicer.kitware.com/midas3/download?items=11319', 'phantomGYN.nrrd')
+    return self.loadVolume(filePath, 'phantomGYN')
+
+  def downloadFileIntoCache(self, uri, name):
+    destFolderPath = slicer.mrmlScene.GetCacheManager().GetRemoteCacheDirectory()
+    return self.downloadFile(uri, destFolderPath, name)
+
+  def humanFormatSize(self,size):
+    """ from http://stackoverflow.com/questions/1094841/reusable-library-to-get-human-readable-version-of-file-size"""
+    for x in ['bytes','KB','MB','GB']:
+      if size < 1024.0 and size > -1024.0:
+        return "%3.1f%s" % (size, x)
+      size /= 1024.0
+    return "%3.1f%s" % (size, 'TB')
+
+  def reportHook(self,blocksSoFar,blockSize,totalSize):
+    percent = int((100. * blocksSoFar * blockSize) / totalSize)
+    if percent == 100 or (percent - self.downloadPercent >= 10):
+      humanSizeSoFar = self.humanFormatSize(blocksSoFar * blockSize)
+      humanSizeTotal = self.humanFormatSize(totalSize)
+      self.logMessage('<i>Downloaded %s (%d%% of %s)...</i>' % (humanSizeSoFar, percent, humanSizeTotal))
+      self.downloadPercent = percent
+
+  def downloadFile(self, uri, destFolderPath, name):
+    filePath = destFolderPath + '/' + name
+    if not os.path.exists(filePath) or os.stat(filePath).st_size == 0:
+      import urllib
+      self.logMessage('<b>Requesting download</b> <i>%s</i> from %s...\n' % (name, uri))
+      # add a progress bar
+      self.downloadPercent = 0
+      try:
+        urllib.urlretrieve(uri, filePath, self.reportHook)
+        self.logMessage('<b>Download finished</b>')
+      except IOError as e:
+        self.logMessage('<b><font color="red">\tDownload failed: %s</font></b>' % e)
+    else:
+      self.logMessage('<b>File already exists in cache - reusing it.</b>')
+    return filePath
+
+  def loadVolume(self, uri, name):
+    self.logMessage('<b>Requesting load</b> <i>%s</i> from %s...\n' % (name, uri))
+    success, volumeNode = slicer.util.loadVolume(uri, properties = {'name' : name}, returnNode=True)
+    if success:
+      self.logMessage('<b>Load finished</b>\n')
+    else:
+      self.logMessage('<b><font color="red">\tLoad failed!</font></b>\n')
+    return volumeNode
       
   #--------------------------------------------#
   '''
