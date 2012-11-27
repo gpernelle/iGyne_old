@@ -285,6 +285,24 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.__bendingFrame.collapsed = 1
     bendingFrame = qt.QFormLayout(self.__bendingFrame)
     
+    # Look for needles in CT?
+    self.invertedContrast = qt.QCheckBox('Needles in CT (needles appear bright)?')
+    bendingFrame.addRow(self.invertedContrast)
+    # Compute gradient?
+    self.gradient=qt.QCheckBox('Compute gradient?')
+    self.gradient.setChecked(1)
+    bendingFrame.addRow(self.gradient)
+
+    # Filter ControlPoints?
+    self.filterControlPoints=qt.QCheckBox('Filter Control Points?')
+    self.filterControlPoints.setChecked(0)
+    bendingFrame.addRow(self.filterControlPoints)
+
+    # Draw Fiducial Points?
+    self.drawFiducialPoints=qt.QCheckBox('Draw Control Points?')
+    self.drawFiducialPoints.setChecked(0)
+    bendingFrame.addRow(self.drawFiducialPoints)
+
     # nb points per line spin box
     self.nbPointsPerLine = qt.QSpinBox()
     self.nbPointsPerLine.setMinimum(2)
@@ -340,21 +358,6 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.lenghtNeedleParameter.setValue(70)
     stepsizeLabel = qt.QLabel("Lenght of the needles: ")
     bendingFrame.addRow( stepsizeLabel, self.lenghtNeedleParameter)
-
-    # Compute gradient?
-    self.gradient=qt.QCheckBox('Compute gradient?')
-    self.gradient.setChecked(1)
-    bendingFrame.addRow(self.gradient)
-
-    # Filter ControlPoints?
-    self.filterControlPoints=qt.QCheckBox('Filter Control Points?')
-    self.filterControlPoints.setChecked(0)
-    bendingFrame.addRow(self.filterControlPoints)
-
-    # Draw Fiducial Points?
-    self.drawFiducialPoints=qt.QCheckBox('Draw Control Points?')
-    self.drawFiducialPoints.setChecked(0)
-    bendingFrame.addRow(self.drawFiducialPoints)
     
     self.__layout.addRow(self.__filterFrame)
     self.__layout.addRow(self.__bendingFrame)
@@ -941,7 +944,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
                 if ijk[0]<dims[0] and ijk[0]>0 and  ijk[1]<dims[1] and ijk[1]>0 and ijk[2]<dims[2] and ijk[2]>0:
                   center=imageData.GetScalarComponentAsDouble(ijk[0], ijk[1], ijk[2], 0)
                   total += center
-                  if self.gradient.isChecked():
+                  if self.gradient.isChecked() and self.invertedContrast.isChecked()== False:
                     total += center - imageData.GetScalarComponentAsDouble(ijk[0]+5, ijk[1], ijk[2], 0)/4
                     total += center - imageData.GetScalarComponentAsDouble(ijk[0]-5, ijk[1], ijk[2], 0)/4
                     total += center - imageData.GetScalarComponentAsDouble(ijk[0], ijk[1]+5, ijk[2], 0)/4
@@ -956,13 +959,24 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
               
             if total != 0:     
               estimator = total
-              if estimator<initialIntensity:
-                area+=1
+              if self.invertedContrast.isChecked():     # look for needles in CT (bright), so we are looking for a max
                 
-              if estimator<minEstimator or minEstimator == 0:
-                minEstimator=estimator
-                if minEstimator!=0:  
-                  bestPoint=C
+                if estimator>initialIntensity:
+                  area+=1
+                
+                if estimator>minEstimator or minEstimator == 0:
+                  minEstimator=estimator
+                  if minEstimator!=0:  
+                    bestPoint=C
+              
+              else:
+                if estimator<initialIntensity:
+                  area+=1
+                
+                  if estimator<minEstimator or minEstimator == 0:
+                    minEstimator=estimator
+                    if minEstimator!=0:  
+                      bestPoint=C
                   
       tip0=A 
       A=bestPoint
