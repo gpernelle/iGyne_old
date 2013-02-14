@@ -2,7 +2,6 @@ from __main__ import qt, ctk
 import os.path, time
 from iGyneStep import *
 from Helper import *
-import coverage
 
 
 class iGyneSelectProcedureStep( iGyneStep ) :

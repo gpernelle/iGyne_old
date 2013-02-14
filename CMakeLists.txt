@@ -9,7 +9,7 @@ if(NOT Slicer_SOURCE_DIR)
 
   set(EXTENSION_DESCRIPTION "iGyne is an open source software for MR-Guided Interstitial Gynecologic Brachytherapy. It enables on-time processing of the intra-operative MRI data via a DICOM connection to the scanner followed by a multi-stage registration of CAD models of the template and the obturator to the patient images. This allows the virtual placement of interstitial needles during the intervention, as well as the detection/labeling of needles in MR images")
 
-  set(EXTENSION_ICONURL "http://www.slicer.org/slicerWiki/images/9/96/Icon.png")
+  set(EXTENSION_ICONURL "http://www.slicer.org/slicerWiki/images/9/90/IGynePyIcon.png")
   set(EXTENSION_SCREENSHOTURLS "http://www.slicer.org/slicerWiki/images/5/5d/IGyne-labelingResult.png")
 endif()
 
