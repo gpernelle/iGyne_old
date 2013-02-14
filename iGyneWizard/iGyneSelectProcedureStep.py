@@ -31,25 +31,9 @@ class iGyneSelectProcedureStep( iGyneStep ) :
     self.noTemplateButton = qt.QRadioButton("No Template")  
     self.__layout.addRow(self.templateButton)
     self.__layout.addRow(self.noTemplateButton)
-    
-    #--------------------------------------------
-    # to be used in the future
-    
-    # checkButton1 = qt.QCheckBox("EBRT")
-    # radioButton2 = qt.QRadioButton("Brachy HDR Intracav")
-    # radioButton3 = qt.QRadioButton("Brachy HDR Interstitial")
-    # radioButton4 = qt.QRadioButton("Brachy LDR Intracav")
-    # radioButton5 = qt.QRadioButton("Brachy LDR Interstitial")
-    # self.__layout.addRow(checkButton1)
-    # self.__layout.addRow(radioButton2)
-    # self.__layout.addRow(radioButton3)
-    # self.__layout.addRow(radioButton4)
-    # self.__layout.addRow(radioButton5)
       
   def onEntry(self, comingFrom, transitionType):
 
-    cov = coverage.coverage()
-    cov.start()
     super(iGyneSelectProcedureStep, self).onEntry(comingFrom, transitionType)
     pNode = self.parameterNode()
     pNode.SetParameter('currentStep', self.stepid)
@@ -71,11 +55,7 @@ class iGyneSelectProcedureStep( iGyneStep ) :
       self.workflow().goForward() # 2   
     else:
       pNode.SetParameter('skip', '0')
-      super(iGyneSelectProcedureStep, self).onExit(goingTo, transitionType)
-    
-    cov.stop()
-    cov.save()
-    cov.html_report()    
+      super(iGyneSelectProcedureStep, self).onExit(goingTo, transitionType)   
 
   def validate( self, desiredBranchId ):
     '''
