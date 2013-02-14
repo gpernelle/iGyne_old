@@ -41,13 +41,19 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     self.fiducialButton.checkable = True
     self.__layout.addRow(self.fiducialButton)
     self.fiducialButton.connect('toggled(bool)', self.onRunButtonToggled)
-	
-    self.firstRegButton = qt.QPushButton('Run Registration')
+  
+    self.firstRegButton = qt.QPushButton('Run Initial Registration')
     self.__registrationStatus = qt.QLabel('Register Template and Scan')
     self.__layout.addRow(self.__registrationStatus, self.firstRegButton)
     self.firstRegButton.checkable = False
     self.__layout.addRow(self.firstRegButton)
     self.firstRegButton.connect('clicked()', self.firstRegistration)
+
+    # define cropping area
+    self.drawRectlangelButton = qt.QPushButton('Outline Area Containing Fiducial Points')
+    self.drawRectlangelButton.checkable = True
+    self.__layout.addRow(self.drawRectlangelButton)
+    self.drawRectlangelButton.connect('toggled(bool)',self.onDrawRectangleButtonToggled)
 
     # option for horizontal template
     self.horizontalTemplate=qt.QCheckBox('Horizontal Template?')
@@ -64,6 +70,11 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     houghFrame = qt.QFormLayout(self.__houghFrame)
     
     # Auto-value option
+    self.autoLimit = qt.QCheckBox('Auto limit Hought Transform computation volume?')
+    self.autoLimit.checked = True
+    houghFrame.addRow(self.autoLimit)
+
+    # Auto-value option
     self.autoValue = qt.QCheckBox('Automatic values?')
     self.autoValue.checked = True
     houghFrame.addRow(self.autoValue)
@@ -79,17 +90,28 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     self.ratioWidthCroppedVolume = qt.QSpinBox()
     self.ratioWidthCroppedVolume.setMinimum(1)
     self.ratioWidthCroppedVolume.setMaximum(15)
-    self.ratioWidthCroppedVolume.setValue(6)
+    self.ratioWidthCroppedVolume.setValue(4)
     ratioWidthCroppedVolumeLabel = qt.QLabel("Divide the width by: ")
     houghFrame.addRow(ratioWidthCroppedVolumeLabel, self.ratioWidthCroppedVolume)
     # Ratio length
     self.ratioLengthCroppedVolume = qt.QSpinBox()
     self.ratioLengthCroppedVolume.setMinimum(1)
     self.ratioLengthCroppedVolume.setMaximum(15)
-    self.ratioLengthCroppedVolume.setValue(6)
+    self.ratioLengthCroppedVolume.setValue(4)
     ratioLengthCroppedVolumeLabel = qt.QLabel("Divide the length by: ")
     houghFrame.addRow(ratioLengthCroppedVolumeLabel, self.ratioLengthCroppedVolume)
-    
+
+
+    # Threshold slider for template segmentation
+    threshLabel = qt.QLabel('Threshold for CHT:')
+    self.__threshRange = slicer.qMRMLRangeWidget()
+    self.__threshRange.decimals = 0
+    self.__threshRange.singleStep = 1
+    self.__threshRange.minimum = 80
+    self.__threshRange.minimumValue = 110
+    self.__threshRange.maximum = 255
+    self.__threshRange.maximumValue = 255
+    houghFrame.addRow(threshLabel,self.__threshRange)
     self.__layout.addRow(self.__houghFrame)
 
     # reset module button 
@@ -122,6 +144,8 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     return ras
 
   def cropTemplateArea(self):
+    # TODO: draw a rectangle with the mouse
+    # observer: left button pressed -> get XYZ / left button released -> get XYZ
     volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
     imageData = volumeNode.GetImageData()
     imageDimensions = imageData.GetDimensions()
@@ -130,13 +154,19 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     
     if self.autoValue.isChecked():
       hValue = round(m.GetElement(2,2)*imageDimensions[2]/float(25))
-      self.ratioHeightCroppedVolume.setValue(hValue)
+      self.ratioHeightCroppedVolume.setValue(max(1,hValue-4))
     # create ROI
+    if self.autoLimit.isChecked():
+      a=self.ratioLengthCroppedVolume.value
+      b=self.ratioWidthCroppedVolume.value
+      c=self.ratioHeightCroppedVolume.value
+    else:
+      a,b,c=1,1,1
     roi = slicer.mrmlScene.CreateNodeByClass('vtkMRMLAnnotationROINode')
     slicer.mrmlScene.AddNode(roi)
     roi.SetROIAnnotationVisibility(1)
-    roi.SetRadiusXYZ(imageDimensions[0]/self.ratioLengthCroppedVolume.value,imageDimensions[1]/self.ratioWidthCroppedVolume.value,imageDimensions[2]/self.ratioHeightCroppedVolume.value)
-    roi.SetXYZ(0,0,m.GetElement(2,3)+imageDimensions[2]/self.ratioHeightCroppedVolume.value)
+    roi.SetRadiusXYZ(imageDimensions[0]/a,imageDimensions[1]/b,imageDimensions[2]/c)
+    roi.SetXYZ(0,0,m.GetElement(2,3)+imageDimensions[2]/c)
     roi.SetLocked(1)
 
     #crop volume
@@ -174,7 +204,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     parameters["variance"] = 0.7
     parameters["sphereRadiusRatio"] = 12
     parameters["votingRadiusRatio"] = 10
-    parameters["threshold"] = 80
+    parameters["threshold"] = self.__threshRange.minimumValue
     parameters["outputThreshold"] = 0.1
     parameters["gradientThreshold"] = 100
     parameters["nbOfThreads"] = 8
@@ -324,11 +354,19 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     
   def onRunButtonToggled(self, checked):
     if checked:
-      self.start()
+      self.start('fiducials')
       self.fiducialButton.text = "Stop"  
     else:
       self.stop()
       self.fiducialButton.text = "Choose Fiducial Points"
+
+  def onDrawRectangleButtonToggled(self, checked):
+    if checked:
+      self.start('rectangle')
+      self.drawRectlangelButton.text = "Stop"  
+    else:
+      self.stop()
+      self.drawRectlangelButton.text = "Outline Area with Fiducial Markers"
 
   def firstRegistration(self):
     '''
@@ -387,7 +425,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       pNode.SetParameter('followupTransformID', self.__followupTransform.GetID())
       self.registered = 1
 
-  def start(self):    
+  def start(self,action):    
     self.removeObservers()
     # get new slice nodes
     layoutManager = slicer.app.layoutManager()
@@ -402,7 +440,10 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
         self.sliceWidgetsPerStyle[style] = sliceWidget
         events = ("LeftButtonPressEvent","LeftButtonReleaseEvent","MouseMoveEvent", "KeyPressEvent","KeyReleaseEvent","EnterEvent", "LeaveEvent")
         for event in events:
-          tag = style.AddObserver(event, self.processEvent)   
+          if action=='fiducials':
+            tag = style.AddObserver(event, self.processEvent)
+          elif action=='rectangle':
+            tag = style.AddObserver(event, self.processEventRectangle)
           self.styleObserverTags.append([style,tag])
 
   def stop(self):
@@ -504,6 +545,67 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       fiducial.Initialize(slicer.mrmlScene)
       self.fixedLandmarks.AddItem(fiducial)
       
+  def processEvent(self,observee,event=None):
+    '''
+    get the mouse clicks and create a fiducial node at this position. Used later for the fiducial registration
+    '''
+    if self.fixedLandmarks == None :
+      self.fixedLandmarks = vtk.vtkCollection()
+
+    if self.sliceWidgetsPerStyle.has_key(observee) and event == "LeftButtonPressEvent":
+      if slicer.app.repositoryRevision<= 21022:
+        sliceWidget = self.sliceWidgetsPerStyle[observee]
+        style = sliceWidget.sliceView().interactorStyle()          
+        xy = style.GetInteractor().GetEventPosition()
+        xyz = sliceWidget.convertDeviceToXYZ(xy)
+        ras = sliceWidget.convertXYZToRAS(xyz)
+      else:
+        sliceWidget = self.sliceWidgetsPerStyle[observee]
+        sliceLogic = sliceWidget.sliceLogic()
+        sliceNode = sliceWidget.mrmlSliceNode()
+        interactor = observee.GetInteractor()
+        xy = interactor.GetEventPosition()
+        xyz = sliceWidget.sliceView().convertDeviceToXYZ(xy);
+        ras = sliceWidget.sliceView().convertXYZToRAS(xyz)
+
+      if self.click == 0:
+        firstCorner=ras
+        self.click += 1
+      elif self.click == 1:
+        lastCorner=ras
+
+        #crop volume (IJK or RAS?)
+    volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+    imageData = volumeNode.GetImageData()
+    imageDimensions = imageData.GetDimensions()
+    m = vtk.vtkMatrix4x4()
+    volumeNode.GetIJKToRASMatrix(m)
+    a = (firstCorner[0]+lastCorner[0])/2
+    b = (firstCorner[1]+lastCorner[1])/2
+    c = (firstCorner[2]+lastCorner[2])/2
+    ra = abs(lastCorner[0]-firstCorner[0])
+    rb = abs(lastCorner[1]-firstCorner[1])
+    rc = min(ra/float(rb),rb/float(ra))
+    roi = slicer.mrmlScene.CreateNodeByClass('vtkMRMLAnnotationROINode')
+    slicer.mrmlScene.AddNode(roi)
+    roi.SetROIAnnotationVisibility(1)
+    roi.SetRadiusXYZ(ra,rb,rc)
+    roi.SetXYZ(a,b,c)
+    roi.SetLocked(1)
+
+    #crop volume
+    cropVolumeNode =slicer.mrmlScene.CreateNodeByClass('vtkMRMLCropVolumeParametersNode')
+    cropVolumeNode.SetScene(slicer.mrmlScene)
+    cropVolumeNode.SetName('template-area_CropVolume_node')
+    cropVolumeNode.SetIsotropicResampling(False)
+    slicer.mrmlScene.AddNode(cropVolumeNode)
+    cropVolumeNode.SetInputVolumeNodeID(volumeNode.GetID())
+    cropVolumeNode.SetROINodeID(roi.GetID())
+    cropVolumeLogic = slicer.modules.cropvolume.logic()
+    cropVolumeLogic.Apply(cropVolumeNode)
+    roiVolume = slicer.mrmlScene.GetNodeByID(cropVolumeNode.GetOutputVolumeNodeID())
+    roiVolume.SetName("template-area-ROI")
+
   def validate( self, desiredBranchId ):
     '''
     '''

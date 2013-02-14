@@ -1367,14 +1367,9 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     if status == 'Completed':
       self.__registrationStatus.setText('Segmented obturator model built.')
       self.status = 'Segmentation Completed'
-
-      if self.fullAutoRegOn == 1 :
-        slicer.mrmlScene.Modified()
-        time.sleep(1)
-        slicer.mrmlScene.Modified()
-        self.updatedNbModelNodes = slicer.mrmlScene.GetNumberOfNodesByClass('vtkMRMLModelNode')
-        
-        self.startICP()        
+      for i in range(50):
+        print 'wait...' 
+      self.startICP()      
       self.fullAutoRegOn = 0
   
   def updateROItemplate(self):

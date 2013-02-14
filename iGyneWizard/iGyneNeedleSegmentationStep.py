@@ -12,6 +12,7 @@ import numpy
 import thread
 import random
 import copy
+import operator
 
 class iGyneNeedleSegmentationStep( iGyneStep ) :
 
@@ -25,6 +26,9 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.buttonsGroupBox = None
     self.round=1
     self.row=0
+    self.validationNeedleNumber=0
+    self.stepNeedle = 0
+    self.tableValueCtrPt=[[]]
     self.table=None
     self.view = None
     self.previousValues=[[0,0,0]]
@@ -137,11 +141,17 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.sendButton.connect('clicked()', self.onSendClicked)
 
     #-----------------------------------------------------------------------------
+    #Report Frame
+    self.__reportFrame = ctk.ctkCollapsibleButton()
+    self.__reportFrame.text = "Segmentation Report"
+    self.__reportFrame.collapsed = 1
+    reportFrame = qt.QFormLayout(self.__reportFrame)
+
     # segmentation report
     self.analysisGroupBox = qt.QGroupBox()
     self.analysisGroupBox.setFixedHeight(330)
     self.analysisGroupBox.setTitle( 'Segmentation Report' )
-    self.__layout.addRow( self.analysisGroupBox )
+    reportFrame.addRow( self.analysisGroupBox )
     self.analysisGroupBoxLayout = qt.QFormLayout( self.analysisGroupBox )    
 
 
@@ -193,41 +203,72 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
 
     #-----------------------------------------------------------------------------
 
+
+    #Segmentation Frame
+    self.__segmentationFrame = ctk.ctkCollapsibleButton()
+    self.__segmentationFrame.text = "Segmentation"
+    self.__segmentationFrame.collapsed = 1
+    segmentationFrame = qt.QFormLayout(self.__segmentationFrame)
+
     # give needle tips
     self.fiducialButton = qt.QPushButton('Start Giving Needle Tips')
     self.fiducialButton.checkable = True
-    self.__layout.addRow(self.fiducialButton)
+    segmentationFrame.addRow(self.fiducialButton)
     self.fiducialButton.connect('toggled(bool)', self.onRunButtonToggled)
 
     # #Segment Needle Button 
     # self.needleButton = qt.QPushButton('Segment Needles')
-    # self.__layout.addRow(self.needleButton)
+    # segmentationFrame.addRow(self.needleButton)
     # self.needleButton.connect('clicked()', self.needleSegmentation)
     # self.needleButton.setEnabled(0)
 
     #Segment Needle Button 
-    self.needleButton2 = qt.QPushButton('Segment/Update Needles - Python')
-    self.__layout.addRow(self.needleButton2)
-    self.needleButton2.connect('clicked()', self.needleDetection)
+    # self.needleButton2 = qt.QPushButton('Segment/Update Needles - Python')
+    # segmentationFrame.addRow(self.needleButton2)
+    # self.needleButton2.connect('clicked()', self.needleDetection)
 
     #New insertion - create new round of needles with different colors
     self.newInsertionButton = qt.QPushButton('New Insertion Needle')
-    self.__layout.addRow(self.newInsertionButton)
+    segmentationFrame.addRow(self.newInsertionButton)
     self.newInsertionButton.connect('clicked()', self.newInsertionNeedle)
 
     #Delete Needles Button 
     self.deleteNeedleButton = qt.QPushButton('Delete Segmented Needles')
-    self.__layout.addRow(self.deleteNeedleButton)
+    segmentationFrame.addRow(self.deleteNeedleButton)
     self.deleteNeedleButton.connect('clicked()', self.deleteSegmentedNeedle)
 
     #Reset Needle Detection Button 
     self.resetDetectionButton = qt.QPushButton('Reset Needle Detection')
-    self.__layout.addRow(self.resetDetectionButton)
+    segmentationFrame.addRow(self.resetDetectionButton)
     self.resetDetectionButton.connect('clicked()', self.resetNeedleDetection)
     
     self.updateWidgetFromParameters(self.parameterNode())
       
-  	#Filter Needles Button
+  	#Validation Frame
+    self.__validationFrame = ctk.ctkCollapsibleButton()
+    self.__validationFrame.text = "Validation"
+    self.__validationFrame.collapsed = 1
+    validationFrame = qt.QFormLayout(self.__validationFrame)
+
+    self.validationNeedleButton = qt.QPushButton('New Validation Needle: (0)->(1)')
+    validationFrame.addRow(self.validationNeedleButton)
+    self.validationNeedleButton.connect('clicked()', self.validationNeedle)
+
+    self.startGivingControlPointsButton = qt.QPushButton('Start Giving Control Points')
+    self.startGivingControlPointsButton.checkable = True
+    validationFrame.addRow(self.startGivingControlPointsButton)
+    self.startGivingControlPointsButton.connect('toggled(bool)', self.onNeedleValidationButtonToggled)
+
+    self.drawValidationNeedlesButton = qt.QPushButton('(Re)Draw Needles 3D Models')
+    validationFrame.addRow(self.drawValidationNeedlesButton)
+    self.drawValidationNeedlesButton.connect('clicked()', self.drawValidationNeedles)
+
+    #Reset Needle Validation Button 
+    self.resetDetectionButton = qt.QPushButton('Reset Needles from Manual Segmention')
+    validationFrame.addRow(self.resetDetectionButton)
+    self.resetDetectionButton.connect('clicked()', self.resetNeedleValidation)
+
+    #Filter Needles Button
     self.__filterFrame = ctk.ctkCollapsibleButton()
     self.__filterFrame.text = "Filter Needles"
     self.__filterFrame.collapsed = 1
@@ -271,11 +312,11 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     # self.analysisReportButton.connect('clicked()',self.analyzeSegmentation)
     
     
-    self.__layout.addRow(self.displayFiducialButton)
+    segmentationFrame.addRow(self.displayFiducialButton)
     # self.__layout.addRow(self.displayRadPlannedButton)
     # self.__layout.addRow(self.displayRadSegmentedButton)
-    self.__layout.addRow(self.displayContourButton)
-    self.__layout.addRow(self.hideContourButton)
+    segmentationFrame.addRow(self.displayContourButton)
+    segmentationFrame.addRow(self.hideContourButton)
     # self.__layout.addRow(self.analysisReportButton)
     
 
@@ -303,6 +344,28 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.drawFiducialPoints.setChecked(0)
     bendingFrame.addRow(self.drawFiducialPoints)
 
+    # Add Gaussian Estimation?
+    self.gaussianAttenuationButton = qt.QCheckBox('Add Gaussian Prob. Attenuation?')
+    self.gaussianAttenuationButton.setChecked(0)
+    bendingFrame.addRow(self.gaussianAttenuationButton)
+
+
+    # nb points per line spin box
+    self.sigmaValue = qt.QSpinBox()
+    self.sigmaValue.setMinimum(0.1)
+    self.sigmaValue.setMaximum(500)
+    self.sigmaValue.setValue(2)
+    sigmaValueLabel = qt.QLabel("Sigma Value (exp(-x^2/(2*(sigma/10)^2))): ")
+    bendingFrame.addRow( sigmaValueLabel, self.sigmaValue)
+
+    # nb points per line spin box
+    self.gradientPonderation = qt.QSpinBox()
+    self.gradientPonderation.setMinimum(0.01)
+    self.gradientPonderation.setMaximum(500)
+    self.gradientPonderation.setValue(2)
+    gradientPonderationLabel = qt.QLabel("Gradient Ponderation: ")
+    bendingFrame.addRow( gradientPonderationLabel, self.gradientPonderation)
+
     # nb points per line spin box
     self.nbPointsPerLine = qt.QSpinBox()
     self.nbPointsPerLine.setMinimum(2)
@@ -310,7 +373,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.nbPointsPerLine.setValue(20)
     nbPointsPerLineLabel = qt.QLabel("Number of points per line: ")
     bendingFrame.addRow( nbPointsPerLineLabel, self.nbPointsPerLine)
-    
+
     # nb radius iteration spin box
     self.nbRadiusIterations = qt.QSpinBox()
     self.nbRadiusIterations.setMinimum(2)
@@ -323,7 +386,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.distanceMax = qt.QSpinBox()
     self.distanceMax.setMinimum(0)
     self.distanceMax.setMaximum(50)
-    self.distanceMax.setValue(5)
+    self.distanceMax.setValue(3)
     distanceMaxLabel = qt.QLabel("rMax: ")
     bendingFrame.addRow( distanceMaxLabel, self.distanceMax)
     
@@ -339,7 +402,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.numberOfPointsPerNeedle = qt.QSpinBox()
     self.numberOfPointsPerNeedle.setMinimum(1)
     self.numberOfPointsPerNeedle.setMaximum(50)
-    self.numberOfPointsPerNeedle.setValue(7)
+    self.numberOfPointsPerNeedle.setValue(8)
     numberOfPointsPerNeedleLabel = qt.QLabel("Number of Control Points: ")
     bendingFrame.addRow( numberOfPointsPerNeedleLabel, self.numberOfPointsPerNeedle)
 
@@ -359,13 +422,16 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     stepsizeLabel = qt.QLabel("Lenght of the needles: ")
     bendingFrame.addRow( stepsizeLabel, self.lenghtNeedleParameter)
     
+    self.__layout.addRow(self.__reportFrame)
+    self.__layout.addRow(self.__segmentationFrame)
+    self.__layout.addRow(self.__validationFrame)
     self.__layout.addRow(self.__filterFrame)
     self.__layout.addRow(self.__bendingFrame)
     # reset module
     
     resetButton = qt.QPushButton( 'Reset Module' )
     resetButton.connect( 'clicked()', self.onResetButton )
-    self.__layout.addRow(resetButton)
+    # self.__layout.addRow(resetButton)
   
   def onResetButton( self ):
     '''
@@ -765,6 +831,17 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     s =(sum(self.Fibonacci(k),-1)+F[k+1])/(sum(self.Fibonacci(l+1),-1))
     return s
 
+  def sortTable(self, table, cols):
+    """ sort a table by multiple columns
+        table: a list of lists (or tuple of tuples) where each inner list 
+               represents a row
+        cols:  a list (or tuple) specifying the column numbers to sort by
+               e.g. (1,0) would sort by column 1, then by column 0
+    """
+    for col in reversed(cols):
+      table = sorted(table, key=operator.itemgetter(col))
+    return table
+
   def ijk2ras(self,A):
     '''
     Convert IJK coordinates to RAS coordinates. The transformation matrix is the one 
@@ -844,6 +921,25 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       colorVar = I/(len(label))
       self.needleDetectionThread(A, imageData, colorVar,spacing)
 
+  def needleValidation(self,A, imageData,colorVar,spacing):
+    fiducial = slicer.mrmlScene.CreateNodeByClass('vtkMRMLAnnotationFiducialNode')
+    fiducial.SetName('cp-'+str(self.validationNeedleNumber)+"-"+str(self.stepNeedle)) 
+    fiducial.Initialize(slicer.mrmlScene)
+    fiducial.SetFiducialCoordinates(self.ijk2ras(A))
+    fiducial.SetAttribute('ValidationNeedle','1')
+    fiducial.SetAttribute('NeedleNumber',str(self.validationNeedleNumber))
+    fiducial.SetAttribute('NeedleStep',str(self.stepNeedle))
+    
+    nth = int(self.validationNeedleNumber)
+
+    displayNode=fiducial.GetDisplayNode()
+    displayNode.SetGlyphScale(2)
+    displayNode.SetColor(self.color[int(nth)][0],self.color[int(nth)][1],self.color[int(nth)][2])
+    textNode=fiducial.GetAnnotationTextDisplayNode()
+    textNode.SetTextScale(2)
+    textNode.SetColor(self.color[int(nth)][0],self.color[int(nth)][1],self.color[int(nth)][2])
+    self.tableValueCtrPt[self.validationNeedleNumber].append(self.ijk2ras(A))
+
   def needleDetectionThread(self,A, imageData,colorVar,spacing):
     '''
     From the needle tip, the algorithm looks for a direction maximizing the "needle likelihood" of a small segment in a conic region. 
@@ -870,6 +966,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     difference = 0
     oldtotal = 0
     A0=A
+    print A0
     controlPoints = []
     controlPointsIJK = []
     controlPoints.append(self.ijk2ras(A))
@@ -894,7 +991,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         rMax = max(stepsize,self.distanceMax.value/spacing[0])
         rIter = max(int(stepsize/(2))+5,self.nbRadiusIterations.value)
       
-      if step==NbStepsNeedle+1:
+      if step==NbStepsNeedle+10:
         bestPoint = [(A[0]-A0[0])/(0.5*step)+A[0],(A[1]-A0[1])/(0.5*step)+A[1],(A[2]-A0[2])/(0.5*step)+A[2]]
       else:
       # if 1==1:
@@ -912,8 +1009,8 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
             total = 0
             M=[[0,0,0] for i in xrange(tIter+1)]
             
-            if step==NbStepsNeedle+1:
-            # if 0==1:
+            #if step==NbStepsNeedle+1:
+            if 0==1:
               M=[[0,0,0] for i in xrange(100+1)]
               controlPointsAndLastPoint = copy.deepcopy(controlPointsIJK)
               controlPointsAndLastPoint.insert(len(controlPointsIJK),C)
@@ -938,27 +1035,38 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
                 # x,y,z coordinates
                 for i in range(3):
                   M[t][i] = (1-tt)*A[i] + tt*C[i]
-                  ijk[i]=M[t][i]
+                  ijk[i]=int(round(M[t][i]))
                 
                 # first, test if points are in the image space 
                 if ijk[0]<dims[0] and ijk[0]>0 and  ijk[1]<dims[1] and ijk[1]>0 and ijk[2]<dims[2] and ijk[2]>0:
                   center=imageData.GetScalarComponentAsDouble(ijk[0], ijk[1], ijk[2], 0)
                   total += center
                   if self.gradient.isChecked() and self.invertedContrast.isChecked()== False:
-                    total += center - imageData.GetScalarComponentAsDouble(ijk[0]+5, ijk[1], ijk[2], 0)/4
-                    total += center - imageData.GetScalarComponentAsDouble(ijk[0]-5, ijk[1], ijk[2], 0)/4
-                    total += center - imageData.GetScalarComponentAsDouble(ijk[0], ijk[1]+5, ijk[2], 0)/4
-                    total += center - imageData.GetScalarComponentAsDouble(ijk[0], ijk[1]-5, ijk[2], 0)/4
-                    total += center - imageData.GetScalarComponentAsDouble(ijk[0]+5, ijk[1]+5, ijk[2], 0)/4
-                    total += center - imageData.GetScalarComponentAsDouble(ijk[0]-5, ijk[1]-5, ijk[2], 0)/4
-                    total += center - imageData.GetScalarComponentAsDouble(ijk[0]-5, ijk[1]+5, ijk[2], 0)/4
-                    total += center - imageData.GetScalarComponentAsDouble(ijk[0]+5, ijk[1]-5, ijk[2], 0)/4
+                    radiusNeedle = int(round(1/spacing[0]))
+                    radiusNeedleCorner = int(round((1/spacing[0])/1.414))
+                    g1 = imageData.GetScalarComponentAsDouble(ijk[0]+radiusNeedle, ijk[1], ijk[2], 0)
+                    g2 = imageData.GetScalarComponentAsDouble(ijk[0]-radiusNeedle, ijk[1], ijk[2], 0)
+                    g3 = imageData.GetScalarComponentAsDouble(ijk[0], ijk[1]+radiusNeedle, ijk[2], 0)
+                    g4 = imageData.GetScalarComponentAsDouble(ijk[0], ijk[1]-radiusNeedle, ijk[2], 0)
+                    g5 = imageData.GetScalarComponentAsDouble(ijk[0]+radiusNeedleCorner, ijk[1]+radiusNeedleCorner, ijk[2], 0)
+                    g6 = imageData.GetScalarComponentAsDouble(ijk[0]-radiusNeedleCorner, ijk[1]-radiusNeedleCorner, ijk[2], 0)
+                    g7 = imageData.GetScalarComponentAsDouble(ijk[0]-radiusNeedleCorner, ijk[1]+radiusNeedleCorner, ijk[2], 0)
+                    g8 = imageData.GetScalarComponentAsDouble(ijk[0]+radiusNeedleCorner, ijk[1]-radiusNeedleCorner, ijk[2], 0)
+                    total += 8*center - ((g1+g2+g3+g4+g5+g6+g7+g8)/8)*self.gradientPonderation.value
                 
             if R==0:
-              initialIntensity = total
+              initialIntensity = total - 255
               
-            if total != 0:     
-              estimator = total
+            if total != 0:
+              if R==0:     
+                estimator = total - 255
+              else:
+                if self.gaussianAttenuationButton.isChecked():
+                    gaussianAttenuation = math.exp(-(r/float(rMax))**2/float((2*(self.sigmaValue.value/float(10))**2)))   # 1 for x=0, 0.2 for x=5
+                    estimator = (total-255)*gaussianAttenuation
+                else:
+                    estimator = (total-255)
+                #print estimator, gaussianAttenuation, r  
               if self.invertedContrast.isChecked():     # look for needles in CT (bright), so we are looking for a max
                 
                 if estimator>initialIntensity:
@@ -968,6 +1076,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
                   minEstimator=estimator
                   if minEstimator!=0:  
                     bestPoint=C
+
               
               else:
                 if estimator<initialIntensity:
@@ -977,10 +1086,14 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
                     minEstimator=estimator
                     if minEstimator!=0:  
                       bestPoint=C
+                      
                   
-      tip0=A 
-      A=bestPoint
-      print area
+      tip0=A
+      if bestPoint==[0,0,0]:
+        A=C0
+      else: 
+        A=bestPoint
+      # print(step,minEstimator,area)
       if area < 5: # this means there is not so much uncertainty for the control point, so it is probably good
         bestControlPoints.append(self.ijk2ras(A))
       controlPoints.append(self.ijk2ras(A))
@@ -989,7 +1102,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       # Draw Fiducial points at the control points if the checkbox is checked
       if self.drawFiducialPoints.isChecked():
         fiducial = slicer.mrmlScene.CreateNodeByClass('vtkMRMLAnnotationFiducialNode')
-        fiducial.SetName(str(step)+"-"+str(area)) 
+        fiducial.SetName(str(step)+"-"+str(minEstimator)+'-'+str(area)) 
         fiducial.Initialize(slicer.mrmlScene)
         fiducial.SetFiducialCoordinates(controlPoints[step+1])
     if len(bestControlPoints) >= 3 and self.filterControlPoints.isChecked(): # take only the "good" control points
@@ -997,12 +1110,37 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     elif len(controlPoints) >= 2:
       self.addNeedleToScene(controlPoints,colorVar)
 
-  def addNeedleToScene(self,controlPoint,colorVar): 
+  def drawValidationNeedles(self):
+
+    # reset report table
+    self.table =None
+    self.row=0
+    self.initTableView()
+    while slicer.util.getNodes('manual-seg*') != {}:
+        nodes = slicer.util.getNodes('manual-seg*')
+        for node in nodes.values():
+          slicer.mrmlScene.RemoveNode(node)
+
+    modelNodes = slicer.util.getNodes('vtkMRMLAnnotationFiducialNode*')
+    for modelNode in modelNodes.values():
+        if modelNode.GetAttribute("ValidationNeedle") == "1":
+          needleNumber = int(modelNode.GetAttribute("NeedleNumber"))
+          needleStep = int(modelNode.GetAttribute("NeedleStep"))
+          coord=[0,0,0]
+          modelNode.GetFiducialCoordinates(coord)
+          self.tableValueCtrPt[needleNumber][needleStep]=coord
+
+    for i in range(len(self.tableValueCtrPt)):
+      colorVar = random.randrange(50,100,1)/(100)
+      controlPoints=self.sortTable(self.tableValueCtrPt[i],(2,1,0))
+      self.addNeedleToScene(controlPoints,i,'Validation')    
+
+  def addNeedleToScene(self,controlPoint,colorVar, needleType='Detection'): 
     '''
     Create a model of the needle from its equation (Beziers curve fitting the control points)
     '''
     # initialisation
-    print controlPoint
+    # print controlPoint
     label=None
     scene = slicer.mrmlScene
     points = vtk.vtkPoints()
@@ -1039,16 +1177,16 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     ### Create display node
     modelDisplay = slicer.vtkMRMLModelDisplayNode()
     # functions below are not used anymore. can be removed
-    if self.round==1: 
-      modelDisplay.SetColor(1,1-colorVar,colorVar) # yellow to magenta
-    elif self.round==2:
-      modelDisplay.SetColor(colorVar,1,1) # cyan
-    elif self.round==3:
-      modelDisplay.SetColor(1,0.5+colorVar/2,1) # 
-    elif self.round==4:
-      modelDisplay.SetColor(0.5+colorVar/2,1,0.5+colorVar/2) #
-    else:
-      modelDisplay.SetColor(random.randrange(0,10,1)/(10),random.randrange(0,10,1)/(10),random.randrange(0,10,1)/(10))
+    # if self.round==1: 
+    #   modelDisplay.SetColor(1,1-colorVar,colorVar) # yellow to magenta
+    # elif self.round==2:
+    #   modelDisplay.SetColor(colorVar,1,1) # cyan
+    # elif self.round==3:
+    #   modelDisplay.SetColor(1,0.5+colorVar/2,1) # 
+    # elif self.round==4:
+    #   modelDisplay.SetColor(0.5+colorVar/2,1,0.5+colorVar/2) #
+    # else:
+    #   modelDisplay.SetColor(random.randrange(0,10,1)/(10),random.randrange(0,10,1)/(10),random.randrange(0,10,1)/(10))
 
     modelDisplay.SetScene(scene)
     scene.AddNode(modelDisplay)
@@ -1065,21 +1203,35 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     tube.Update()
     model.SetAndObservePolyData(tube.GetOutput())
     model.GetDisplayNode().SliceIntersectionVisibilityOn()
-    model.SetName('python-catch-round_'+str(self.round)+'-ID-'+str(model.GetID()))
+    if needleType=='Validation':
+      model.SetName('manual-seg_'+str(colorVar))
+    else:
+      model.SetName('python-catch-round_'+str(self.round)+'-ID-'+str(model.GetID()))
+    model.SetAttribute('type',needleType)
+    
+    # evaluate and print the processing time
     processingTime = time.clock()-self.t0
-    print processingTime
+    # print processingTime
+
     # if registration has been done, find the label for the needle
     if self.transform!=None:
       label = self.findLabelNeedleID(model.GetID())
       print label
       modelDisplay.SetColor(self.color[label[0]][0],self.color[label[0]][1],self.color[label[0]][2])
       model.SetAttribute("nth",str(label[0]))
+    elif needleType=='Validation':
+      nth = colorVar
+      modelDisplay.SetColor(self.color[int(nth)][0],self.color[int(nth)][1],self.color[int(nth)][2])
+      model.SetAttribute("nth",str(nth)) 
     else:
       nth = model.GetID().strip('vtkMRMLModelNode')
       modelDisplay.SetColor(self.color[int(nth)][0],self.color[int(nth)][1],self.color[int(nth)][2])
       model.SetAttribute("nth",str(nth))
-
-    self.addSegmentedNeedleToTable(int(model.GetID().strip('vtkMRMLModelNode')),label)
+    
+    if needleType=='Validation':
+      self.addSegmentedNeedleToTable(int(colorVar),label,'Validation')
+    else:
+      self.addSegmentedNeedleToTable(int(model.GetID().strip('vtkMRMLModelNode')),label)
 
   def deleteSegmentedNeedle(self):
     '''
@@ -1121,7 +1273,36 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       self.row=0
       self.initTableView()
 
-  def start(self):
+  def resetNeedleValidation(self):
+    '''
+    Reset the needle detection to completely start over.
+    '''
+    ret = messageBox = qt.QMessageBox.question( self, 'Attention','''
+      Are you sure that you want to reset the needle validation? 
+      It will delete every segmented needles and the control points...
+      ''',qt.QMessageBox.Ok, qt.QMessageBox.Cancel)
+    if ret == qt.QMessageBox.Ok:
+      while slicer.util.getNodes('manual-seg*') != {}:
+        nodes = slicer.util.getNodes('manual-seg*')
+        for node in nodes.values():
+          slicer.mrmlScene.RemoveNode(node)
+
+      while slicer.util.getNodes('cp*') != {}:
+        nodes = slicer.util.getNodes('cp*')
+        for node in nodes.values():
+          slicer.mrmlScene.RemoveNode(node)
+
+      # reset report table
+      self.table =None
+      self.row=0
+      self.initTableView()
+    
+    self.validationNeedleNumber=0
+    self.stepNeedle = 0
+    self.tableValueCtrPt=[[]]
+
+
+  def start(self,process=0):
     '''
     Start to observe the mouse clicks given by user (clicks on needle tips)
     '''    
@@ -1139,7 +1320,10 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         self.sliceWidgetsPerStyle[style] = sliceWidget
         events = ("LeftButtonPressEvent","LeftButtonReleaseEvent","MouseMoveEvent", "KeyPressEvent","KeyReleaseEvent","EnterEvent", "LeaveEvent")
         for event in events:
-          tag = style.AddObserver(event, self.processEvent)   
+          if process==1:
+            tag = style.AddObserver(event, self.processEventNeedleValidation)
+          else:
+            tag = style.AddObserver(event, self.processEvent)   
           self.styleObserverTags.append([style,tag])
 
   def stop(self):
@@ -1185,13 +1369,56 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       self.t0=time.clock()
       self.needleDetectionThread(ijk, imageData, colorVar,spacing)
 
+  def processEventNeedleValidation(self,observee,event=None):
+    '''
+    Get the mouse clicks and create a fiducial node at this position. Used later for the fiducial registration
+    '''
+    if self.sliceWidgetsPerStyle.has_key(observee) and event == "LeftButtonPressEvent":
+      if slicer.app.repositoryRevision<= 21022:
+        sliceWidget = self.sliceWidgetsPerStyle[observee]
+        style = sliceWidget.sliceView().interactorStyle()          
+        xy = style.GetInteractor().GetEventPosition()
+        xyz = sliceWidget.convertDeviceToXYZ(xy)
+        ras = sliceWidget.convertXYZToRAS(xyz)
+      else:
+        sliceWidget = self.sliceWidgetsPerStyle[observee]
+        sliceLogic = sliceWidget.sliceLogic()
+        sliceNode = sliceWidget.mrmlSliceNode()
+        interactor = observee.GetInteractor()
+        xy = interactor.GetEventPosition()
+        xyz = sliceWidget.sliceView().convertDeviceToXYZ(xy);
+        ras = sliceWidget.sliceView().convertXYZToRAS(xyz)
+      
+      colorVar = random.randrange(50,100,1)/(100)
+      volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+      imageData = volumeNode.GetImageData()
+      spacing = volumeNode.GetSpacing()
+      ijk=self.ras2ijk(ras)
+      self.t0=time.clock()
+      self.needleValidation(ijk, imageData, colorVar,spacing)
+      self.stepNeedle+=1
+
   def onRunButtonToggled(self, checked):
     if checked:
       self.start()
       self.fiducialButton.text = "Stop Giving Tips"  
     else:
       self.stop()
-      self.fiducialButton.text = "Start Giving Needle Tips"  
+      self.fiducialButton.text = "Start Giving Needle Tips"
+
+  def onNeedleValidationButtonToggled(self, checked):
+    if checked:
+      self.start(1)
+      self.startGivingControlPointsButton.text = "Stop Giving Control Points"  
+    else:
+      self.stop()
+      self.startGivingControlPointsButton.text = "Start Giving Control Points"
+
+  def validationNeedle(self):
+    self.validationNeedleNumber += 1
+    self.validationNeedleButton.text= "New Validation Needle: ("+str(self.validationNeedleNumber)+")->("+str(self.validationNeedleNumber+1)+")"
+    self.tableValueCtrPt.append([])
+    self.stepNeedle = 0     
 
   #----------------------------------------------------------------------------------------------
   ''' Needle segmentation report'''
@@ -1231,7 +1458,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       self.view.setColumnWidth(2,28)
       self.table = 1
 
-  def addSegmentedNeedleToTable(self,ID,label=None):
+  def addSegmentedNeedleToTable(self,ID,label=None,needleType=None):
     '''
     Add last segmented needle to the table
     The color icon corresponds to the color of the needle, which corresponds to its label (color code)
@@ -1268,6 +1495,8 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     displayButton = qt.QPushButton("Display")
     displayButton.checked = True
     displayButton.checkable = True
+    if needleType=='Validation':
+      ID=int(slicer.util.getNode('manual-seg_'+str(ID)).GetID().strip('vtkMRMLModelNode'))
     displayButton.connect("clicked()", lambda who=ID: self.displayNeedleID(who))
     index = self.model.index(self.row,4)
     self.view.setIndexWidget(index,displayButton)

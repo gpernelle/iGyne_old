@@ -2,6 +2,8 @@ from __main__ import qt, ctk
 import os.path, time
 from iGyneStep import *
 from Helper import *
+import coverage
+
 
 class iGyneSelectProcedureStep( iGyneStep ) :
 
@@ -47,10 +49,13 @@ class iGyneSelectProcedureStep( iGyneStep ) :
       
   def onEntry(self, comingFrom, transitionType):
 
+    cov = coverage.coverage()
+    cov.start()
     super(iGyneSelectProcedureStep, self).onEntry(comingFrom, transitionType)
     pNode = self.parameterNode()
     pNode.SetParameter('currentStep', self.stepid)
     pNode.SetParameter('skip', '0')
+    
 
   def onExit(self, goingTo, transitionType):
   
@@ -69,6 +74,9 @@ class iGyneSelectProcedureStep( iGyneStep ) :
       pNode.SetParameter('skip', '0')
       super(iGyneSelectProcedureStep, self).onExit(goingTo, transitionType)
     
+    cov.stop()
+    cov.save()
+    cov.html_report()    
 
   def validate( self, desiredBranchId ):
     '''
