@@ -1409,6 +1409,13 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     TemplateSheetWidget.visible = True
     
     self.__layout.addWidget(TemplateSheetWidget)
+    qt.QTimer.singleShot(0, self.killButton)
+      
+  def killButton(self):
+    # hide useless button
+    bl = slicer.util.findChildren(text='NeedleSegmentation')
+    if len(bl):
+      bl[0].hide()
      
   def refreshSegmented(self):
     '''
@@ -1458,9 +1465,11 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     '''
     super(iGyneNeedlePlanningStep, self).onEntry(comingFrom, transitionType)
     pNode = self.parameterNode()
+    print pNode
+    self.updateWidgetFromParameters(pNode)
     if pNode.GetParameter('skip') != '1':
-      self.updateWidgetFromParameters(pNode)
-      Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
+      lm = slicer.app.layoutManager()
+      lm.setLayout(3)
 
       pNode.SetParameter('currentStep', self.stepid)
       self.loadNeedles()

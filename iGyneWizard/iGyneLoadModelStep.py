@@ -166,6 +166,15 @@ class iGyneLoadModelStep( iGyneStep ) :
 
     self.__layout.addRow( baselineScanLabel, self.__baselineVolumeSelector )
 
+    qt.QTimer.singleShot(0, self.killButton)
+      
+  def killButton(self):
+    # hide useless button
+    bl = slicer.util.findChildren(text='NeedleSegmentation')
+    if len(bl):
+      bl[0].hide()
+
+
   def loadData(self):
     slicer.util.openAddDataDialog()
 
@@ -173,36 +182,35 @@ class iGyneLoadModelStep( iGyneStep ) :
     '''
     '''
     pNode = self.parameterNode()
+    volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+
     if pNode.GetParameter('skip') != '1':
       self.__parent.validate( desiredBranchId )
       # check here that the selectors are not empty
-      baseline = self.__baselineVolumeSelector.currentNode()
-      modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
-      for modelNode in modelNodes.values():
-        if modelNode.GetName()=='Template' :
-          template=modelNode
-        if modelNode.GetName()=='Obturator_reg' :
-          obturator=modelNode
       
+      baseline = self.__baselineVolumeSelector.currentNode()
+      template=slicer.util.getNode('Template')
+      obturator = slicer.util.getNode('Obturator_reg')
+
       df = template.GetDisplayNode()
       do = obturator.GetDisplayNode()
       df.SetSliceIntersectionVisibility(0)
       do.SetSliceIntersectionVisibility(0)
+      print template.GetID()
 
-      if baseline != None and template != None:
+      if baseline != None and template != None and obturator != None:
         baselineID = baseline.GetID()
         templateID = template.GetID()
         obturatorID = obturator.GetID()
-        if baselineID != '' and templateID != '' and baselineID != templateID:
       
-          pNode = self.parameterNode()
-          pNode.SetParameter('baselineVolumeID', baselineID)
-          pNode.SetParameter('templateID', templateID)
-          pNode.SetParameter('obturatorID', obturatorID)
-          
-          self.__parent.validationSucceeded(desiredBranchId)
-        else:
-          self.__parent.validationFailed(desiredBranchId, 'Error','Please select distinctive baseline and followup volumes!')
+        pNode = self.parameterNode()
+        pNode.SetParameter('baselineVolumeID', baselineID)
+        pNode.SetParameter('templateID', templateID)
+        pNode.SetParameter('obturatorID', obturatorID)
+
+        self.__parent.validate( desiredBranchId )
+        self.__parent.validationSucceeded(desiredBranchId)
+       
       else:
         self.__parent.validationFailed(desiredBranchId, 'Error','Please select both Template and scan/DICOM Volume!')
     
@@ -228,6 +236,7 @@ class iGyneLoadModelStep( iGyneStep ) :
   def onExit(self, goingTo, transitionType):
    
     pNode= self.parameterNode()
+    print pNode
     if pNode.GetParameter('skip') != '1':
       self.doStepProcessing()
     #error checking

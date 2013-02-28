@@ -18,7 +18,6 @@ class iGyneStep( ctk.ctkWorkflowWidgetStep ) :
     '''
     self.__parameterNode = parameterNode
 
-  '''
   def setMRMLManager( self, mrmlManager ):
     self.__mrmlManager = mrmlManager
 
@@ -30,7 +29,7 @@ class iGyneStep( ctk.ctkWorkflowWidgetStep ) :
 
   def logic( self ):
     return self.__logic
-  '''
+
 
   def workflow( self ):
     return self.__workflow

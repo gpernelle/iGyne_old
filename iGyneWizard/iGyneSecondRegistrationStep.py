@@ -228,7 +228,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.__threshRange.decimals = 0
     self.__threshRange.singleStep = 1
     volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
-    roiRange = volumeNode.GetImageData().GetScalarRange()
+    if volumeNode != None:
+      roiRange = volumeNode.GetImageData().GetScalarRange()
     self.__threshRange.minimumValue = 13
     self.__threshRange.maximum = 300
     self.__threshRange.maximumValue = 300
@@ -476,6 +477,14 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     resetButton = qt.QPushButton( 'Reset Module' )
     resetButton.connect( 'clicked()', self.onResetButton )
     self.__layout.addRow(resetButton)
+
+    qt.QTimer.singleShot(0, self.killButton)
+      
+  def killButton(self):
+    # hide useless button
+    bl = slicer.util.findChildren(text='NeedleSegmentation')
+    if len(bl):
+      bl[0].hide()
   
   def onResetButton( self ):
     '''
@@ -1000,7 +1009,10 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     '''
     super(iGyneSecondRegistrationStep, self).onEntry(comingFrom, transitionType)
     pNode = self.parameterNode()
-    if pNode.GetParameter('skip') != '1':
+    
+    volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+
+    if pNode.GetParameter('skip') != '1' and volumeNode != None:
     # setup the interface
       lm = slicer.app.layoutManager()
       lm.setLayout(3)
@@ -1504,10 +1516,11 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       pNode=self.parameterNode()
       transformID = pNode.GetParameter('followupTransformID')
       transform = slicer.mrmlScene.GetNodeByID(transformID)
-      m = transform.GetMatrixTransformToParent()
-     
-      self.initialTransformMatrix = vtk.vtkMatrix4x4()
-      self.initialTransformMatrix.DeepCopy(m)
+      
+      if transform != None:
+        m = transform.GetMatrixTransformToParent()
+        self.initialTransformMatrix = vtk.vtkMatrix4x4()
+        self.initialTransformMatrix.DeepCopy(m)
       
   def backToInitialRegistration(self):
     if self.initialTransformMatrix != None:

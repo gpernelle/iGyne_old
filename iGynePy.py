@@ -71,15 +71,15 @@ class iGynePyWidget:
     allSteps.append( secondRegistrationStep )
     allSteps.append( needlePlanningStep )
     allSteps.append( needleSegmentationStep )
-#    allSteps.append( registerROIStep )
 
-##     Add transition for the first step which let's the user choose between simple and advanced mode
+
     self.workflow.addTransition( selectProcedureStep, selectApplicatorStep )
     self.workflow.addTransition( selectApplicatorStep, loadModelStep )
     self.workflow.addTransition( loadModelStep, firstRegistrationStep )
     self.workflow.addTransition( firstRegistrationStep, secondRegistrationStep )
     self.workflow.addTransition( secondRegistrationStep, needlePlanningStep )
     self.workflow.addTransition( needlePlanningStep, needleSegmentationStep )
+    self.workflow.addTransition(selectProcedureStep,needleSegmentationStep)
 
 
     nNodes = slicer.mrmlScene.GetNumberOfNodesByClass('vtkMRMLScriptedModuleNode')

@@ -118,6 +118,13 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     # resetButton = qt.QPushButton( 'Reset Module' )
     # resetButton.connect( 'clicked()', self.onResetButton )
     # self.__layout.addWidget( resetButton )
+    qt.QTimer.singleShot(0, self.killButton)
+      
+  def killButton(self):
+    # hide useless button
+    bl = slicer.util.findChildren(text='NeedleSegmentation')
+    if len(bl):
+      bl[0].hide()
 
   def onResetButton( self ):
     '''
@@ -545,66 +552,67 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       fiducial.Initialize(slicer.mrmlScene)
       self.fixedLandmarks.AddItem(fiducial)
       
-  def processEvent(self,observee,event=None):
-    '''
-    get the mouse clicks and create a fiducial node at this position. Used later for the fiducial registration
-    '''
-    if self.fixedLandmarks == None :
-      self.fixedLandmarks = vtk.vtkCollection()
+  # def processEvent(self,observee,event=None):
+  #   '''
+  #   get the mouse clicks and create a fiducial node at this position. Used later for the fiducial registration
+  #   '''
+  #   if self.fixedLandmarks == None :
+  #     self.fixedLandmarks = vtk.vtkCollection()
 
-    if self.sliceWidgetsPerStyle.has_key(observee) and event == "LeftButtonPressEvent":
-      if slicer.app.repositoryRevision<= 21022:
-        sliceWidget = self.sliceWidgetsPerStyle[observee]
-        style = sliceWidget.sliceView().interactorStyle()          
-        xy = style.GetInteractor().GetEventPosition()
-        xyz = sliceWidget.convertDeviceToXYZ(xy)
-        ras = sliceWidget.convertXYZToRAS(xyz)
-      else:
-        sliceWidget = self.sliceWidgetsPerStyle[observee]
-        sliceLogic = sliceWidget.sliceLogic()
-        sliceNode = sliceWidget.mrmlSliceNode()
-        interactor = observee.GetInteractor()
-        xy = interactor.GetEventPosition()
-        xyz = sliceWidget.sliceView().convertDeviceToXYZ(xy);
-        ras = sliceWidget.sliceView().convertXYZToRAS(xyz)
+  #   if self.sliceWidgetsPerStyle.has_key(observee) and event == "LeftButtonPressEvent":
+  #     if slicer.app.repositoryRevision<= 21022:
+  #       sliceWidget = self.sliceWidgetsPerStyle[observee]
+  #       style = sliceWidget.sliceView().interactorStyle()          
+  #       xy = style.GetInteractor().GetEventPosition()
+  #       xyz = sliceWidget.convertDeviceToXYZ(xy)
+  #       ras = sliceWidget.convertXYZToRAS(xyz)
+  #     else:
+  #       sliceWidget = self.sliceWidgetsPerStyle[observee]
+  #       sliceLogic = sliceWidget.sliceLogic()
+  #       sliceNode = sliceWidget.mrmlSliceNode()
+  #       interactor = observee.GetInteractor()
+  #       xy = interactor.GetEventPosition()
+  #       xyz = sliceWidget.sliceView().convertDeviceToXYZ(xy);
+  #       ras = sliceWidget.sliceView().convertXYZToRAS(xyz)
 
-      if self.click == 0:
-        firstCorner=ras
-        self.click += 1
-      elif self.click == 1:
-        lastCorner=ras
+  #     if self.click == 0:
+  #       firstCorner=ras
+  #       self.click += 1
+  #     elif self.click == 1:
+  #       lastCorner=ras
 
-        #crop volume (IJK or RAS?)
-    volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
-    imageData = volumeNode.GetImageData()
-    imageDimensions = imageData.GetDimensions()
-    m = vtk.vtkMatrix4x4()
-    volumeNode.GetIJKToRASMatrix(m)
-    a = (firstCorner[0]+lastCorner[0])/2
-    b = (firstCorner[1]+lastCorner[1])/2
-    c = (firstCorner[2]+lastCorner[2])/2
-    ra = abs(lastCorner[0]-firstCorner[0])
-    rb = abs(lastCorner[1]-firstCorner[1])
-    rc = min(ra/float(rb),rb/float(ra))
-    roi = slicer.mrmlScene.CreateNodeByClass('vtkMRMLAnnotationROINode')
-    slicer.mrmlScene.AddNode(roi)
-    roi.SetROIAnnotationVisibility(1)
-    roi.SetRadiusXYZ(ra,rb,rc)
-    roi.SetXYZ(a,b,c)
-    roi.SetLocked(1)
+  #       #crop volume (IJK or RAS?)
+  #   volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+  #   imageData = volumeNode.GetImageData()
+  #   imageDimensions = imageData.GetDimensions()
+  #   m = vtk.vtkMatrix4x4()
+  #   volumeNode.GetIJKToRASMatrix(m)
+  #   a = (firstCorner[0]+lastCorner[0])/2
+  #   b = (firstCorner[1]+lastCorner[1])/2
+  #   c = (firstCorner[2]+lastCorner[2])/2
+  #   ra = abs(lastCorner[0]-firstCorner[0])
+  #   rb = abs(lastCorner[1]-firstCorner[1])
+  #   rc = min(ra/float(rb),rb/float(ra))
+  #   roi = slicer.mrmlScene.CreateNodeByClass('vtkMRMLAnnotationROINode')
+  #   slicer.mrmlScene.AddNode(roi)
+  #   roi.SetROIAnnotationVisibility(1)
+  #   roi.SetRadiusXYZ(ra,rb,rc)
+  #   roi.SetXYZ(a,b,c)
+  #   roi.SetLocked(1)
 
-    #crop volume
-    cropVolumeNode =slicer.mrmlScene.CreateNodeByClass('vtkMRMLCropVolumeParametersNode')
-    cropVolumeNode.SetScene(slicer.mrmlScene)
-    cropVolumeNode.SetName('template-area_CropVolume_node')
-    cropVolumeNode.SetIsotropicResampling(False)
-    slicer.mrmlScene.AddNode(cropVolumeNode)
-    cropVolumeNode.SetInputVolumeNodeID(volumeNode.GetID())
-    cropVolumeNode.SetROINodeID(roi.GetID())
-    cropVolumeLogic = slicer.modules.cropvolume.logic()
-    cropVolumeLogic.Apply(cropVolumeNode)
-    roiVolume = slicer.mrmlScene.GetNodeByID(cropVolumeNode.GetOutputVolumeNodeID())
-    roiVolume.SetName("template-area-ROI")
+  #   #crop volume
+  #   cropVolumeNode =slicer.mrmlScene.CreateNodeByClass('vtkMRMLCropVolumeParametersNode')
+  #   cropVolumeNode.SetScene(slicer.mrmlScene)
+  #   cropVolumeNode.SetName('template-area_CropVolume_node')
+  #   cropVolumeNode.SetIsotropicResampling(False)
+  #   slicer.mrmlScene.AddNode(cropVolumeNode)
+  #   cropVolumeNode.SetInputVolumeNodeID(volumeNode.GetID())
+  #   cropVolumeNode.SetROINodeID(roi.GetID())
+  #   cropVolumeLogic = slicer.modules.cropvolume.logic()
+  #   cropVolumeLogic.Apply(cropVolumeNode)
+  #   roiVolume = slicer.mrmlScene.GetNodeByID(cropVolumeNode.GetOutputVolumeNodeID())
+  #   roiVolume.SetName("template-area-ROI")
+
 
   def validate( self, desiredBranchId ):
     '''
@@ -615,10 +623,12 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
   def onEntry(self,comingFrom,transitionType):
     super(iGyneFirstRegistrationStep, self).onEntry(comingFrom, transitionType)
     pNode = self.parameterNode()
-    if pNode.GetParameter('skip') != '1':
+    print pNode
+    volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+
+    if pNode.GetParameter('skip') != '1' and volumeNode != None:
       
       #hough transform parameters
-      volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
       imageData = volumeNode.GetImageData()
       imageDimensions = imageData.GetDimensions()
       m = vtk.vtkMatrix4x4()

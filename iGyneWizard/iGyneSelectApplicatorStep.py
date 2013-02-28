@@ -46,16 +46,24 @@ class iGyneSelectApplicatorStep( iGyneStep ) :
     # self.__layout.addRow(checkBox7)
     # self.__layout.addRow(checkBox8)
     # self.updateWidgetFromParameters(self.parameterNode())
-    # qt.QTimer.singleShot(0, self.killButton)
+    qt.QTimer.singleShot(0, self.killButton)
+      
+  def killButton(self):
+    # hide useless button
+    bl = slicer.util.findChildren(text='NeedleSegmentation')
+    if len(bl):
+      bl[0].hide()
 
   def onEntry(self,comingFrom,transitionType):
   
     super(iGyneSelectApplicatorStep, self).onEntry(comingFrom, transitionType)
     # setup the interface
     pNode = self.parameterNode()
+    print pNode
     pNode.SetParameter('currentStep', self.stepid)
-    if pNode.GetParameter('skip')=='1':
-      self.workflow().goForward() # 3       
+    print 'iGyneSelectApplicatorStep'
+    # if pNode.GetParameter('skip')=='1':
+    #   self.workflow().goForward() # 3       
 
 
   def onExit(self, goingTo, transitionType):
