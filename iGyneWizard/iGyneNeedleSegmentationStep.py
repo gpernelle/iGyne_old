@@ -14,6 +14,7 @@ import random
 import copy
 import operator
 import csv
+import numpy as np
 
 class iGyneNeedleSegmentationStep( iGyneStep ) :
 
@@ -29,9 +30,9 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.row=0
     self.validationNeedleNumber=0
     self.fiducialNode= None
-    self.axialSegmentationLimit = 0
+    self.axialSegmentationLimit = None
     self.stepNeedle = 0
-    self.tableValueCtrPt=[[]]
+    self.tableValueCtrPt = [[[999,999,999] for i in range(100)] for j in range(100)]
     self.ptNumber=0
     self.table=None
     self.view = None
@@ -43,6 +44,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.color = self.setColors()
     self.color255 = self.setColors255()
     self.p = self.setHolesCoordinates()
+    self.t0=0
 
     # initialize the dicom infrastructure
     settings = qt.QSettings()
@@ -273,6 +275,10 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     validationFrame.addRow(self.drawValidationNeedlesButton)
     self.drawValidationNeedlesButton.connect('clicked()', self.drawValidationNeedles)
 
+    self.startValidationButton = qt.QPushButton('Start Evaluation')
+    validationFrame.addRow(self.startValidationButton)
+    self.startValidationButton.connect('clicked()', self.startValidation)
+
     #Reset Needle Validation Button 
     self.resetDetectionButton = qt.QPushButton('Reset Needles from Manual Segmention')
     validationFrame.addRow(self.resetDetectionButton)
@@ -373,7 +379,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.sigmaValue = qt.QSpinBox()
     self.sigmaValue.setMinimum(0.1)
     self.sigmaValue.setMaximum(500)
-    self.sigmaValue.setValue(2)
+    self.sigmaValue.setValue(4)
     sigmaValueLabel = qt.QLabel("Sigma Value (exp(-x^2/(2*(sigma/10)^2))): ")
     bendingFrame.addRow( sigmaValueLabel, self.sigmaValue)
 
@@ -413,7 +419,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.nbRotatingIterations = qt.QSpinBox()
     self.nbRotatingIterations.setMinimum(2)
     self.nbRotatingIterations.setMaximum(500)
-    self.nbRotatingIterations.setValue(36)
+    self.nbRotatingIterations.setValue(35)
     nbRotatingIterationsLabel = qt.QLabel("Number of rotating steps: ")
     bendingFrame.addRow( nbRotatingIterationsLabel, self.nbRotatingIterations)
     
@@ -429,7 +435,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.stepsize = qt.QSpinBox()
     self.stepsize.setMinimum(1)
     self.stepsize.setMaximum(50)
-    self.stepsize.setValue(18)
+    self.stepsize.setValue(5)
     stepsizeLabel = qt.QLabel("Stepsize: ")
     bendingFrame.addRow( stepsizeLabel, self.stepsize)
 
@@ -972,7 +978,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     textNode=fiducial.GetAnnotationTextDisplayNode()
     textNode.SetTextScale(4)
     textNode.SetColor(self.color[int(nth)][0],self.color[int(nth)][1],self.color[int(nth)][2])
-    self.tableValueCtrPt[self.validationNeedleNumber].append(self.ijk2ras(A))
+    self.tableValueCtrPt[self.validationNeedleNumber][self.stepNeedle] = self.ijk2ras(A)
 
   def needleDetectionThread(self,A, imageData,colorVar,spacing):
     '''
@@ -1001,7 +1007,12 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     axialSegmentationLimit      = self.axialSegmentationLimit
 
     ### length needle = distance Aijk[2]*0.9
-    lenghtNeedle = self.ijk2ras(A)[2]*0.9
+    # lenghtNeedle = abs(self.ijk2ras(A)[2]*0.9)
+
+    if axialSegmentationLimit!=None:
+      lenghtNeedle = abs(A[2] - axialSegmentationLimit)*1.15*spacing[2]
+    else:
+      lenghtNeedle = A[2]*0.9*spacing[2]
     
     rMax            = distanceMax/float(spacing[0])
     NbStepsNeedle   = numberOfPointsPerNeedle - 1
@@ -1023,12 +1034,12 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     bestControlPoints.append(self.ijk2ras(A))
 
     for step in range(0,NbStepsNeedle+2):
-      
+      print "length", lenghtNeedle
       #step 0
       #------------------------------------------------------------------------------
       if step==0:
 
-        L       = 20/float(spacing[2])
+        L       = self.stepSize(step+1,NbStepsNeedle+1)*lenghtNeedle
         C0      = [A[0],A[1],A[2]- L]
         rMax    = distanceMax/float(spacing[0])
         rIter   = rMax
@@ -1038,7 +1049,8 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       #------------------------------------------------------------------------------
       else:
 
-        stepSize = max(self.stepSize(step,NbStepsNeedle+1)*lenghtNeedle,stepsize/float(spacing[2]))
+        stepSize = self.stepSize(step+1,NbStepsNeedle+1)*lenghtNeedle
+        print stepSize
 
         C0      = [ 2*A[0]-tip0[0],
                     2*A[1]-tip0[1],
@@ -1145,7 +1157,8 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       elif bestPoint!=tip0: 
         A   = bestPoint
  
-      if A[2]<axialSegmentationLimit:
+
+      if A[2]<axialSegmentationLimit and A!=A0:
         
         asl = axialSegmentationLimit
         l   = (A[2]-asl)/float(tip0[2]-A[2])
@@ -1163,7 +1176,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         fiducial.SetName('.')
         fiducial.SetFiducialCoordinates(controlPoints[step+1])
 
-      if A[2]<=axialSegmentationLimit:
+      if A[2]<=axialSegmentationLimit and A!=A0:
         break
     
     self.addNeedleToScene(controlPoints,colorVar)
@@ -1178,7 +1191,9 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         nodes = slicer.util.getNodes('manual-seg*')
         for node in nodes.values():
           slicer.mrmlScene.RemoveNode(node)
-
+    
+    if self.tableValueCtrPt==[[]]:
+        self.tableValueCtrPt = [[[999,999,999] for i in range(100)] for j in range(100)]
     modelNodes = slicer.mrmlScene.GetNodesByClass('vtkMRMLAnnotationFiducialNode')
     nbNode=modelNodes.GetNumberOfItems()
     for nthNode in range(nbNode):
@@ -1189,11 +1204,17 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
           coord=[0,0,0]
           modelNode.GetFiducialCoordinates(coord)
           self.tableValueCtrPt[needleNumber][needleStep]=coord
+          print needleNumber,needleStep,coord
+
+
 
     for i in range(len(self.tableValueCtrPt)):
-      colorVar = random.randrange(50,100,1)/(100)
-      controlPoints=self.sortTable(self.tableValueCtrPt[i],(2,1,0))
-      self.addNeedleToScene(controlPoints,i,'Validation')    
+      if self.tableValueCtrPt[i][0][0]!=999:
+          colorVar = random.randrange(50,100,1)/(100)
+          controlPointsUnsorted = [val for val in self.tableValueCtrPt[i] if val !=[999,999,999]]
+          controlPoints=self.sortTable(controlPointsUnsorted,(2,1,0))
+          print self.tableValueCtrPt[i]
+          self.addNeedleToScene(controlPoints,i,'Validation')    
 
   def addNeedleToScene(self,controlPoint,colorVar, needleType='Detection'): 
     '''
@@ -1360,7 +1381,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     
     self.validationNeedleNumber=0
     self.stepNeedle = 0
-    self.tableValueCtrPt=[[]]
+    self.tableValueCtrPt=[[[999,999,999] for i in range(100)] for j in range(100)]
 
   def changeCursor(self,cursorNumber):
     appLogic = slicer.app.applicationLogic()
@@ -1457,6 +1478,8 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         for event in events:
           if process==1:
             tag = style.AddObserver(event, self.processEventNeedleValidation)
+          elif process==2:
+            tag = style.AddObserver(event, self.processEventAddManualTips)
           else:
             tag = style.AddObserver(event, self.processEvent)   
           self.styleObserverTags.append([style,tag])
@@ -1535,6 +1558,37 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       self.needleValidation(ijk, imageData, colorVar,spacing)
       self.stepNeedle+=1
 
+  def processEventAddManualTips(self,observee,event=None):
+    '''
+    Get the mouse clicks and create a fiducial node at this position. Used later for the fiducial registration
+    '''
+    if self.sliceWidgetsPerStyle.has_key(observee) and event == "LeftButtonPressEvent":
+      if slicer.app.repositoryRevision<= 21022:
+        sliceWidget = self.sliceWidgetsPerStyle[observee]
+        style = sliceWidget.sliceView().interactorStyle()          
+        xy = style.GetInteractor().GetEventPosition()
+        xyz = sliceWidget.convertDeviceToXYZ(xy)
+        ras = sliceWidget.convertXYZToRAS(xyz)
+      else:
+        sliceWidget = self.sliceWidgetsPerStyle[observee]
+        sliceLogic = sliceWidget.sliceLogic()
+        sliceNode = sliceWidget.mrmlSliceNode()
+        interactor = observee.GetInteractor()
+        xy = interactor.GetEventPosition()
+        xyz = sliceWidget.sliceView().convertDeviceToXYZ(xy);
+        ras = sliceWidget.sliceView().convertXYZToRAS(xyz)
+      
+      
+      volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+      imageData = volumeNode.GetImageData()
+      spacing = volumeNode.GetSpacing()
+      # ijk=self.ras2ijk(ras)
+      # self.t0=time.clock()
+      self.addManualTip(ras)
+
+
+
+
   def onRunButtonToggled(self, checked):
     if checked:
       self.start()
@@ -1554,7 +1608,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
   def validationNeedle(self):
     self.validationNeedleNumber += 1
     self.validationNeedleButton.text= "New Validation Needle: ("+str(self.validationNeedleNumber)+")->("+str(self.validationNeedleNumber+1)+")"
-    self.tableValueCtrPt.append([])
+    # self.tableValueCtrPt.append([])
     self.stepNeedle = 0     
 
   #----------------------------------------------------------------------------------------------
@@ -2905,28 +2959,27 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
   '''
   #----------------------------------------------------------------------------------------------
   
+  def returnTips(self):
+    returnTips=[]
+    modelNodes=slicer.mrmlScene.GetNodesByClass('vtkMRMLModelNode')
+    nbNode=modelNodes.GetNumberOfItems()
+    for nthNode in range(nbNode):
+        # print nthNode
+        node=slicer.mrmlScene.GetNthNodeByClass(nthNode,'vtkMRMLModelNode')
+        if node.GetAttribute('type')=='Validation':
+            polydata = node.GetPolyData()
+            p,pbis=[0,0,0],[0,0,0]
+            if polydata.GetNumberOfPoints()>100:
+                polydata.GetPoint(0,p)
+                polydata.GetPoint(int(polydata.GetNumberOfPoints()-1),pbis)
+                if pbis[2]>p[2]:
+                    p=pbis
+                
+                returnTips.append(self.ras2ijk(p))
+    return returnTips
+
   def startValidation(self):
-    tips=[]
-    tips.append(    [230.67027144723474, 203.97902453186239, 72.498735809326135]    )
-    tips.append(    [232.7501088692118, 187.34032515604588, 73.498735809326135] )
-    tips.append(    [199.81934968790827, 196.69959355494265, 69.498735809326135]    )
-    tips.append(    [225.81731746262156, 227.89715488459865, 65.498735809326135]    )
-    tips.append(    [246.61569168239222, 234.48330672085933, 61.498735809326135]    )
-    tips.append(    [252.50856437799391, 240.72281898679054, 57.498735809326135]    )
-    tips.append(    [215.07149078240673, 221.31100304833794, 55.498735809326135]    )
-    tips.append(    [216.45804906372479, 223.390840470315, 63.498735809326135]  )
-    tips.append(    [222.00428218899697, 215.76476992306576, 62.498735809326135]    )
-    tips.append(    [214.0315720714182, 199.12607054724924, 61.498735809326135] )
-    tips.append(    [178.32769632747861, 211.95173464944114, 62.498735809326135]    )
-    tips.append(    [176.24785890550152, 198.08615183626071, 64.498735809326135]    )
-    tips.append(    [158.56924081869647, 211.25845550878211, 66.498735809326135]    )
-    tips.append(    [165.84867179561621, 197.04623312527215, 70.498735809326135]    )
-    tips.append(    [158.22260124836697, 190.46008128901147, 66.498735809326135]    )
-    tips.append(    [171.74154449121789, 185.26048773406879, 56.498735809326135]    )
-    tips.append(    [192.88655828131806, 170.70162578022934, 56.498735809326135]    )
-    tips.append(    [206.75214109449848, 171.39490492088837, 55.498735809326135]    )
-    tips.append(    [167.58186964726377, 158.91588038902597, 62.498735809326135]    )
-    tips.append(    [181.1008128901147, 232.05682972855277, 55.498735809326135] )
+    tips= self.returnTips()
     # select the image node from the Red slice viewer
     m=vtk.vtkMatrix4x4()
     volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
@@ -2939,6 +2992,10 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       A=tips[I]
       colorVar = I/(len(tips))
       self.needleDetectionThread(A, imageData, colorVar,spacing)
+
+    t = self.evaluate()
+    for i in range(len(t)):
+        print t[i][0]
 
   def startValidationSCRIPT(self, volumeNodeID,tips, axialSegmentationLimit,
     radiusNeedleParameter, lenghtNeedleParameter,drawFid,nbRotatingIterations,
@@ -2977,7 +3034,10 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     From these NbStepsNeedle-1 control points and 2 extremities a Bezier curve is computed, approximating the needle path.
     '''
     ### length needle = distance Aijk[2]*1.1
-    lenghtNeedle = self.ijk2rasSCRIPT(A,volumeNodeID)[2]*0.9
+    if axialSegmentationLimit!=None:
+      lenghtNeedle = (self.ijk2rasSCRIPT(A,volumeNodeID)[2] - axialSegmentationLimit)*1.15
+    else:
+      lenghtNeedle = self.ijk2rasSCRIPT(A,volumeNodeID)[2]*0.9
 
     ### initialisation of the parameters
     self.valuesExperience=[radiusNeedleParameter,lenghtNeedleParameter,
@@ -3294,5 +3354,171 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     print self.axialSegmentationLimit
 
 
+  def exportEvaluation(self,results,url):
+    self.valuesExperience=[ self.radiusNeedleParameter.value,
+                            self.lenghtNeedleParameter.value,
+                            self.distanceMax.value,
+                            self.numberOfPointsPerNeedle.value, 
+                            self.nbRotatingIterations.value,
+                            self.stepsize.value,
+                            self.gradientPonderation.value,
+                            self.gaussianAttenuationChecked.value,
+                            self.sigmaValue.value]
+    myfile = open(url, 'a')
+    wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
+    results.append(self.valuesExperience)
+    wr.writerow(results)
 
-            
+  def hausdorffDistance2(self,id1,id2):
+      node1 = slicer.mrmlScene.GetNodeByID(id1)
+      polydata1=node1.GetPolyData()
+      node2 = slicer.mrmlScene.GetNodeByID(id2)
+      polydata2=node2.GetPolyData()
+      nb1 = polydata1.GetNumberOfPoints()
+      nb2 = polydata2.GetNumberOfPoints()
+      minimum=None
+      maximum=None
+      JJ,jj=None,None
+      II,ii=None,None
+      pt1=[0,0,0]
+      pt2=[0,0,0]
+      polydata1.GetPoint(1,pt1)
+      polydata1.GetPoint(nb1-1,pt2)
+      minVal1=min(pt1[2],pt2[2])
+      maxVal1=max(pt1[2],pt2[2])
+      pt1=[0,0,0]
+      pt2=[0,0,0]
+      pt1b,pt2b=None,None
+      polydata2.GetPoint(1,pt1)
+      polydata2.GetPoint(nb2-1,pt2)
+      minVal2 = min(pt1[2],pt2[2])
+      maxVal2 = max(pt1[2],pt2[2])
+      valueBase=max(minVal1,minVal2)
+      valueTip=min(maxVal1,maxVal2)
+      cellId=vtk.mutable(1)
+      subid=vtk.mutable(1)
+      dist=vtk.mutable(1)
+      cl2=vtk.vtkCellLocator()
+      cl2.SetDataSet(polydata2)
+      cl2.BuildLocator()
+      # Hausforff 1 -> 2
+      minima=[]
+      for i in range(int(nb1/float(100))):
+        pt=[0,0,0]
+        polydata1.GetPoint(100*i,pt)
+        closest=[0,0,0]
+        cl2.FindClosestPoint(pt,closest,cellId,subid,dist)
+        if abs(closest[2]-pt[2])<=1:
+          minima.append(self.distance(pt,closest))
+        else:
+            minima.append(0)
+      hausdorff12 = max(minima)
+      
+      # Hausforff 2 -> 1
+      minima=[]
+      cl1=vtk.vtkCellLocator()
+      cl1.SetDataSet(polydata1)
+      cl1.BuildLocator()
+      for i in range(int(nb2/float(10))):
+        pt=[0,0,0]
+        polydata2.GetPoint(10*i,pt)
+        closest=[0,0,0]
+        cl1.FindClosestPoint(pt,closest,cellId,subid,dist)
+        if abs(closest[2]-pt[2])<=1:
+          minima.append(self.distance(pt,closest))
+        else:
+            minima.append(0)
+      hausdorff21 = max(minima)
+      return max(hausdorff12,hausdorff21)
+
+  def evaluate(self):
+      result=self.needleMatching()
+      HD=[]
+      for i in range(len(result)):
+        val=self.hausdorffDistance2(result[i][1],result[i][2])
+        results = [float(val),int(result[i][1].strip('vtkMRMLModelNode')),int(result[i][2].strip('vtkMRMLModelNode'))]
+        HD.append(results)
+      return np.array(HD).astype(np.longdouble)
+
+  def distTip(self,id1,id2):
+      node = slicer.mrmlScene.GetNodeByID('vtkMRMLModelNode'+str(id1))
+      polydata=node.GetPolyData()
+      node2 = slicer.mrmlScene.GetNodeByID('vtkMRMLModelNode'+str(id2))
+      polydata2=node2.GetPolyData()
+      p,pbis=[0,0,0],[0,0,0]
+      p2=[0,0,0]
+      p2bis=[0,0,0]
+      axialDistance=[]
+      for i in range(100):
+          polydata.GetPoint(i,p)
+          polydata.GetPoint(2499-i,pbis)
+          if pbis[2]>p[2]:
+            p=pbis
+          polydata2.GetPoint(2499-i,p2)
+          polydata2.GetPoint(i,p2bis)
+          if p2bis[2]>p2[2]:
+            p2=p2bis
+          axialDistance.append((( p2[0]-p[0] )**2 +  ( p2[1]-p[1] )**2)**0.5)
+      return min(axialDistance)
+
+
+  def needleMatching(self):
+      modelNodes=slicer.mrmlScene.GetNodesByClass('vtkMRMLModelNode')
+      nbNode=modelNodes.GetNumberOfItems()
+      result=[]
+      found=[]
+      print nbNode
+      for nthNode in range(nbNode):
+        node=slicer.mrmlScene.GetNthNodeByClass(nthNode,'vtkMRMLModelNode')
+        if node.GetID() not in found and node.GetAttribute('type')!='Validation':
+          dist=[]
+          polydata = node.GetPolyData()
+          if polydata!=None:
+            bounds = polydata.GetBounds()
+            for nthNode2 in range(nbNode):
+              node2=slicer.mrmlScene.GetNthNodeByClass(nthNode2,'vtkMRMLModelNode')
+              if node2.GetID() not in found and node2.GetAttribute('type')=='Validation':
+                polydata2 = node2.GetPolyData()
+                if polydata2!=None and polydata2.GetNumberOfPoints()>100 and polydata.GetNumberOfPoints()>100:
+                  bounds2 = polydata2.GetBounds()
+                  tot=0
+                  p,pbis=[0,0,0],[0,0,0]
+                  p2=[0,0,0]
+                  p2bis=[0,0,0]
+                  polydata.GetPoint(0,p)
+                  polydata.GetPoint(0,pbis)
+                  polydata2.GetPoint(2499,p2)
+                  polydata2.GetPoint(0,p2bis)
+                  # tot=min(( p[0]-p2[0] )**2 +  ( p[1]-p2[1] )**2,  ( p[0]-p2bis[0] )**2 +  ( p[1]-p2bis[1] )**2 , (pbis[0]-p2[0] )**2 +  ( pbis[1]-p2[1] )**2 , (pbis[0]-p2bis[0] )**2 +  ( pbis[1]-p2bis[1] )**2)
+                  # axialDistance=(tot)**(0.5)
+                  axialDistance=self.distTip( int(node.GetID().strip('vtkMRMLModelNode')) , int(node2.GetID().strip('vtkMRMLModelNode')))
+                  # axialDistance=hausdorffDistance(node.GetID(), node2.GetID())
+                  dist.append([axialDistance,node2.GetID()])
+                  # print axialDistance
+                  
+            if dist!=[]:
+              match=[min(dist)[0],min(dist)[1],node.GetID()]
+              result.append(match)
+              found.append(min(dist)[1])
+              found.append(node.GetID()) 
+              node.GetDisplayNode().SetSliceIntersectionVisibility(1)
+      # print result
+      return result
+
+  def distance(self,pt1,pt2):
+    d = ( (  float(pt1[0]) - float(pt2[0])  )**2 + (  float(pt1[1]) - float(pt2[1])  )**2 + (  float(pt1[2]) - float(pt2[2])  )**2 )**0.5
+    return d
+
+
+  def addManualTip(self,A):
+    self.fiducialNode = slicer.mrmlScene.CreateNodeByClass('vtkMRMLAnnotationFiducialNode')
+    self.fiducialNode.Initialize(slicer.mrmlScene)
+    self.fiducialNode.SetName('tip')        
+    self.fiducialNode.SetFiducialCoordinates(A)
+    fd=self.fiducialNode.GetDisplayNode()
+    fd.SetVisibility(1)
+    fd.SetColor([0,1,0])
+
+
+
+
