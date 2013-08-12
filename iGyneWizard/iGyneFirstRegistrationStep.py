@@ -76,7 +76,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
 
     # Auto-value option
     self.autoValue = qt.QCheckBox('Automatic values?')
-    self.autoValue.checked = True
+    self.autoValue.checked = False
     houghFrame.addRow(self.autoValue)
 
     # Ratio height
@@ -101,16 +101,20 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     ratioLengthCroppedVolumeLabel = qt.QLabel("Divide the length by: ")
     houghFrame.addRow(ratioLengthCroppedVolumeLabel, self.ratioLengthCroppedVolume)
 
+    # Get Maximum Threshold Value
+    imageData = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode().GetImageData()
+    minMax = imageData.GetScalarRange()
+    maxThresh = minMax[1]
 
     # Threshold slider for template segmentation
     threshLabel = qt.QLabel('Threshold for CHT:')
     self.__threshRange = slicer.qMRMLRangeWidget()
     self.__threshRange.decimals = 0
     self.__threshRange.singleStep = 1
-    self.__threshRange.minimum = 80
-    self.__threshRange.minimumValue = 110
-    self.__threshRange.maximum = 255
-    self.__threshRange.maximumValue = 255
+    self.__threshRange.minimum = 150
+    self.__threshRange.minimumValue = 150
+    self.__threshRange.maximum = maxThresh
+    self.__threshRange.maximumValue = maxThresh
     houghFrame.addRow(threshLabel,self.__threshRange)
     self.__layout.addRow(self.__houghFrame)
 
@@ -172,7 +176,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     roi = slicer.mrmlScene.CreateNodeByClass('vtkMRMLAnnotationROINode')
     slicer.mrmlScene.AddNode(roi)
     roi.SetROIAnnotationVisibility(1)
-    roi.SetRadiusXYZ(imageDimensions[0]/a,imageDimensions[1]/b,imageDimensions[2]/c)
+    roi.SetRadiusXYZ(100,100,imageDimensions[2]/c)
     roi.SetXYZ(0,0,m.GetElement(2,3)+imageDimensions[2]/c)
     roi.SetLocked(1)
 
