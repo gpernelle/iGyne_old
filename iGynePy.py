@@ -47,9 +47,6 @@ class iGynePyWidget:
 
     workflowWidget = ctk.ctkWorkflowStackedWidget()
     workflowWidget.setWorkflow( self.workflow )
-
-    workflowWidget.buttonBoxWidget().nextButtonDefaultText = ""
-    workflowWidget.buttonBoxWidget().backButtonDefaultText = ""
     
     # create all wizard steps
     selectProcedureStep = iGyneWizard.iGyneSelectProcedureStep( 'SelectProcedure'  )
