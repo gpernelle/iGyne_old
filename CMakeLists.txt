@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 2.8.7)
 
 #-----------------------------------------------------------------------------
 if(NOT Slicer_SOURCE_DIR)
-  set(EXTENSION_NAME iGynePy)
-  set(EXTENSION_HOMEPAGE "http://www.slicer.org/slicerWiki/index.php/Documentation/4.2/Extensions/iGynePy")
+  set(EXTENSION_NAME iGyne)
+  set(EXTENSION_HOMEPAGE "http://www.slicer.org/slicerWiki/index.php/Documentation/4.3/Extensions/iGyne")
   set(EXTENSION_CATEGORY "IGT")
   set(EXTENSION_CONTRIBUTORS "Guillaume Pernelle, Xiaojun Chen, Yi Gao, Carolina Vale, Jan Egger, Tobias Penzkofer, Sandy Wells, Sam Song, Antonio Damato, Tina Kapur, Akila Viswanathan")
 
@@ -14,7 +14,7 @@ if(NOT Slicer_SOURCE_DIR)
 endif()
 
 #-----------------------------------------------------------------------------
-set(MODULE_NAME iGynePy)
+set(MODULE_NAME iGyne)
 
 #-----------------------------------------------------------------------------
 if(NOT Slicer_SOURCE_DIR)
@@ -28,7 +28,7 @@ add_subdirectory(iGyneWizard)
 file(COPY ${CMAKE_SOURCE_DIR}/Resources DESTINATION ${Slicer_QTSCRIPTEDMODULES_LIB_DIR}) 
 
 set(MODULE_PYTHON_SCRIPTS
-  iGynePy.py)
+  iGyne.py)
 
 set(MODULE_PYTHON_RESOURCES
   )
@@ -37,7 +37,7 @@ set(MODULE_PYTHON_RESOURCES
 # Build
 #-----------------------------------------------------------------------------
 ctkMacroCompilePythonScript(
-  TARGET_NAME iGynePy
+  TARGET_NAME iGyne
   SCRIPTS "${MODULE_PYTHON_SCRIPTS}"
   RESOURCES "${MODULE_PYTHON_RESOURCES}"
   DESTINATION_DIR ${CMAKE_BINARY_DIR}/${Slicer_QTSCRIPTEDMODULES_LIB_DIR}
