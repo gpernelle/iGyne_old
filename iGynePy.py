@@ -2,7 +2,7 @@ from __main__ import vtk, qt, ctk, slicer
 import os.path,time
 import iGyneWizard
 
-class iGyne:
+class iGynePy:
   def __init__( self, parent ):
     parent.title = "iGyne"
     parent.categories = ["Wizards"]
@@ -11,7 +11,7 @@ class iGyne:
     parent.acknowledgementText = " Version : " + "iGyne v2.0."
     self.parent = parent
 
-class iGyneWidget:
+class iGynePyWidget:
   def __init__( self, parent=None ):
     if not parent:
       self.parent = slicer.qMRMLWidget()
@@ -85,13 +85,13 @@ class iGyneWidget:
     for n in xrange(nNodes):
       compNode = slicer.mrmlScene.GetNthNodeByClass(n, 'vtkMRMLScriptedModuleNode')
       nodeid = None
-      if compNode.GetModuleName() == 'iGyne':
+      if compNode.GetModuleName() == 'iGynePy':
         self.parameterNode = compNode
         print 'Found existing iGyne parameter node'
         break
     if self.parameterNode == None:
       self.parameterNode = slicer.mrmlScene.CreateNodeByClass('vtkMRMLScriptedModuleNode')
-      self.parameterNode.SetModuleName('iGyne')
+      self.parameterNode.SetModuleName('iGynePy')
       slicer.mrmlScene.AddNode(self.parameterNode)
  
     # Propagate the workflow, the logic and the MRML Manager to the steps

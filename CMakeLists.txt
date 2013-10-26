@@ -37,7 +37,7 @@ set(MODULE_PYTHON_RESOURCES
 # Build
 #-----------------------------------------------------------------------------
 ctkMacroCompilePythonScript(
-  TARGET_NAME iGyne
+  TARGET_NAME iGyne 
   SCRIPTS "${MODULE_PYTHON_SCRIPTS}"
   RESOURCES "${MODULE_PYTHON_RESOURCES}"
   DESTINATION_DIR ${CMAKE_BINARY_DIR}/${Slicer_QTSCRIPTEDMODULES_LIB_DIR}
