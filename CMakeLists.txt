@@ -28,7 +28,7 @@ add_subdirectory(iGyneWizard)
 file(COPY ${CMAKE_SOURCE_DIR}/Resources DESTINATION ${Slicer_QTSCRIPTEDMODULES_LIB_DIR}) 
 
 set(MODULE_PYTHON_SCRIPTS
-  iGyne.py)
+  iGynePy.py)
 
 set(MODULE_PYTHON_RESOURCES
   )
