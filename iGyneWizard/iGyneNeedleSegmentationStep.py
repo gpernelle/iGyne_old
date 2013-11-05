@@ -428,10 +428,11 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
 
 
     # nb points per line spin box
+    ### previously 4 - try with 20
     self.sigmaValue = qt.QSpinBox()
     self.sigmaValue.setMinimum(0.1)
     self.sigmaValue.setMaximum(500)
-    self.sigmaValue.setValue(4)
+    self.sigmaValue.setValue(20)
     sigmaValueLabel = qt.QLabel("Sigma Value (exp(-x^2/(2*(sigma/10)^2))): ")
     bendingFrame.addRow( sigmaValueLabel, self.sigmaValue)
 
@@ -442,6 +443,15 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.gradientPonderation.setValue(5)
     gradientPonderationLabel = qt.QLabel("Neighborhood Ponderation: ")
     bendingFrame.addRow( gradientPonderationLabel, self.gradientPonderation)
+
+    # center accuentuation
+    ### previously 1, try with 2 ( avoids exiting catheter track)
+    self.exponent = qt.QSpinBox()
+    self.exponent.setMinimum(0.01)
+    self.exponent.setMaximum(500)
+    self.exponent.setValue(2)
+    exponentLabel = qt.QLabel("Center Ponderation: ")
+    bendingFrame.addRow( exponentLabel, self.exponent)
 
     # nb points per line spin box
     self.nbPointsPerLine = qt.QSpinBox()
@@ -1093,6 +1103,10 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       self.obtuNeedleValueCtrPt[needleNumber][1] = [Ex,Ey,Ez]
 
     self.drawObturatorNeedles()
+    self.stop()
+    self.fiducialObturatorButton.checked = 1
+    self.start(3)
+
 
 
   def objectiveFunction(self,imageData, ijk, radiusNeedleParameter, spacing, gradientPonderation):
@@ -1164,6 +1178,9 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
 
   def findTip(self, A, imageData, radiusNeedle, coeff, sigmaValue, gradientPonderation, X, Y, Z):
     minTotalTip=0
+    X = int(X)
+    Y = int(Y)
+    Z = int(Z)
     for I in range(-X,X):
       i=I/float(coeff)
       for J in range(-Y,Y):
@@ -1401,6 +1418,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
           
          
           # calculates tIter = number of points per segment 
+          #print tIter
           for t in xrange(tIter+1):
 
             tt  = t/float(tIter)
@@ -1414,8 +1432,17 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
             # first, test if points are in the image space 
             if ijk[0]<dims[0] and ijk[0]>0 and  ijk[1]<dims[1] and ijk[1]>0 and ijk[2]<dims[2] and ijk[2]>0:
               
-              center    = imageData.GetScalarComponentAsDouble(ijk[0], ijk[1], ijk[2], 0)
-              total     += center
+              center    =   imageData.GetScalarComponentAsDouble(ijk[0], ijk[1], ijk[2], 0)
+              center    +=  imageData.GetScalarComponentAsDouble(ijk[0]+1, ijk[1], ijk[2], 0)
+              center    +=  imageData.GetScalarComponentAsDouble(ijk[0]-1, ijk[1], ijk[2], 0)
+              center    +=  imageData.GetScalarComponentAsDouble(ijk[0], ijk[1]+1, ijk[2], 0)
+              center    +=  imageData.GetScalarComponentAsDouble(ijk[0], ijk[1]-1, ijk[2], 0)
+              center    +=  imageData.GetScalarComponentAsDouble(ijk[0]+1, ijk[1]+1, ijk[2], 0)
+              center    +=  imageData.GetScalarComponentAsDouble(ijk[0]+1, ijk[1]-1, ijk[2], 0)
+              center    +=  imageData.GetScalarComponentAsDouble(ijk[0]-1, ijk[1]+1, ijk[2], 0)
+              center    +=  imageData.GetScalarComponentAsDouble(ijk[0]-1, ijk[1]-1, ijk[2], 0)
+
+              total     += center**self.exponent.value
               if lookNeighborhood ==1 and mode == "circle" :
                 
                 g1 = imageData.GetScalarComponentAsDouble(ijk[0]+radiusNeedle, ijk[1], ijk[2], 0)
@@ -1427,7 +1454,15 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
                 g7 = imageData.GetScalarComponentAsDouble(ijk[0]-radiusNeedleCorner, ijk[1]+radiusNeedleCorner, ijk[2], 0)
                 g8 = imageData.GetScalarComponentAsDouble(ijk[0]+radiusNeedleCorner, ijk[1]-radiusNeedleCorner, ijk[2], 0)
                 
-                total += (8*center - ((g1+g2+g3+g4+g5+g6+g7+g8)/float(8))*gradientPonderation)/float(tIter)
+                #total += (center - ((g1+g2+g3+g4+g5+g6+g7+g8)/float(8))*gradientPonderation)/float(tIter)
+                total += ((center - g1)**gradientPonderation)/float(tIter)
+                total += ((center - g2)**gradientPonderation)/float(tIter)
+                total += ((center - g3)**gradientPonderation)/float(tIter)
+                total += ((center - g4)**gradientPonderation)/float(tIter)
+                total += ((center - g5)**gradientPonderation)/float(tIter)
+                total += ((center - g6)**gradientPonderation)/float(tIter)
+                total += ((center - g7)**gradientPonderation)/float(tIter)
+                total += ((center - g8)**gradientPonderation)/float(tIter)
                
                 # total = self.objectiveFunctionLOG(imageData, ijk, radiusNeedleParameter, spacing, 1)
 
@@ -1448,6 +1483,8 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
             estimator           = total
             
           if gaussianAttenuationChecked==1 and step>=2 :
+            if step == NbStepsNeedle:
+                sigmaValue = 100
             
             if Vz != 0:
               ''' 
@@ -1503,12 +1540,12 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
 
       self.controlPoints.append(self.ijk2ras(A))
       controlPointsIJK.append(A)
-
+      print('step:',step,':',minEstimator )
       if self.drawFiducialPoints.isChecked():
         fiducial = slicer.mrmlScene.CreateNodeByClass('vtkMRMLAnnotationFiducialNode')
         fiducial.Initialize(slicer.mrmlScene)
-        fiducial.SetName('.')
-        fiducial.SetFiducialCoordinates(controlPoints[step+1])
+        fiducial.SetName('.'+str(minEstimator))
+        fiducial.SetFiducialCoordinates(self.controlPoints[step+1])
 
       if A[2]<=axialSegmentationLimit and A!=A0:
         break
@@ -2080,17 +2117,20 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       print label
       modelDisplay.SetColor(self.color[label[0]][0],self.color[label[0]][1],self.color[label[0]][2])
       model.SetAttribute("nth",str(label[0]))
+    
     elif needleType=='Validation':
-      nth = colorVar
+      nth = int(colorVar)%64
       modelDisplay.SetColor(self.color[int(nth)][0],self.color[int(nth)][1],self.color[int(nth)][2])
       model.SetAttribute("nth",str(nth)) 
+    
     else:
-      nth = model.GetID().strip('vtkMRMLModelNode')
+      nth = int(model.GetID().strip('vtkMRMLModelNode'))%64
       modelDisplay.SetColor(self.color[int(nth)][0],self.color[int(nth)][1],self.color[int(nth)][2])
       model.SetAttribute("nth",str(nth))
     
     if needleType=='Validation':
       self.addSegmentedNeedleToTable(int(colorVar),label,'Validation')
+    
     else:
       self.addSegmentedNeedleToTable(int(model.GetID().strip('vtkMRMLModelNode')),label)
 
@@ -2254,7 +2294,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         # add obserservers and keep track of tags
         style = sliceWidget.sliceView().interactorStyle()
         self.sliceWidgetsPerStyle[style] = sliceWidget
-        events = ("LeftButtonPressEvent","LeftButtonReleaseEvent","MouseMoveEvent", "KeyPressEvent","KeyReleaseEvent","EnterEvent", "LeaveEvent")
+        events = ("LeftButtonPressEvent","LeftButtonReleaseEvent", "EnterEvent", "LeaveEvent","KeyPressEvent","KeyReleaseEvent")
         for event in events:
           if process==1:
             tag = style.AddObserver(event, self.processEventNeedleValidation)
@@ -2262,6 +2302,10 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
             tag = style.AddObserver(event, self.processEventAddManualTips)
           elif process==3:
             tag = style.AddObserver(event, self.processEventAddObturatorNeedleTips)
+            dn = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode().GetDisplayNode()
+            w = dn.GetWindow()
+            l = dn.GetLevel()
+            dn.AddObserver(vtk.vtkCommand.ModifiedEvent, lambda c,e : self.setWL(dn,w,l))
           else:
             tag = style.AddObserver(event, self.processEvent)   
           self.styleObserverTags.append([style,tag])
@@ -2272,6 +2316,10 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     '''
     self.changeCursor(0)
     self.removeObservers()
+    self.fiducialObturatorButton.checked = 0
+    self.fiducialButton.checked = 0
+    self.validationNeedleButton.checked = 0
+
 
 
   def removeObservers(self):
@@ -2287,7 +2335,18 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     '''
     Get the mouse clicks and create a fiducial node at this position. Used later for the fiducial registration
     '''
+    if self.sliceWidgetsPerStyle.has_key(observee) and event == "KeyPressEvent":
+      sliceWidget = self.sliceWidgetsPerStyle[observee]
+      style = sliceWidget.sliceView().interactorStyle()
+      key = style.GetInteractor().GetKeySym()
+      if key == 'o':
+        self.numberOfPointsPerNeedle.setValue(3)
+    if self.sliceWidgetsPerStyle.has_key(observee) and event == "KeyReleaseEvent":
+      self.numberOfPointsPerNeedle.setValue(6)
+
     if self.sliceWidgetsPerStyle.has_key(observee) and event == "LeftButtonPressEvent":
+
+
       if slicer.app.repositoryRevision<= 21022:
         sliceWidget = self.sliceWidgetsPerStyle[observee]
         style = sliceWidget.sliceView().interactorStyle()          
@@ -2344,6 +2403,9 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       self.needleValidation(ijk, imageData, colorVar,spacing)
       self.stepNeedle+=1
 
+    if self.sliceWidgetsPerStyle.has_key(observee) and event == "LeaveEvent":
+      self.stop()
+
 
   def processEventAddObturatorNeedleTips(self,observee,event=None):
     '''
@@ -2373,6 +2435,9 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       self.t0=time.clock()
       self.obturatorNeedle(ijk, imageData, colorVar,spacing)
       self.obtuNeedle += 1
+
+    if self.sliceWidgetsPerStyle.has_key(observee) and event == "LeaveEvent":
+      self.stop()
 
   def processEventAddManualTips(self,observee,event=None):
     '''
@@ -2407,6 +2472,8 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
 
   def onRunButtonToggled(self, checked):
     if checked:
+      self.startGivingControlPointsButton.checked = 0
+      self.fiducialObturatorButton.checked = 0
       self.start()
       self.fiducialButton.text = "Stop Giving Tips"  
     else:
@@ -2416,6 +2483,8 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
   def onRunObturatorButtonToggled(self, checked):
     if checked:
       self.fiducialButton.checked = 0
+      self.fiducialButton.text = "Start Giving Needle Tips"
+      self.startGivingControlPointsButton.checked = 0
       self.start(3)
       self.fiducialObturatorButton.text = "Stop Giving Obturator Needle Tips"  
     else:
@@ -2424,6 +2493,9 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
 
   def onNeedleValidationButtonToggled(self, checked):
     if checked:
+      self.fiducialObturatorButton.checked = 0
+      self.fiducialButton.checked = 0
+      self.fiducialButton.text = "Start Giving Needle Tips"
       self.start(1)
       self.startGivingControlPointsButton.text = "Stop Giving Control Points"  
     else:
@@ -3818,6 +3890,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       colorVar = I/(len(tips))
       self.needleDetectionThread(A, imageData, colorVar,spacing)
 
+    print tips
     t = self.evaluate()
     for i in range(len(t)):
         print t[i][0]
@@ -3918,7 +3991,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
                 A[2]-stepSize]
         rMax = max(stepSize,distanceMax/float(spacing[0]))
         # rIter = max(int(stepsize/(2))+5,nbRadiusIterations.value)
-        rIter = max(15,min(20,int(rMax/float(spacing[0]))))
+        rIter = int(max(15,min(20,int(rMax/float(spacing[0])))))
         tIter = stepSize
         
       estimator = 0
@@ -4220,17 +4293,22 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       maxVal2 = max(pt1[2],pt2[2])
       valueBase=max(minVal1,minVal2)
       valueTip=min(maxVal1,maxVal2)
+
+      # truncate polydatas
+      truncatedPolydata1 = self.clipPolyData(node1,valueBase)
+      truncatedPolydata2 = self.clipPolyData(node2,valueBase)
+
       cellId=vtk.mutable(1)
       subid=vtk.mutable(1)
       dist=vtk.mutable(1)
       cl2=vtk.vtkCellLocator()
-      cl2.SetDataSet(polydata2)
+      cl2.SetDataSet(truncatedPolydata2)
       cl2.BuildLocator()
       # Hausforff 1 -> 2
       minima=[]
-      for i in range(int(nb1/float(100))):
+      for i in range(int(nb1/float(10))):
         pt=[0,0,0]
-        polydata1.GetPoint(100*i,pt)
+        polydata1.GetPoint(10*i,pt)
         closest=[0,0,0]
         cl2.FindClosestPoint(pt,closest,cellId,subid,dist)
         if abs(closest[2]-pt[2])<=1:
@@ -4242,7 +4320,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       # Hausforff 2 -> 1
       minima=[]
       cl1=vtk.vtkCellLocator()
-      cl1.SetDataSet(polydata1)
+      cl1.SetDataSet(truncatedPolydata1)
       cl1.BuildLocator()
       for i in range(int(nb2/float(10))):
         pt=[0,0,0]
@@ -4348,6 +4426,45 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     # used in addNeedleToScene
     length = ( (A[0]-B[0])**2 + (A[1]-B[1])**2 + (A[2]-B[2])**2 ) ** 0.5
     return length
+  
+  def clipPolyData(self,node,value,visible=0):
+    # We clip with an implicit function. Here we use a plane positioned near
+    # the center of the cow model and oriented at an arbitrary angle.
+    plane = vtk.vtkPlane()
+    plane.SetOrigin(0, 0, 0)
+    plane.SetNormal(0, 0, 1)
+    # vtkClipPolyData requires an implicit function to define what it is to
+    # clip with. Any implicit function, including complex boolean combinations
+    # can be used. Notice that we can specify the value of the implicit function
+    # with the SetValue method.
+    clipper = vtk.vtkClipPolyData()
+    clipper.SetInput(node.GetPolyData())
+    clipper.SetClipFunction(plane)
+    clipper.GenerateClipScalarsOn()
+    clipper.GenerateClippedOutputOn()
+    clipper.SetValue(value)
+    polyData = clipper.GetOutput()
+    if 1==1:
+        scene   =   slicer.mrmlScene
+        model = slicer.vtkMRMLModelNode()
+        model.SetScene(scene)
+        model.SetAndObservePolyData(polyData)
+        ### Create display node
+        modelDisplay = slicer.vtkMRMLModelDisplayNode()
+        modelDisplay.SetScene(scene)
+        scene.AddNode(modelDisplay)
+        model.SetAndObserveDisplayNodeID(modelDisplay.GetID())
+        ### Add to scene
+        modelDisplay.SetInputPolyData(model.GetPolyData())
+        scene.AddNode(model)
+    if visible!=1:
+        scene.RemoveNode(model)
+
+    return polyData
+
+  def setWL(self,dn,w,l):
+    dn.SetWindow(w)
+    dn.SetLevel(l)
 
 
 
