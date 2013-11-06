@@ -725,7 +725,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
           minZ = (pt[2]-Z)**2
           bestNB = 20*i
     hole = self.setNeedleCoordinates()
-    print bestNB
+    #print bestNB
     A=[0,0,0]
     polydata.GetPoint(bestNB,A)
     for j in xrange(63):
@@ -817,7 +817,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     Add caculated isosurfaces (self.drawIsoSurfaces) around visible needles to the scene
     and add opacity, color...
     '''
-    print polyData
+    #print polyData
     scene = slicer.mrmlScene
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
     contourNode = None
@@ -1226,8 +1226,8 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       fiducial.SetName(str(pi))
       fiducial.SetFiducialCoordinates(self.ijk2ras(P[pi]))
     '''
-    print "bestTip:",IBest,JBest,KBest, minTotalTip
-    print "initialtip:", A
+    #print "bestTip:",IBest,JBest,KBest, minTotalTip
+    #print "initialtip:", A
     AInit=A
 
     A=[IBest,JBest,KBest]
@@ -1291,7 +1291,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     pixelValue      = numpy.zeros(shape=(dims[0],dims[1],dims[2]))
     
     A0              = A
-    print A0
+    #print A0
     
     self.controlPoints       = []
     controlPointsIJK    = []
@@ -1307,7 +1307,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     X=coeff*radiusSphere/float(spacing[0])
     Y=coeff*radiusSphere/float(spacing[1])
     Z=5/float(spacing[2])
-    print "X,Y,Z",X,Y,Z
+    #print "X,Y,Z",X,Y,Z
     #---------------------------------------------------------------------------------
     # find the tip in a circle
     A = self.findTip(A,imageData, radiusNeedle, coeff, sigmaValue, gradientPonderation, X,Y,Z)
@@ -1348,7 +1348,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         rIter   = int(round(rMax))
         tIter   = max(1,int(round(stepSize)))
 
-        print "stepsize 0:",stepSize
+        #print "stepsize 0:",stepSize
         
         tot     = stepSize
 
@@ -1365,7 +1365,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
 
         '''
         stepSize = self.stepSize(step+1,NbStepsNeedle+1)*lenghtNeedle
-        print '\nstepsize',step, ':',stepSize
+        #print '\nstepsize',step, ':',stepSize
         
 
         C0      = [ 2*A[0]-tip0[0],
@@ -1540,7 +1540,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
 
       self.controlPoints.append(self.ijk2ras(A))
       controlPointsIJK.append(A)
-      print('step:',step,':',minEstimator )
+      #print('step:',step,':',minEstimator )
       if self.drawFiducialPoints.isChecked():
         fiducial = slicer.mrmlScene.CreateNodeByClass('vtkMRMLAnnotationFiducialNode')
         fiducial.Initialize(slicer.mrmlScene)
@@ -1612,7 +1612,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     pixelValue      = numpy.zeros(shape=(dims[0],dims[1],dims[2]))
     
     A0              = A
-    print A0
+    #print A0
     
     controlPointsUP       = []
     controlPointsIJK    = []
@@ -1633,7 +1633,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     X=10/float(spacing[0])
     Y=10/float(spacing[1])
     Z=10/float(spacing[2])
-    print "X,Y,Z",X,Y,Z
+    #print "X,Y,Z",X,Y,Z
     minTotalTip=0
        
     for i in range(-3,3):
@@ -1657,8 +1657,8 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
               KBest = ijk[2]+k
 
     
-    print "bestTip:",IBest,JBest,KBest, minTotalTip
-    print "initialtip:", A
+    #print "bestTip:",IBest,JBest,KBest, minTotalTip
+    #print "initialtip:", A
     #---------------------------------------------------------------------------------
     '''
 
@@ -1680,7 +1680,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         rIter     = int(round(rMax))
         tIter     = max(1,int(round(stepSize)))
 
-        print "stepsize 0:",stepSize
+        #print "stepsize 0:",stepSize
         
         # tot     = stepSize
 
@@ -1735,8 +1735,8 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
             P1    = [ P0[0] + K * Vx,
                       P0[1] + K * Vy,
                       P0[2] + K * Vz ]
-          print "\t----------------------------------------"
-          print '\nstepsize',step, ':', stepSize
+          #print "\t----------------------------------------"
+          #print '\nstepsize',step, ':', stepSize
           # tot     += stepSize
 
           '''
@@ -1761,8 +1761,8 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
           rMax    = stepSize/float(spacing[0])
           rIter   = max(15,min(20,int(rMax/float(spacing[0]))))
           tIter   = max(3,int(round(stepSize)))
-          print "\trMax:",rMax, "rIter:",rIter, "tIter",tIter
-          print "\tP1:",P1[2]
+          #print "\trMax:",rMax, "rIter:",rIter, "tIter",tIter
+          #print "\tP1:",P1[2]
       
         
         #radius variation
@@ -1855,8 +1855,8 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
                   bestPoint   = C
           
              
-        print "\tInitial Intensity:",initialIntensity
-        print "\tMin Estimator:",minEstimator
+        #print "\tInitial Intensity:",initialIntensity
+        #print "\tMin Estimator:",minEstimator
         
         if step == 0:
           minEstimator0 = self.estimatorReference
@@ -1864,10 +1864,10 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         if minEstimator0 != None and minEstimator0 !=0:
           RelMinEstimator = abs((minEstimator-minEstimator0)/float(minEstimator0))
           
-          print "\tmin Estimator 0 :",minEstimator0,"\n"
-          print "\tRel Estimator :",RelMinEstimator,"\n"
+          #print "\tmin Estimator 0 :",minEstimator0,"\n"
+          #print "\tRel Estimator :",RelMinEstimator,"\n"
           valCtrPt = self.objectiveFunction(imageData, A, 3, spacing, 1)
-          print "\tObjective function Ctl Pt: ", valCtrPt
+          #print "\tObjective function Ctl Pt: ", valCtrPt
 
           if dichoStep >= 8:
             stopTracking = 1
@@ -2007,7 +2007,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
           coord=[0,0,0]
           modelNode.GetFiducialCoordinates(coord)
           self.tableValueCtrPt[needleNumber][needleStep]=coord
-          print needleNumber,needleStep,coord
+          #print needleNumber,needleStep,coord
 
 
 
@@ -2016,7 +2016,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
           colorVar = random.randrange(50,100,1)/(100)
           controlPointsUnsorted = [val for val in self.tableValueCtrPt[i] if val !=[999,999,999]]
           controlPoints=self.sortTable(controlPointsUnsorted,(2,1,0))
-          print self.tableValueCtrPt[i]
+          #print self.tableValueCtrPt[i]
           self.addNeedleToScene(controlPoints,i,'Validation')   
 
   def addNeedleToScene(self,controlPoint,colorVar, needleType='Detection'): 
@@ -2033,7 +2033,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     for i in range(len(controlPoint)-1):
         lenghtTotal += self.distanceTwoPoints(controlPointListSorted[i+1],controlPointListSorted[i])
   
-    print 'lenght tube: ', lenghtTotal
+    #print 'lenght tube: ', lenghtTotal
     
 
 
@@ -2114,7 +2114,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     # if registration has been done, find the label for the needle
     if self.transform!=None:
       label = self.findLabelNeedleID(model.GetID())
-      print label
+      #print label
       modelDisplay.SetColor(self.color[label[0]][0],self.color[label[0]][1],self.color[label[0]][2])
       model.SetAttribute("nth",str(label[0]))
     
@@ -2232,11 +2232,11 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
   def scrollPoint(self):
     self.changeValue()
     needle = self.editNeedleTxtBox.value
-    print self.ptNumber
-    print needle
+    #print self.ptNumber
+    #print needle
     coord=[0,0,0]
     ptName = '.'+str(needle)+'-'+str(self.ptNumber)
-    print ptName
+    #print ptName
     modelNode = slicer.util.getNode(ptName)
     if modelNode != None:
         self.ptNumber=self.ptNumber+1
@@ -3358,7 +3358,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         theta = math.degrees(math.acos((tip[1]-base[1])/((tip[1]-base[1])**2+(tip[2]-base[2])**2)**0.5))
         psi = math.degrees(math.acos((tip[0]-base[0])/((tip[0]-base[0])**2+(tip[2]-base[2])**2)**0.5))
         angleDeviation = (phi1-phi)**2+(theta1-theta)**2+(psi1-psi)**2
-        print("diff angle:",angleDeviation)
+        #print("diff angle:",angleDeviation)
         
         
         displayNode = modelNode.GetDisplayNode()
@@ -3673,7 +3673,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     storageNode = slicer.vtkMRMLModelStorageNode()
  
     fileName = self.option[i]+'.vtp'
-    print("filename:",fileName)
+    #print("filename:",fileName)
 
     mrmlScene = slicer.mrmlScene
     modelNode.SetName(fileName)  
@@ -3890,10 +3890,10 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       colorVar = I/(len(tips))
       self.needleDetectionThread(A, imageData, colorVar,spacing)
 
-    print tips
+    #print tips
     t = self.evaluate()
-    for i in range(len(t)):
-        print t[i][0]
+    #for i in range(len(t)):
+        #print t[i][0]
 
   def startValidationSCRIPT(self, volumeNodeID,tips, axialSegmentationLimit,
     radiusNeedleParameter, lenghtNeedleParameter,drawFid,nbRotatingIterations,
@@ -4249,7 +4249,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     fd.SetVisibility(1)
     fd.SetColor([0,1,0])
     
-    print self.axialSegmentationLimit
+    #print self.axialSegmentationLimit
 
 
   def exportEvaluation(self,results,url):
@@ -4370,7 +4370,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
       nbNode=modelNodes.GetNumberOfItems()
       result=[]
       found=[]
-      print nbNode
+      #print nbNode
       for nthNode in range(nbNode):
         node=slicer.mrmlScene.GetNthNodeByClass(nthNode,'vtkMRMLModelNode')
         if node.GetID() not in found and node.GetAttribute('type')!='Validation':

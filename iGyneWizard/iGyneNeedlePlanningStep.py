@@ -1423,12 +1423,12 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     '''    
     self.segmented = [0 for i in range(63)]
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
-    print 'refresh'
+    #print 'refresh'
   
     for modelNode in modelNodes.values():
       if modelNode.GetAttribute("nth")!=None and modelNode.GetDisplayVisibility()==1:
         self.segmented[int(modelNode.GetAttribute("nth"))]=1
-        print int(modelNode.GetAttribute("nth"))
+        #print int(modelNode.GetAttribute("nth"))
     
       if modelNode.GetAttribute("plannednth")!=None:
         button= "self."+self.option[int(modelNode.GetAttribute("plannednth"))]+"RadioButton"
@@ -1465,7 +1465,7 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     '''
     super(iGyneNeedlePlanningStep, self).onEntry(comingFrom, transitionType)
     pNode = self.parameterNode()
-    print pNode
+    #print pNode
     self.updateWidgetFromParameters(pNode)
     if pNode.GetParameter('skip') != '1':
       lm = slicer.app.layoutManager()
@@ -1670,7 +1670,7 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     The trasnformation matrix must be reapplied to the moved needle in the 
     original coordinate system.
     '''
-    print i, nDepth
+    #print i, nDepth
     pNode = self.parameterNode()
     needleID = pNode.GetParameter(self.option[i]+'.vtp')
     fidID = pNode.GetParameter("fid"+self.option[i] )    
@@ -1678,7 +1678,7 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     NeedleNode = slicer.mrmlScene.GetNodeByID(needleID)
     fiducialNode = slicer.mrmlScene.GetNodeByID(fidID)
     # RadNode = slicer.mrmlScene.GetNodeByID(radID)
-    print needleID
+    #print needleID
     vtkmat = vtk.vtkMatrix4x4()
     vtkmat.DeepCopy(self.m_vtkmat) 
 
@@ -1732,7 +1732,7 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
 
         displayNode.SetColor(color.red()/float(255.0),color.green()/float(255.0),color.blue()/float(255.0))
         sColor = "background-color: rgb(" + str(color.red())+ "," + str(color.green()) + "," + str(color.blue()) + ');'
-        print sColor
+        #print sColor
         eval(ColorPushButton).setStyleSheet(sColor)
         
         if fiducialNode!=None:
@@ -1816,7 +1816,7 @@ class iGyneNeedlePlanningStep( iGyneStep ) :
     ObturatorNode = slicer.mrmlScene.GetNodeByID(obturatorID)
 
     if ObturatorNode!=None:
-      print("obturator loaded")
+      #print("obturator loaded")
       self.computerPolydataAndMatrix()    
       self.m_poly = vtk.vtkPolyData()  
       self.m_poly.DeepCopy(ObturatorNode.GetPolyData())

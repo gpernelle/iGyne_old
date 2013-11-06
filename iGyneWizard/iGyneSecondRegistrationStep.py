@@ -336,7 +336,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     # Evaluation settings 4,5,7
     pNode = self.parameterNode()
     transformNodeID = pNode.GetParameter('followupTransformID')
-    print("transfo id:" , transformNodeID)
+    #print("transfo id:" , transformNodeID)
     self.templateIDButton = qt.QSpinBox()
     self.templateIDButton.setMinimum(0)
     self.templateIDButton.setMaximum(1000)
@@ -1021,7 +1021,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       self.saveInitialRegistration()
       pNode.SetParameter('currentStep', self.stepid)
       if pNode.GetParameter('followupTransformID')!=None and slicer.util.getNode('Segmentation Model')==None:
-        print 'modelmaker'
+        #print 'modelmaker'
         self.applyModelMaker()
       
       # chrono start
@@ -1085,7 +1085,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
           self.actionState = "idle"
           self.before = 0
 
-      print(self.actionState)
+      #print(self.actionState)
 
       global fi, theta, psi
       
@@ -1379,8 +1379,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     if status == 'Completed':
       self.__registrationStatus.setText('Segmented obturator model built.')
       self.status = 'Segmentation Completed'
-      for i in range(50):
-        print 'wait...' 
+      #for i in range(50):
+        #print 'wait...' 
       self.startICP()      
       self.fullAutoRegOn = 0
   

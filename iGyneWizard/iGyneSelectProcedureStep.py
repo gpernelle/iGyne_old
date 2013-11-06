@@ -69,7 +69,7 @@ class iGyneSelectProcedureStep( iGyneStep ) :
     pNode = self.parameterNode()
     pNode.SetParameter('currentStep', self.stepid)
     pNode.SetParameter('skip', '0')
-    print pNode
+    #print pNode
     
 
   def onExit(self, goingTo, transitionType):
@@ -96,7 +96,7 @@ class iGyneSelectProcedureStep( iGyneStep ) :
     '''
     self.advancedButton.checked = False
     self.skip = 0
-    print 'start registration'
+    #print 'start registration'
     # workflow = self.workflow()
     # if not workflow:
     #   Helper.Error( "No valid workflow found!" )
@@ -104,7 +104,7 @@ class iGyneSelectProcedureStep( iGyneStep ) :
 
     # if self.workflow().isRunning:
     #    workflow.goForward( 'RegistrationMode' )
-    #    print 'goForward'
+    #    #print 'goForward'
     # else:
     #    workflow.start()
     #    Helper.Info("Please press Registration button again")
@@ -114,7 +114,7 @@ class iGyneSelectProcedureStep( iGyneStep ) :
     '''
     self.simpleButton.checked = False
     self.skip = 1
-    print 'go to needle segmentation'
+    #print 'go to needle segmentation'
     # workflow = self.workflow()
     # if not workflow:
     #   Helper.Error( "No valid workflow found!" )

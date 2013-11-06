@@ -196,7 +196,7 @@ class iGyneLoadModelStep( iGyneStep ) :
       do = obturator.GetDisplayNode()
       df.SetSliceIntersectionVisibility(0)
       do.SetSliceIntersectionVisibility(0)
-      print template.GetID()
+      #print template.GetID()
 
       if baseline != None and template != None and obturator != None:
         baselineID = baseline.GetID()
@@ -236,7 +236,7 @@ class iGyneLoadModelStep( iGyneStep ) :
   def onExit(self, goingTo, transitionType):
    
     pNode= self.parameterNode()
-    print pNode
+    #print pNode
     if pNode.GetParameter('skip') != '1':
       self.doStepProcessing()
     #error checking

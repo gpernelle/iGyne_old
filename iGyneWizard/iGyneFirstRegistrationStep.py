@@ -288,7 +288,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
           sphereCenters[nbLine] = self.ijk2ras(json.loads(line),self.inputVolume)
         nbLine += 1
 
-      print sphereCenters
+      print 'Markers coord. :', sphereCenters
       for i in range(nbLine+1):
         for j in range(nbLine+1): 
           if i != j and sphereCenters[i]!=[0,0,0]:
@@ -305,24 +305,24 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
             d2 = (sphereCenters[i][0]-sphereCenters[j][0])**2+(sphereCenters[i][1]-sphereCenters[j][1])**2+(sphereCenters[i][2]-sphereCenters[j][2])**2
             d = d2**0.5
             # print sphereCenters[i],sphereCenters[j]
-            print d
+            #print d
             if d >=45 and d<=53:
               U += 1
             elif d >53 and d<60:  
               V +=1
             elif d >=70 and d<80:  
               W +=1 
-        print U,V,W      
+        #print U,V,W      
         if U+V+W>=3:
-          print sphereCenters[i]
+          #print sphereCenters[i]
           point.extend([i])
 
       point.remove(0)
       minX = [999,999,999,999]
       maxX = [-999,-999,-999,-999]
       
-      print point
-      print sphereCenters
+      #print point
+      #print sphereCenters
       sorted = [[0,0,0] for l in range(4)]
       sortedConverted = [[0,0,0] for l in range(4)]
       for i in range(2):  
@@ -355,7 +355,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
         sorted[3] = maxX[1]
       
       sorted2 = [0,0,0,0]
-      print self.horizontalTemplate
+      #print self.horizontalTemplate
       if self.horizontalTemplate.isChecked():
         sorted2[0]=sorted[2]
         sorted2[2]=sorted[0]
@@ -493,7 +493,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
           self.styleObserverTags.append([style,tag])
 
   def stop(self):
-    print("here")
+    #print("here")
     self.removeObservers() 
 
   def removeObservers(self):
@@ -662,7 +662,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
   def onEntry(self,comingFrom,transitionType):
     super(iGyneFirstRegistrationStep, self).onEntry(comingFrom, transitionType)
     pNode = self.parameterNode()
-    print pNode
+    #print pNode
     volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
 
     if pNode.GetParameter('skip') != '1' and volumeNode != None:
@@ -900,8 +900,8 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
           #center = polydata.GetCenter()
           #print center
           center.append(self.ijk2ras(self.getCenterOfMass(labelX,self.thresholdSlider.value ),labelX))
-          print center
-          print i
+          #print center
+          #print i
           self.__registrationStatus.setText('Found Marker ' +str(i)+'...')
 
     self.getAndSortFiducialPoints(center)
@@ -940,9 +940,9 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     # print center
     markerCenters = center
     nbCenter = len(center)
-    print "nbCenter",nbCenter
+    #print "nbCenter",nbCenter
       
-    print markerCenters
+    #print markerCenters
     for k in range(nbCenter):
       point = [0]
       for i in range(nbCenter):
@@ -952,16 +952,16 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
             d2 = (markerCenters[i][0]-markerCenters[j][0])**2+(markerCenters[i][1]-markerCenters[j][1])**2+(markerCenters[i][2]-markerCenters[j][2])**2
             d = d2**0.5
             # print markerCenters[i],markerCenters[j]
-            print d
+            #print d
             if d >=45 and d<=53:
               U += 1
             elif d >53 and d<60:  
               V +=1
             elif d >=70 and d<80:  
               W +=1 
-        print U,V,W      
+        #print U,V,W      
         if U+V+W>=3:
-          print markerCenters[i]
+          #print markerCenters[i]
           point.extend([i])
 
     point.remove(0)
@@ -1002,7 +1002,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       sorted[3] = maxX[1]
     
     sorted2 = [0,0,0,0]
-    print self.horizontalTemplate
+    #print self.horizontalTemplate
     if self.horizontalTemplate.isChecked():
       sorted2[0]=sorted[2]
       sorted2[2]=sorted[0]
@@ -1060,7 +1060,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     sumX = sumY = sumZ = 0
     #
     volume = volumeNode.GetImageData()
-    print('  Volume extent: (' + repr(volume.GetExtent()[0]) + '-' + repr(volume.GetExtent()[1]) + ', ' + repr(volume.GetExtent()[2]) + '-' + repr(volume.GetExtent()[3]) + ', ' + repr(volume.GetExtent()[4]) + '-' + repr(volume.GetExtent()[5]) + ')')
+    #print('  Volume extent: (' + repr(volume.GetExtent()[0]) + '-' + repr(volume.GetExtent()[1]) + ', ' + repr(volume.GetExtent()[2]) + '-' + repr(volume.GetExtent()[3]) + ', ' + repr(volume.GetExtent()[4]) + '-' + repr(volume.GetExtent()[5]) + ')')
     for z in xrange(volume.GetExtent()[4], volume.GetExtent()[5]+1):
       #logFile.write(repr(z) + '\n')
       for y in xrange(volume.GetExtent()[2], volume.GetExtent()[3]+1,step):
@@ -1078,7 +1078,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
       centerOfMass[2] = sumZ / numberOfStructureVoxels
     #
     #logFile.close()
-    print('Center of mass for \'' + volumeNode.GetName() + '\': ' + repr(centerOfMass))
+    #print('Center of mass for \'' + volumeNode.GetName() + '\': ' + repr(centerOfMass))
     self.__registrationStatus.setText('Registration Completed')
     return centerOfMass
 

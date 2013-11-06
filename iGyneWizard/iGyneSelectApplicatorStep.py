@@ -59,9 +59,9 @@ class iGyneSelectApplicatorStep( iGyneStep ) :
     super(iGyneSelectApplicatorStep, self).onEntry(comingFrom, transitionType)
     # setup the interface
     pNode = self.parameterNode()
-    print pNode
+    #print pNode
     pNode.SetParameter('currentStep', self.stepid)
-    print 'iGyneSelectApplicatorStep'
+    #print 'iGyneSelectApplicatorStep'
     # if pNode.GetParameter('skip')=='1':
     #   self.workflow().goForward() # 3       
 
