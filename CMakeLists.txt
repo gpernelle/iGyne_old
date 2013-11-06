@@ -36,7 +36,7 @@ set(MODULE_PYTHON_RESOURCES
 #-----------------------------------------------------------------------------
 # Build
 #-----------------------------------------------------------------------------
-slicerMacroCompilePythonScript(
+slicerMacroBuildScriptedModule(
   NAME iGyne 
   SCRIPTS ${MODULE_PYTHON_SCRIPTS}
   RESOURCES ${MODULE_PYTHON_RESOURCES}
