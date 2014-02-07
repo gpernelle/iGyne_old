@@ -379,6 +379,12 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.__bendingFrame.collapsed = 1
     bendingFrame = qt.QFormLayout(self.__bendingFrame)
     
+    
+    # Auto correct tip position?
+    self.autoCorrectTip = qt.QCheckBox('Auto correct tip position?')
+    bendingFrame.addRow(self.autoCorrectTip)
+    self.autoCorrectTip.setChecked(1)
+
     # Look for needles in CT?
     self.invertedContrast = qt.QCheckBox('Search for bright needles (CT)?')
     bendingFrame.addRow(self.invertedContrast)
@@ -473,7 +479,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     self.distanceMax = qt.QSpinBox()
     self.distanceMax.setMinimum(0)
     self.distanceMax.setMaximum(50)
-    self.distanceMax.setValue(20)
+    self.distanceMax.setValue(5)
     distanceMaxLabel = qt.QLabel("Radius of cone base (mm): ")
     bendingFrame.addRow( distanceMaxLabel, self.distanceMax)
     
@@ -1302,7 +1308,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     
     #---------------------------------------------------------------------------------
     # look for the best tip in the neighboorhood of the mouse click
-    coeff = 5 # to look every 0.2mm
+    coeff = 1 # to look every 0.2mm
     radiusSphere=5
     X=coeff*radiusSphere/float(spacing[0])
     Y=coeff*radiusSphere/float(spacing[1])
@@ -1310,7 +1316,8 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     #print "X,Y,Z",X,Y,Z
     #---------------------------------------------------------------------------------
     # find the tip in a circle
-    A = self.findTip(A,imageData, radiusNeedle, coeff, sigmaValue, gradientPonderation, X,Y,Z)
+    if self.autoCorrectTip.isChecked():
+      A = self.findTip(A,imageData, radiusNeedle, coeff, sigmaValue, gradientPonderation, X,Y,Z)
     # keep the first control point as A0
     A0=A
     #---------------------------------------------------------------------------------
