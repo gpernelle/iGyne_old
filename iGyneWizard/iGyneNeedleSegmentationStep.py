@@ -438,7 +438,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     '''
     super(iGyneNeedleSegmentationStep, self).onEntry(comingFrom, transitionType)
     pNode = self.parameterNode()
-    volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+    volumeNode = slicer.app.layoutManager().sliceWidget("Red").sliceLogic().GetBackgroundLayer().GetVolumeNode()
 
     if pNode.GetParameter('skip') != '1' and volumeNode != None:
       self.updateWidgetFromParameters(pNode)
@@ -575,7 +575,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     Takes the closest one to the surface of the template holes
     Find the closest hole to the needle and assign the label to the needle 
     '''
-    volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+    volumeNode = slicer.app.layoutManager().sliceWidget("Red").sliceLogic().GetBackgroundLayer().GetVolumeNode()
     imageData = volumeNode.GetImageData()
     imageDimensions = imageData.GetDimensions()
     m = vtk.vtkMatrix4x4()
@@ -830,7 +830,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     of the active volume on the red slice
     '''
     m=vtk.vtkMatrix4x4()
-    volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+    volumeNode = slicer.app.layoutManager().sliceWidget("Red").sliceLogic().GetBackgroundLayer().GetVolumeNode()
     volumeNode.GetIJKToRASMatrix(m)
     imageData = volumeNode.GetImageData()
     ras=[0,0,0]
@@ -851,7 +851,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     of the active volume on the red slice
     '''
     m=vtk.vtkMatrix4x4()
-    volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+    volumeNode = slicer.app.layoutManager().sliceWidget("Red").sliceLogic().GetBackgroundLayer().GetVolumeNode()
     volumeNode.GetIJKToRASMatrix(m)
     m.Invert()
     imageData = volumeNode.GetImageData()
@@ -890,7 +890,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     islandTool.removeIslands()
     # select the image node from the Red slice viewer
     m=vtk.vtkMatrix4x4()
-    volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+    volumeNode = slicer.app.layoutManager().sliceWidget("Red").sliceLogic().GetBackgroundLayer().GetVolumeNode()
     volumeNode.GetIJKToRASMatrix(m)
     imageData = volumeNode.GetImageData()
     spacing = volumeNode.GetSpacing()
@@ -2172,7 +2172,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
             tag = style.AddObserver(event, self.processEventAddManualTips)
           elif process==3:
             tag = style.AddObserver(event, self.processEventAddObturatorNeedleTips)
-            dn = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode().GetDisplayNode()
+            dn = slicer.app.layoutManager().sliceWidget("Red").sliceLogic().GetBackgroundLayer().GetVolumeNode().GetDisplayNode()
             w = dn.GetWindow()
             l = dn.GetLevel()
             dn.AddObserver(vtk.vtkCommand.ModifiedEvent, lambda c,e : self.setWL(dn,w,l))
@@ -2233,7 +2233,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         ras = sliceWidget.sliceView().convertXYZToRAS(xyz)
       
       colorVar = random.randrange(50,100,1)/(100)
-      volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+      volumeNode = slicer.app.layoutManager().sliceWidget("Red").sliceLogic().GetBackgroundLayer().GetVolumeNode()
       imageData = volumeNode.GetImageData()
       spacing = volumeNode.GetSpacing()
       ijk=self.ras2ijk(ras)
@@ -2265,7 +2265,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         ras = sliceWidget.sliceView().convertXYZToRAS(xyz)
       
       colorVar = random.randrange(50,100,1)/(100)
-      volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+      volumeNode = slicer.app.layoutManager().sliceWidget("Red").sliceLogic().GetBackgroundLayer().GetVolumeNode()
       imageData = volumeNode.GetImageData()
       spacing = volumeNode.GetSpacing()
       ijk=self.ras2ijk(ras)
@@ -2298,7 +2298,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         ras = sliceWidget.sliceView().convertXYZToRAS(xyz)
       
       colorVar = random.randrange(50,100,1)/(100)
-      volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+      volumeNode = slicer.app.layoutManager().sliceWidget("Red").sliceLogic().GetBackgroundLayer().GetVolumeNode()
       imageData = volumeNode.GetImageData()
       spacing = volumeNode.GetSpacing()
       ijk=self.ras2ijk(ras)
@@ -2330,7 +2330,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
         ras = sliceWidget.sliceView().convertXYZToRAS(xyz)
       
       
-      volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+      volumeNode = slicer.app.layoutManager().sliceWidget("Red").sliceLogic().GetBackgroundLayer().GetVolumeNode()
       imageData = volumeNode.GetImageData()
       spacing = volumeNode.GetSpacing()
       # ijk=self.ras2ijk(ras)
@@ -2615,7 +2615,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
            
 
       m = vtk.vtkMatrix4x4()
-      volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+      volumeNode = slicer.app.layoutManager().sliceWidget("Red").sliceLogic().GetBackgroundLayer().GetVolumeNode()
       volumeNode.GetIJKToRASMatrix(m)
       m.Invert()
       imageData = volumeNode.GetImageData()
@@ -2707,7 +2707,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     else:
     
       m = vtk.vtkMatrix4x4()
-      volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+      volumeNode = slicer.app.layoutManager().sliceWidget("Red").sliceLogic().GetBackgroundLayer().GetVolumeNode()
       volumeNode.GetIJKToRASMatrix(m)
       m.Invert()
       imageData = volumeNode.GetImageData()
@@ -3461,7 +3461,7 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     tips= self.returnTips()
     # select the image node from the Red slice viewer
     m=vtk.vtkMatrix4x4()
-    volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+    volumeNode = slicer.app.layoutManager().sliceWidget("Red").sliceLogic().GetBackgroundLayer().GetVolumeNode()
     volumeNode.GetIJKToRASMatrix(m)
     imageData = volumeNode.GetImageData()
     spacing = volumeNode.GetSpacing()
@@ -3488,7 +3488,6 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     
     # select the image node from the Red slice viewer
     m=vtk.vtkMatrix4x4()
-    # volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
     volumeNode=slicer.mrmlScene.GetNodeByID(volumeNodeID)
     volumeNode.GetIJKToRASMatrix(m)
     imageData = volumeNode.GetImageData()
@@ -3818,9 +3817,9 @@ class iGyneNeedleSegmentationStep( iGyneStep ) :
     if self.fiducialNode != None:
         slicer.mrmlScene.RemoveNode(self.fiducialNode)
 
-    s=slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetSliceNode()
-    offSet=s.GetSliceOffset()
-    rasVector=[0,0,offSet]
+    s           =   slicer.app.layoutManager().sliceWidget("Red").sliceLogic().GetBackgroundLayer().GetSliceNode()
+    offSet      =   s.GetSliceOffset()
+    rasVector   =   [0,0,offSet]
     self.templateSliceButton.text = "Select Current Axial Slice as seg. limit (current: "+str(offSet)+")"
 
     self.axialSegmentationLimit = int(round(self.ras2ijk(rasVector)[2]))

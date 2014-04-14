@@ -127,7 +127,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     self.__threshRange = slicer.qMRMLRangeWidget()
     self.__threshRange.decimals = 0
     self.__threshRange.singleStep = 1
-    volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+    volumeNode = slicer.app.layoutManager().sliceWidget("Red").sliceLogic().GetBackgroundLayer().GetVolumeNode()
     if volumeNode != None:
       roiRange = volumeNode.GetImageData().GetScalarRange()
     self.__threshRange.minimumValue = 13
@@ -466,7 +466,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
         modelFromImageNodeManu = node 
     
     #  Scroll all the model nodes. Keep nodes from automatic segmentation and from manual/growCut Segmentation. Keep in priority these last one.
-    modelnodes = slicer.util.getNodes('modelobturator')
+    modelnodes = slicer.util.getNodes('modelobturator*')
     for node in modelnodes.values():
       modelFromImageNodeAuto=node
     
@@ -575,7 +575,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       #  Apply the transformation: Multiply the transformation matrix
       FinalMatrix.Multiply4x4(icpTransform.GetMatrix(),self.vtkMatInitial,FinalMatrix)
       #  Update the linear transform with the computed transformation matrix  
-      self.transform.SetAndObserveMatrixTransformToParent(FinalMatrix)
+      self.transform.SetMatrixTransformToParent(FinalMatrix)
 
       #  post registration stuffs
       self.processRegistrationCompletion()
@@ -709,7 +709,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     #  Apply the transformation: Multiply the transformation matrix
     FinalMatrix.Multiply4x4(icpTransform.GetMatrix(),self.vtkMatInitial,FinalMatrix)
     #  Update the linear transform with the computed transformation matrix  
-    self.transform.SetAndObserveMatrixTransformToParent(FinalMatrix)
+    self.transform.SetMatrixTransformToParent(FinalMatrix)
 
     #  post registration stuffs
     self.processRegistrationCompletion()
@@ -910,7 +910,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     super(iGyneSecondRegistrationStep, self).onEntry(comingFrom, transitionType)
     pNode = self.parameterNode()
     
-    volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+    volumeNode = slicer.app.layoutManager().sliceWidget("Red").sliceLogic().GetBackgroundLayer().GetVolumeNode()
 
     if pNode.GetParameter('skip') != '1' and volumeNode != None:
     # setup the interface
@@ -1083,9 +1083,6 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     y = (65.1951-42.9222)/2+42.9222
     z = 150/2-90
     pNode = self.parameterNode()
-    # volume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
-    # volume = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
-    # pNode.SetParameter('BaselineVolumeID', volume.GetID())
     volume = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('baselineVolumeID'))
     modelNodes = slicer.util.getNodes('vtkMRMLModelNode*')
     for modelNode in modelNodes.values():
@@ -1137,7 +1134,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     m0.SetElement(1,3,y)
     m0.SetElement(2,3,z)
     m.Multiply4x4(m,m0,m)
-    t.SetAndObserveMatrixTransformToParent(m)
+    t.SetMatrixTransformToParent(m)
     roi.SetAndObserveTransformNodeID(t.GetID())
     roi.SetLocked(1)
     
@@ -1163,7 +1160,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       slicer.mrmlScene.AddNode(self.imagefiltered)
       #median filter processing
       parameters = {}
-      parameters["inputVolume"] = outputVolume
+      parameters["inputVolume"] = outputVolume.GetID()
       parameters["outputVolume"] = self.imagefiltered
       parameters["neighborhood"] = self.xRoi.value,self.yRoi.value,self.zRoi.value
       medianfiltercli = slicer.modules.medianimagefilter
@@ -1171,6 +1168,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       __cliNode = slicer.cli.run(medianfiltercli, __cliNode, parameters)
       pNode.SetParameter('obturatorCroppedAndSmooth',self.imagefiltered.GetID())
       self.__cliObserverTag = __cliNode.AddObserver('ModifiedEvent', self.medianFilterCompleted)
+      # self.thresholdObturator()
 
     
     else:
@@ -1182,7 +1180,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
   def medianFilterCompleted(self, node, event):
     
     status = node.GetStatusString()
-
+    t0 = time.clock()
     if status == 'Completed':
       self.thresholdObturator()
       self.__registrationStatus.setText('Median Filter Completed. Threshold Running...')
@@ -1191,7 +1189,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     pNode = self.parameterNode()
     inputImage = slicer.mrmlScene.GetNodeByID(pNode.GetParameter('obturatorCroppedAndSmooth'))
     vl = slicer.modules.volumes.logic()
-    roiSegmentation = vl.CreateLabelVolume(slicer.mrmlScene, self.imagefiltered, 'obturator_segmentation')
+    roiSegmentation = vl.CreateAndAddLabelVolume(slicer.mrmlScene, self.imagefiltered, 'obturator_segmentation')
     # roiRange = outputVolume.GetImageData().GetScalarRange()
     # default threshold is half-way of the range
     # thresholdParameter = str(0)+','+str(roiRange[1])
@@ -1225,8 +1223,10 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     islandTool.removeIslands()
     self.__registrationStatus.setText('Threshold, island effect applied. Model Maker Running...')
     
-    #make model from segmented labelmap
-   # set up the model maker node 
+    Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
+
+    # make model from segmented labelmap
+    # set up the model maker node 
     parameters = {} 
     parameters['Name'] = 'modelobturator'
     parameters["InputVolume"] = roiSegmentation.GetID() 
@@ -1235,8 +1235,8 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     parameters['Labels'] = 1
     parameters["StartLabel"] = -1 
     parameters["EndLabel"] = -1 
-    parameters['GenerateAll'] = False 
-    parameters["JointSmoothing"] = False 
+    parameters['GenerateAll'] = True 
+    parameters["JointSmoothing"] = True 
     parameters["SplitNormals"] = True 
     parameters["PointNormals"] = True 
     parameters["SkipUnNamed"] = True 
@@ -1245,7 +1245,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     # output 
     # - make a new hierarchy node if needed 
     #
-    Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),'')
+    
  
     numNodes = slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLModelHierarchyNode" ) 
     segmentationModel = None 
@@ -1256,14 +1256,13 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
         self.segmentationModelID = segmentationModel.GetID()
         pNode.SetParameter('obturatorSegmentedID',self.segmentationModelID)        
         break  
+
     if not segmentationModel: 
       segmentationModel = slicer.vtkMRMLModelHierarchyNode()  
       slicer.mrmlScene.AddNode( segmentationModel )
       self.segmentationModelID = segmentationModel.GetID()
       pNode.SetParameter('obturatorSegmentedID',self.segmentationModelID)
-    # if self.fullAutoRegOn == 1 :
-      # slicer.mrmlScene.AddObserver(8193,self.startICP)  
-      # print self.segmentationModelID
+   
     parameters["ModelSceneFile"] = segmentationModel 
     modelMaker = slicer.modules.modelmaker 
     __cliNode = None
@@ -1276,12 +1275,13 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
   def updateStatus(self, node, event):
     slicer.mrmlScene.Modified()
     status = node.GetStatusString()
+    t0 =time.clock()
     if status == 'Completed':
       self.__registrationStatus.setText('Segmented obturator model built.')
       self.status = 'Segmentation Completed'
       #for i in range(50):
-        #print 'wait...' 
-      self.startICP()      
+        #print 'wait...'  
+      # self.startICP()      
       self.fullAutoRegOn = 0
   
   def updateROItemplate(self):
@@ -1329,7 +1329,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     m0.SetElement(1,3,y)
     m0.SetElement(2,3,z)
     m.Multiply4x4(m,m0,m)
-    t.SetAndObserveMatrixTransformToParent(m)
+    t.SetMatrixTransformToParent(m)
     roi.SetAndObserveTransformNodeID(t.GetID())
 
     roi.SetLocked(1)
@@ -1352,7 +1352,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
     pNode.SetParameter('cropVolumeNodeID',cropVolumeNode.GetID())
     
     vl = slicer.modules.volumes.logic()
-    roiSegmentationNode = vl.CreateLabelVolume(slicer.mrmlScene, roiVolume, 'baselineROI_segmentation')
+    roiSegmentationNode = vl.CreateAndAddLabelVolume(slicer.mrmlScene, roiVolume, 'baselineROI_segmentation')
     pNode.SetParameter('croppedBaselineVolumeSegmentationID', roiSegmentationNode.GetID())
     
     
@@ -1427,7 +1427,7 @@ class iGyneSecondRegistrationStep( iGyneStep ) :
       pNode=self.parameterNode()
       transformID = pNode.GetParameter('followupTransformID')
       transform = slicer.mrmlScene.GetNodeByID(transformID)
-      transform.SetAndObserveMatrixTransformToParent(self.initialTransformMatrix)
+      transform.SetMatrixTransformToParent(self.initialTransformMatrix)
       
   def IFeelLucky(self):
     

@@ -186,7 +186,6 @@ class iGyneLoadModelStep( iGyneStep ) :
     '''
     '''
     pNode = self.parameterNode()
-    volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
 
     if pNode.GetParameter('skip') != '1':
       self.__parent.validate( desiredBranchId )

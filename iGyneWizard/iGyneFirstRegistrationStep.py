@@ -119,7 +119,8 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     # houghFrame.addRow(ratioLengthCroppedVolumeLabel, self.ratioLengthCroppedVolume)
 
     # Get Maximum Threshold Value
-    imageData = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode().GetImageData()
+    red_logic = slicer.app.layoutManager().sliceWidget("Red").sliceLogic()
+    imageData = red_logic.GetImageData()
     minMax = imageData.GetScalarRange()
     maxThresh = minMax[1]
 
@@ -184,7 +185,8 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
   def cropTemplateArea(self):
     # TODO: draw a rectangle with the mouse
     # observer: left button pressed -> get XYZ / left button released -> get XYZ
-    volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+    red_logic = slicer.app.layoutManager().sliceWidget("Red").sliceLogic()
+    volumeNode = red_logic.GetBackgroundLayer().GetVolumeNode()
     imageData = volumeNode.GetImageData()
     imageDimensions = imageData.GetDimensions()
     m = vtk.vtkMatrix4x4()
@@ -419,7 +421,8 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     landmark registration (fiducial registration CLI Module)
     '''
     pNode = self.parameterNode()
-    baselineVolumeID = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+    red_logic = slicer.app.layoutManager().sliceWidget("Red").sliceLogic()
+    baselineVolumeID = red_logic.GetBackgroundLayer().GetVolumeNode()
     templateID = pNode.GetParameter('templateID')
     self.__followupTransform = slicer.mrmlScene.GetNodeByID('vtkMRMLLinearTransformNode4')
     slicer.mrmlScene.AddNode(self.__followupTransform)
@@ -663,7 +666,8 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     super(iGyneFirstRegistrationStep, self).onEntry(comingFrom, transitionType)
     pNode = self.parameterNode()
     #print pNode
-    volumeNode = slicer.sliceWidgetRed_sliceLogic.GetBackgroundLayer().GetVolumeNode()
+    red_logic = slicer.app.layoutManager().sliceWidget("Red").sliceLogic()
+    volumeNode = red_logic.GetBackgroundLayer().GetVolumeNode()
 
     if pNode.GetParameter('skip') != '1' and volumeNode != None:
       
@@ -790,7 +794,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
 
     # label map
     labelsColorNode = slicer.modules.colors.logic().GetColorTableNodeID(10)
-    roiSegmentation = vl.CreateLabelVolume(slicer.mrmlScene, roiVolume, 'marker_segmentation')
+    roiSegmentation = vl.CreateAndAddLabelVolume(slicer.mrmlScene, roiVolume, 'marker_segmentation')
     roiSegmentation.GetDisplayNode().SetAndObserveColorNodeID(labelsColorNode)
 
     #threshold
@@ -847,7 +851,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     slicer.mrmlScene.AddNode(self.hierarchyNode)
 
     labelsColorNodeX = slicer.modules.colors.logic().GetColorTableNodeID(10)
-    labelX = vl.CreateLabelVolume(slicer.mrmlScene, roiVolume, 'labelX')
+    labelX = vl.CreateAndAddLabelVolume(slicer.mrmlScene, roiVolume, 'labelX')
     labelX.GetDisplayNode().SetAndObserveColorNodeID(labelsColorNodeX)
 
     #
@@ -857,7 +861,7 @@ class iGyneFirstRegistrationStep( iGyneStep ) :
     for i in xrange(lo,hi+1):
       #
       labelsColorNodeX = slicer.modules.colors.logic().GetColorTableNodeID(10)
-      labelX = vl.CreateLabelVolume(slicer.mrmlScene, roiVolume, 'labelX')
+      labelX = vl.CreateAndAddLabelVolume(slicer.mrmlScene, roiVolume, 'labelX')
       labelX.GetDisplayNode().SetAndObserveColorNodeID(labelsColorNodeX)
       thresholder = vtk.vtkImageThreshold()
       thresholder.SetInput(roiSegmentation.GetImageData())
